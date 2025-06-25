@@ -19,7 +19,7 @@ function parseRedisUrl(url) {
             host: redisUrl.hostname || 'localhost',
             port: redisUrl.port ? parseInt(redisUrl.port, 10) : 6379,
             password: redisUrl.password || undefined,
-            db: redisUrl.pathname ? parseInt(redisUrl.pathname.slice(1), 10) || 0 : 0
+            db: redisUrl.pathname ? parseInt(redisUrl.pathname.slice(1), 10) || 0 : 0,
         };
     }
     catch {
@@ -29,7 +29,7 @@ function parseRedisUrl(url) {
             host: host || 'localhost',
             port: port ? parseInt(port, 10) : 6379,
             password: undefined,
-            db: 0
+            db: 0,
         };
     }
 }
@@ -61,7 +61,7 @@ const redisConfig = {
     reconnectOnError: (err) => {
         const targetError = 'READONLY';
         return err.message.includes(targetError);
-    }
+    },
 };
 /**
  * Create Redis connection instance
@@ -76,7 +76,7 @@ exports.redis.on('connect', () => {
 exports.redis.on('ready', () => {
     console.log('✅ [Redis]: Redis connection is ready');
 });
-exports.redis.on('error', (error) => {
+exports.redis.on('error', error => {
     console.error('❌ [Redis]: Redis connection error:', error);
 });
 exports.redis.on('close', () => {
@@ -115,8 +115,9 @@ async function getRedisInfo() {
             connected: exports.redis.status === 'ready',
             status: exports.redis.status,
             keyCount,
-            memory: info.includes('used_memory:') ?
-                info.split('used_memory:')[1]?.split('\r\n')[0] : 'unknown'
+            memory: info.includes('used_memory:')
+                ? info.split('used_memory:')[1]?.split('\r\n')[0]
+                : 'unknown',
         };
     }
     catch (error) {
@@ -124,7 +125,7 @@ async function getRedisInfo() {
         return {
             connected: false,
             status: 'error',
-            error: error instanceof Error ? error.message : String(error)
+            error: error instanceof Error ? error.message : String(error),
         };
     }
 }

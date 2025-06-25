@@ -10,6 +10,7 @@ exports.getAllEnrichments = getAllEnrichments;
 exports.getEnrichmentByProspectId = getEnrichmentByProspectId;
 exports.updateEnrichmentStatusBulk = updateEnrichmentStatusBulk;
 exports.getEnrichmentStats = getEnrichmentStats;
+exports.createEnrichmentBatch = createEnrichmentBatch;
 const database_1 = require("@/config/database");
 const apiResponse_1 = require("../utils/apiResponse");
 const errors_1 = require("../utils/errors");
@@ -33,7 +34,7 @@ async function enrichWithLinkedIn(req, res) {
             throw new errors_1.DatabaseError('Invalid AI provider. Must be either "gemini" or "openrouter".');
         }
         const result = await prospectEnricher_1.ProspectEnricher.enrichWithProxycurl(linkedinUrl, {
-            aiProvider: aiProvider || 'openrouter'
+            aiProvider: aiProvider || 'openrouter',
         });
         apiResponse_1.ApiResponseBuilder.success(res, result, result.message);
     }
@@ -61,13 +62,13 @@ async function enrichWithCompanyData(req, res) {
         }
         // Validate prospect exists
         const prospect = await database_1.prisma.cOProspects.findUnique({
-            where: { id: parseInt(prospectId) }
+            where: { id: parseInt(prospectId) },
         });
         if (!prospect) {
             throw new errors_1.NotFoundError(`Prospect with ID ${prospectId} not found`);
         }
         const result = await prospectEnricher_1.ProspectEnricher.enrichWithCompanyData(parseInt(prospectId), {
-            aiProvider: aiProvider || 'openrouter'
+            aiProvider: aiProvider || 'openrouter',
         });
         apiResponse_1.ApiResponseBuilder.success(res, result, result.message);
     }
@@ -95,13 +96,13 @@ async function enrichWithTechStack(req, res) {
         }
         // Validate prospect exists
         const prospect = await database_1.prisma.cOProspects.findUnique({
-            where: { id: parseInt(prospectId) }
+            where: { id: parseInt(prospectId) },
         });
         if (!prospect) {
             throw new errors_1.NotFoundError(`Prospect with ID ${prospectId} not found`);
         }
         const result = await prospectEnricher_1.ProspectEnricher.enrichWithTechStack(parseInt(prospectId), {
-            aiProvider: aiProvider || 'openrouter'
+            aiProvider: aiProvider || 'openrouter',
         });
         apiResponse_1.ApiResponseBuilder.success(res, result, result.message);
     }
@@ -120,7 +121,7 @@ async function startProspectEnrichment(req, res) {
     try {
         const prospectId = parseInt(req.params.id);
         const prospect = await database_1.prisma.cOProspects.findUnique({
-            where: { id: prospectId }
+            where: { id: prospectId },
         });
         if (!prospect) {
             throw new errors_1.NotFoundError(`Prospect with ID ${prospectId} not found`);
@@ -128,26 +129,26 @@ async function startProspectEnrichment(req, res) {
         // Update prospect status to ENRICHING
         await database_1.prisma.cOProspects.update({
             where: { id: prospectId },
-            data: { status: 'ENRICHING' }
+            data: { status: 'ENRICHING' },
         });
         // Create enrichment record
         const enrichment = await database_1.prisma.cOProspectEnrichments.upsert({
             where: { prospectId },
             create: {
                 prospectId,
-                enrichmentStatus: 'PROCESSING'
+                enrichmentStatus: 'PROCESSING',
             },
             update: {
-                enrichmentStatus: 'PROCESSING'
-            }
+                enrichmentStatus: 'PROCESSING',
+            },
         });
         apiResponse_1.ApiResponseBuilder.success(res, {
             prospect: {
                 id: prospect.id,
                 email: prospect.email,
-                status: 'ENRICHING'
+                status: 'ENRICHING',
             },
-            enrichment
+            enrichment,
         }, 'Enrichment started successfully');
     }
     catch (error) {
@@ -167,8 +168,8 @@ async function getEnrichmentStatus(req, res) {
         const prospect = await database_1.prisma.cOProspects.findUnique({
             where: { id: prospectId },
             include: {
-                enrichment: true
-            }
+                enrichment: true,
+            },
         });
         if (!prospect) {
             throw new errors_1.NotFoundError(`Prospect with ID ${prospectId} not found`);
@@ -176,7 +177,7 @@ async function getEnrichmentStatus(req, res) {
         apiResponse_1.ApiResponseBuilder.success(res, {
             prospectId,
             status: prospect.status,
-            enrichment: prospect.enrichment
+            enrichment: prospect.enrichment,
         }, 'Enrichment status retrieved successfully');
     }
     catch (error) {
@@ -197,7 +198,7 @@ async function getAllEnrichments(req, res) {
         const skip = (page - 1) * limit;
         const status = req.query.status;
         const search = req.query.search;
-        let whereClause = {};
+        const whereClause = {};
         if (status) {
             whereClause.enrichmentStatus = status;
         }
@@ -206,8 +207,8 @@ async function getAllEnrichments(req, res) {
                 OR: [
                     { name: { contains: search } },
                     { email: { contains: search } },
-                    { company: { contains: search } }
-                ]
+                    { company: { contains: search } },
+                ],
             };
         }
         const [enrichments, total] = await Promise.all([
@@ -222,15 +223,15 @@ async function getAllEnrichments(req, res) {
                             company: true,
                             position: true,
                             linkedinUrl: true,
-                            status: true
-                        }
-                    }
+                            status: true,
+                        },
+                    },
                 },
                 skip,
                 take: limit,
-                orderBy: { updatedAt: 'desc' }
+                orderBy: { updatedAt: 'desc' },
             }),
-            database_1.prisma.cOProspectEnrichments.count({ where: whereClause })
+            database_1.prisma.cOProspectEnrichments.count({ where: whereClause }),
         ]);
         const pagination = {
             total,
@@ -238,7 +239,7 @@ async function getAllEnrichments(req, res) {
             limit,
             pages: Math.ceil(total / limit),
             hasNext: page < Math.ceil(total / limit),
-            hasPrev: page > 1
+            hasPrev: page > 1,
         };
         apiResponse_1.ApiResponseBuilder.paginated(res, enrichments, pagination, 'Enrichments retrieved successfully');
     }
@@ -267,10 +268,10 @@ async function getEnrichmentByProspectId(req, res) {
                         company: true,
                         position: true,
                         linkedinUrl: true,
-                        status: true
-                    }
-                }
-            }
+                        status: true,
+                    },
+                },
+            },
         });
         if (!enrichment) {
             throw new errors_1.NotFoundError(`Enrichment for prospect ${prospectId} not found`);
@@ -291,21 +292,23 @@ async function getEnrichmentByProspectId(req, res) {
 async function updateEnrichmentStatusBulk(req, res) {
     try {
         const { prospectIds, status } = req.body;
-        if (!prospectIds || !Array.isArray(prospectIds) || prospectIds.length === 0) {
+        if (!prospectIds ||
+            !Array.isArray(prospectIds) ||
+            prospectIds.length === 0) {
             throw new errors_1.DatabaseError('Invalid prospect IDs');
         }
         const updateData = {
             enrichmentStatus: status,
-            updatedAt: new Date()
+            updatedAt: new Date(),
         };
         if (status === 'COMPLETED') {
             updateData.enrichedAt = new Date();
         }
         const updatedCount = await database_1.prisma.cOProspectEnrichments.updateMany({
             where: {
-                prospectId: { in: prospectIds }
+                prospectId: { in: prospectIds },
             },
-            data: updateData
+            data: updateData,
         });
         apiResponse_1.ApiResponseBuilder.success(res, { updatedCount: updatedCount.count }, `Updated ${updatedCount.count} enrichment(s) successfully`);
     }
@@ -322,15 +325,17 @@ async function updateEnrichmentStatusBulk(req, res) {
  */
 async function getEnrichmentStats(req, res) {
     try {
-        const campaignId = req.params.campaignId ? parseInt(req.params.campaignId) : undefined;
-        let whereClause = {};
+        const campaignId = req.params.campaignId
+            ? parseInt(req.params.campaignId)
+            : undefined;
+        const whereClause = {};
         if (campaignId) {
             whereClause.prospect = { campaignId };
         }
         const stats = await database_1.prisma.cOProspectEnrichments.groupBy({
             by: ['enrichmentStatus'],
             where: whereClause,
-            _count: { prospectId: true }
+            _count: { prospectId: true },
         });
         const formattedStats = stats.reduce((acc, stat) => {
             acc[stat.enrichmentStatus] = stat._count.prospectId;
@@ -343,7 +348,7 @@ async function getEnrichmentStats(req, res) {
         apiResponse_1.ApiResponseBuilder.success(res, {
             stats: formattedStats,
             totalProspects,
-            enrichedProspects: Object.values(formattedStats).reduce((sum, count) => sum + count, 0)
+            enrichedProspects: Object.values(formattedStats).reduce((sum, count) => sum + count, 0),
         }, 'Enrichment statistics retrieved successfully');
     }
     catch (error) {
@@ -358,7 +363,7 @@ const createEnrichment = async (req, res) => {
             return apiResponse_1.ApiResponseBuilder.error(res, 'Prospect ID is required', 400);
         }
         const prospect = await database_1.prisma.cOProspects.findUnique({
-            where: { id: parseInt(prospectId) }
+            where: { id: parseInt(prospectId) },
         });
         if (!prospect) {
             return apiResponse_1.ApiResponseBuilder.notFound(res, 'Prospect not found');
@@ -366,8 +371,8 @@ const createEnrichment = async (req, res) => {
         const enrichment = await database_1.prisma.cOProspectEnrichments.create({
             data: {
                 prospectId: parseInt(prospectId),
-                enrichmentStatus: 'PENDING'
-            }
+                enrichmentStatus: 'PENDING',
+            },
         });
         return apiResponse_1.ApiResponseBuilder.success(res, enrichment, 'Enrichment created successfully');
     }
@@ -386,7 +391,7 @@ const updateEnrichment = async (req, res) => {
         }
         const enrichment = await database_1.prisma.cOProspectEnrichments.update({
             where: { prospectId: parseInt(prospectId) },
-            data: updates
+            data: updates,
         });
         return apiResponse_1.ApiResponseBuilder.success(res, enrichment, 'Enrichment updated successfully');
     }
@@ -403,7 +408,7 @@ const deleteEnrichment = async (req, res) => {
             return apiResponse_1.ApiResponseBuilder.error(res, 'Prospect ID is required', 400);
         }
         await database_1.prisma.cOProspectEnrichments.delete({
-            where: { prospectId: parseInt(prospectId) }
+            where: { prospectId: parseInt(prospectId) },
         });
         return apiResponse_1.ApiResponseBuilder.success(res, null, 'Enrichment deleted successfully');
     }
@@ -413,3 +418,70 @@ const deleteEnrichment = async (req, res) => {
     }
 };
 exports.deleteEnrichment = deleteEnrichment;
+/**
+ * Create a new enrichment batch
+ * POST /api/enrichment/batches
+ */
+async function createEnrichmentBatch(req, res) {
+    try {
+        const { workflowSessionId, configuration, campaignId } = req.body;
+        if (!workflowSessionId) {
+            throw new errors_1.BadRequestError('Missing required field: workflowSessionId');
+        }
+        // Get workflow session to access configuration
+        const workflowSession = await database_1.prisma.cOWorkflowSessions.findUnique({
+            where: { id: workflowSessionId }
+        });
+        if (!workflowSession) {
+            throw new errors_1.NotFoundError('Workflow session not found');
+        }
+        // Use configuration from workflow session if not provided in request
+        const enrichmentConfig = configuration || workflowSession.configurationData;
+        if (!enrichmentConfig) {
+            throw new errors_1.BadRequestError('Missing required field: configuration');
+        }
+        if (!campaignId) {
+            throw new errors_1.BadRequestError('Campaign ID is required');
+        }
+        // Create batch data with proper typing
+        const batchData = {
+            name: `Enrichment Batch ${new Date().toISOString()}`,
+            status: 'PENDING',
+            totalProspects: 0,
+            enrichedProspects: 0,
+            generatedEmails: 0,
+            failedProspects: 0,
+            campaign: {
+                connect: { id: parseInt(campaignId.toString()) }
+            }
+        };
+        // Create a new batch
+        const batch = await database_1.prisma.cOBatches.create({
+            data: batchData,
+            include: {
+                campaign: true
+            }
+        });
+        // Update campaign with enrichment configuration
+        await database_1.prisma.cOCampaigns.update({
+            where: { id: parseInt(campaignId.toString()) },
+            data: {
+                enrichmentFlags: enrichmentConfig
+            }
+        });
+        // Return success response
+        apiResponse_1.ApiResponseBuilder.success(res, {
+            batch,
+            message: 'Enrichment batch created successfully'
+        });
+    }
+    catch (error) {
+        console.error('Error creating enrichment batch:', error);
+        if (error instanceof errors_1.BadRequestError || error instanceof errors_1.NotFoundError) {
+            apiResponse_1.ApiResponseBuilder.error(res, error.message, error.statusCode);
+        }
+        else {
+            apiResponse_1.ApiResponseBuilder.error(res, 'Failed to create enrichment batch', 500);
+        }
+    }
+}

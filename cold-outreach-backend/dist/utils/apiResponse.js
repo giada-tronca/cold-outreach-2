@@ -15,8 +15,8 @@ class ApiResponseBuilder {
             ...(data !== undefined && { data }),
             meta: {
                 timestamp: new Date().toISOString(),
-                ...meta
-            }
+                ...meta,
+            },
         };
         return res.status(statusCode).json(response);
     }
@@ -42,8 +42,8 @@ class ApiResponseBuilder {
             ...(errors && { errors }),
             ...(data !== undefined && { data }),
             meta: {
-                timestamp: new Date().toISOString()
-            }
+                timestamp: new Date().toISOString(),
+            },
         };
         return res.status(statusCode).json(response);
     }
@@ -103,17 +103,20 @@ class ApiResponseBuilder {
                 totalItems: pagination.total,
                 itemsPerPage: pagination.limit,
                 hasNext: pagination.hasNext,
-                hasPrev: pagination.hasPrev
+                hasPrev: pagination.hasPrev,
             },
             meta: {
                 timestamp: new Date().toISOString(),
                 total: pagination.total,
                 page: pagination.page,
                 limit: pagination.limit,
-                pages: pagination.pages
-            }
+                pages: pagination.pages,
+            },
         };
         return res.status(200).json(response);
+    }
+    static serverError(res, message = 'Internal server error') {
+        return this.error(res, message, 500);
     }
 }
 exports.ApiResponseBuilder = ApiResponseBuilder;
@@ -128,7 +131,7 @@ function calculatePagination(total, page, limit) {
         limit,
         pages,
         hasNext: page < pages,
-        hasPrev: page > 1
+        hasPrev: page > 1,
     };
 }
 /**
@@ -140,8 +143,8 @@ function createSuccessResponse(data, message = 'Success') {
         message,
         ...(data !== undefined && { data }),
         meta: {
-            timestamp: new Date().toISOString()
-        }
+            timestamp: new Date().toISOString(),
+        },
     };
 }
 /**
@@ -153,7 +156,7 @@ function createErrorResponse(message = 'An error occurred', errors) {
         message,
         ...(errors && { errors: Array.isArray(errors) ? errors : [errors] }),
         meta: {
-            timestamp: new Date().toISOString()
-        }
+            timestamp: new Date().toISOString(),
+        },
     };
 }

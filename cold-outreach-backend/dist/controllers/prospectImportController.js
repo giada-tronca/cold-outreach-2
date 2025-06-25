@@ -32,12 +32,12 @@ async function uploadCSV(req, res) {
         // Generate upload ID and move file to permanent location
         const uploadId = (0, uuid_1.v4)();
         const uploadPath = path_1.default.join(process.cwd(), 'uploads', `${uploadId}.csv`);
-        await require('fs').promises.rename(req.file.path, uploadPath);
+        await fs_1.promises.rename(req.file.path, uploadPath);
         apiResponse_1.ApiResponseBuilder.success(res, {
             uploadId,
             filename: originalname,
             size,
-            mimetype
+            mimetype,
         }, 'File uploaded successfully');
     }
     catch (error) {
@@ -50,17 +50,17 @@ async function getImportTemplate(req, res) {
         const templatePath = path_1.default.join(process.cwd(), 'public', 'templates', 'prospect-template.csv');
         // Check if template exists
         try {
-            await require('fs').promises.access(templatePath);
+            await fs_1.promises.access(templatePath);
         }
         catch {
             // Create template if it doesn't exist
             const templateContent = 'name,email,company,position,linkedin_url\n' +
                 'John Doe,john@example.com,Example Corp,Sales Manager,https://linkedin.com/in/johndoe\n' +
                 'Jane Smith,jane@company.com,Tech Inc,Marketing Director,https://linkedin.com/in/janesmith';
-            await require('fs').promises.writeFile(templatePath, templateContent);
+            await fs_1.promises.writeFile(templatePath, templateContent);
         }
         // Send the template file
-        res.download(templatePath, 'prospect-template.csv', (err) => {
+        res.download(templatePath, 'prospect-template.csv', err => {
             if (err) {
                 console.error('Error sending template:', err);
                 apiResponse_1.ApiResponseBuilder.error(res, 'Failed to download template');
@@ -75,13 +75,17 @@ async function getImportTemplate(req, res) {
 class ProspectImportController {
     async importFromCSV(req, res) {
         try {
-            const { fileId, csvData, filename, createCampaign = true } = req.body;
+            const { fileId, csvData, filename, campaignId: existingCampaignId, } = req.body;
             if (!fileId && !csvData) {
                 apiResponse_1.ApiResponseBuilder.badRequest(res, 'Either fileId or csvData is required');
                 return;
             }
             if (!filename) {
                 apiResponse_1.ApiResponseBuilder.badRequest(res, 'Filename is required');
+                return;
+            }
+            if (!existingCampaignId) {
+                apiResponse_1.ApiResponseBuilder.badRequest(res, 'Campaign ID is required - please select an existing campaign');
                 return;
             }
             let processedData = [];
@@ -103,9 +107,9 @@ class ProspectImportController {
                     const results = [];
                     (0, fs_1.createReadStream)(filePath)
                         .pipe((0, csv_parser_1.default)())
-                        .on('data', (row) => results.push(row))
+                        .on('data', row => results.push(row))
                         .on('end', () => resolve(results))
-                        .on('error', (error) => reject(error));
+                        .on('error', error => reject(error));
                 });
                 console.log(`📊 [Import]: Processed ${processedData.length} rows from CSV file`);
             }
@@ -113,23 +117,15 @@ class ProspectImportController {
                 apiResponse_1.ApiResponseBuilder.badRequest(res, 'No valid data found in CSV');
                 return;
             }
-            // Create campaign if requested
-            let campaignId = null;
-            if (createCampaign) {
-                console.log('📋 [Import]: Creating campaign for CSV import');
-                const campaignName = `CSV Import - ${filename} - ${new Date().toISOString()}`;
-                const campaign = await database_1.prisma.cOCampaigns.create({
-                    data: {
-                        name: campaignName,
-                        emailSubject: 'Personalized Outreach',
-                        prompt: 'Generate a personalized email for this prospect based on their profile and company information.',
-                        enrichmentFlags: ['proxycurl', 'firecrawl', 'builtwith'],
-                        serviceId: null
-                    }
-                });
-                campaignId = campaign.id;
-                console.log('✅ [Import]: Created campaign', campaignId);
+            // Verify the campaign exists
+            const campaign = await database_1.prisma.cOCampaigns.findUnique({
+                where: { id: existingCampaignId },
+            });
+            if (!campaign) {
+                apiResponse_1.ApiResponseBuilder.badRequest(res, 'Campaign not found - please select a valid existing campaign');
+                return;
             }
+            console.log(`📋 [Import]: Using existing campaign: ${campaign.name} (ID: ${existingCampaignId})`);
             // NOTE: We don't create batches here - batches are created when enrichment starts
             // This ensures only the specific prospects from this upload are processed
             // Process and validate prospect data
@@ -141,7 +137,9 @@ class ProspectImportController {
                     // Extract prospect fields from CSV row
                     const prospectData = this.extractProspectFromRow(row);
                     // Validate required fields
-                    if (!prospectData.email && !prospectData.name && !prospectData.company) {
+                    if (!prospectData.email &&
+                        !prospectData.name &&
+                        !prospectData.company) {
                         errors.push(`Row ${i + 1}: At least one of email, name, or company is required`);
                         continue;
                     }
@@ -152,14 +150,14 @@ class ProspectImportController {
                     }
                     prospectsToCreate.push({
                         ...prospectData,
-                        campaignId: campaignId,
+                        campaignId: existingCampaignId,
                         batchId: null, // Batch will be created when enrichment starts
                         status: 'PENDING',
                         additionalData: {
                             ...prospectData.additionalData,
                             csvRowIndex: i + 1,
-                            uploadSession: new Date().toISOString() // Track which upload session this came from
-                        }
+                            uploadSession: new Date().toISOString(), // Track which upload session this came from
+                        },
                     });
                 }
                 catch (error) {
@@ -181,12 +179,12 @@ class ProspectImportController {
                 for (const prospectData of batch) {
                     try {
                         // Check for duplicates
-                        if (prospectData.email && campaignId) {
+                        if (prospectData.email && existingCampaignId) {
                             const existingProspect = await database_1.prisma.cOProspects.findFirst({
                                 where: {
                                     email: prospectData.email,
-                                    campaignId: campaignId
-                                }
+                                    campaignId: existingCampaignId,
+                                },
                             });
                             if (existingProspect) {
                                 console.log(`⚠️ [Import]: Skipping duplicate email: ${prospectData.email}`);
@@ -195,7 +193,7 @@ class ProspectImportController {
                             }
                         }
                         await database_1.prisma.cOProspects.create({
-                            data: prospectData
+                            data: prospectData,
                         });
                         prospectsCreated++;
                     }
@@ -207,11 +205,11 @@ class ProspectImportController {
             }
             console.log(`✅ [Import]: Import completed - ${prospectsCreated} created, ${prospectsSkipped} skipped`);
             apiResponse_1.ApiResponseBuilder.success(res, {
-                campaignId,
+                campaignId: existingCampaignId,
                 batchId: null, // No batch created during import
                 prospectsCreated,
                 prospectsSkipped,
-                totalRows: processedData.length
+                totalRows: processedData.length,
             }, 'CSV import completed successfully', 201);
         }
         catch (error) {
@@ -225,13 +223,25 @@ class ProspectImportController {
     extractProspectFromRow(row) {
         // Common column name mappings
         const fieldMappings = {
-            name: ['name', 'full_name', 'fullname', 'contact_name', 'first_name', 'last_name'],
+            name: [
+                'name',
+                'full_name',
+                'fullname',
+                'contact_name',
+                'first_name',
+                'last_name',
+            ],
             email: ['email', 'email_address', 'contact_email', 'work_email'],
             company: ['company', 'company_name', 'organization', 'employer'],
             position: ['position', 'title', 'job_title', 'role', 'job_role'],
-            linkedinUrl: ['linkedin', 'linkedin_url', 'linkedin_profile', 'linkedin_link'],
+            linkedinUrl: [
+                'linkedin',
+                'linkedin_url',
+                'linkedin_profile',
+                'linkedin_link',
+            ],
             phone: ['phone', 'phone_number', 'mobile', 'contact_number'],
-            location: ['location', 'city', 'country', 'address']
+            location: ['location', 'city', 'country', 'address'],
         };
         const prospect = {};
         const additionalData = {};
@@ -248,7 +258,9 @@ class ProspectImportController {
         // Store unmapped columns as additional data
         for (const [key, value] of Object.entries(row)) {
             if (value && typeof value === 'string' && value.trim()) {
-                const isMappedField = Object.values(fieldMappings).flat().some(column => column.toLowerCase() === key.toLowerCase());
+                const isMappedField = Object.values(fieldMappings)
+                    .flat()
+                    .some(column => column.toLowerCase() === key.toLowerCase());
                 if (!isMappedField) {
                     additionalData[key] = value.trim();
                 }

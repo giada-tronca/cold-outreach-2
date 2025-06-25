@@ -21,7 +21,7 @@ exports.validateCreateCampaign = [
         .withMessage('Prompt must be a valid string'),
     (0, express_validator_1.body)('enrichmentFlags')
         .optional()
-        .custom((value) => {
+        .custom(value => {
         // Allow null, arrays, or objects
         if (value === null || value === undefined) {
             return true;
@@ -40,7 +40,7 @@ exports.validateCreateCampaign = [
     (0, express_validator_1.body)('serviceId')
         .optional()
         .isInt({ min: 1 })
-        .withMessage('Service ID must be a positive integer')
+        .withMessage('Service ID must be a positive integer'),
 ];
 /**
  * Validation for updating a campaign
@@ -65,7 +65,7 @@ exports.validateUpdateCampaign = [
         .withMessage('Prompt must be a valid string'),
     (0, express_validator_1.body)('enrichmentFlags')
         .optional()
-        .custom((value) => {
+        .custom(value => {
         // Allow null, arrays, or objects
         if (value === null || value === undefined) {
             return true;
@@ -84,7 +84,7 @@ exports.validateUpdateCampaign = [
     (0, express_validator_1.body)('serviceId')
         .optional()
         .isInt({ min: 1 })
-        .withMessage('Service ID must be a positive integer')
+        .withMessage('Service ID must be a positive integer'),
 ];
 /**
  * Validation for campaign ID parameter
@@ -92,7 +92,7 @@ exports.validateUpdateCampaign = [
 exports.validateCampaignId = [
     (0, express_validator_1.param)('id')
         .isInt({ min: 1 })
-        .withMessage('Campaign ID must be a positive integer')
+        .withMessage('Campaign ID must be a positive integer'),
 ];
 /**
  * Validation for campaign queries (list, search, filter)
@@ -122,7 +122,7 @@ exports.validateCampaignQuery = [
     (0, express_validator_1.query)('sortOrder')
         .optional()
         .isIn(['asc', 'desc'])
-        .withMessage('Sort order must be asc or desc')
+        .withMessage('Sort order must be asc or desc'),
 ];
 /**
  * Validation for campaign template operations
@@ -146,7 +146,7 @@ exports.validateCampaignTemplate = [
         .isLength({ min: 10 })
         .withMessage('Prompt must be at least 10 characters long'),
     (0, express_validator_1.body)('enrichmentFlags')
-        .custom((value) => {
+        .custom(value => {
         // Allow null, arrays, or objects
         if (value === null || value === undefined) {
             return true;
@@ -170,7 +170,7 @@ exports.validateCampaignTemplate = [
     (0, express_validator_1.body)('isPublic')
         .optional()
         .isBoolean()
-        .withMessage('isPublic must be a boolean value')
+        .withMessage('isPublic must be a boolean value'),
 ];
 /**
  * Validation for campaign settings
@@ -179,9 +179,7 @@ exports.validateCampaignSettings = [
     (0, express_validator_1.param)('id')
         .isInt({ min: 1 })
         .withMessage('Campaign ID must be a positive integer'),
-    (0, express_validator_1.body)('settings')
-        .isObject()
-        .withMessage('Settings must be a valid object'),
+    (0, express_validator_1.body)('settings').isObject().withMessage('Settings must be a valid object'),
     (0, express_validator_1.body)('settings.batchSize')
         .optional()
         .isInt({ min: 1, max: 1000 })
@@ -201,7 +199,7 @@ exports.validateCampaignSettings = [
     (0, express_validator_1.body)('settings.autoArchiveAfterDays')
         .optional()
         .isInt({ min: 1 })
-        .withMessage('Auto archive days must be a positive integer')
+        .withMessage('Auto archive days must be a positive integer'),
 ];
 /**
  * Validation for analytics query parameters
@@ -224,10 +222,15 @@ exports.validateAnalyticsQuery = [
         .withMessage('Granularity must be one of: day, week, month'),
     (0, express_validator_1.query)('metrics')
         .optional()
-        .custom((value) => {
+        .custom(value => {
         const validMetrics = [
-            'prospects', 'enriched', 'generated', 'failed',
-            'successRate', 'enrichmentRate', 'generationRate'
+            'prospects',
+            'enriched',
+            'generated',
+            'failed',
+            'successRate',
+            'enrichmentRate',
+            'generationRate',
         ];
         const metrics = Array.isArray(value) ? value : [value];
         const isValid = metrics.every(metric => validMetrics.includes(metric));
@@ -235,7 +238,7 @@ exports.validateAnalyticsQuery = [
             throw new Error(`Invalid metrics. Must be one of: ${validMetrics.join(', ')}`);
         }
         return true;
-    })
+    }),
 ];
 /**
  * Validation for bulk operations
@@ -249,5 +252,5 @@ exports.validateBulkOperation = [
         .withMessage('Each campaign ID must be a positive integer'),
     (0, express_validator_1.body)('operation')
         .isIn(['archive', 'delete', 'pause', 'resume'])
-        .withMessage('Operation must be one of: archive, delete, pause, resume')
+        .withMessage('Operation must be one of: archive, delete, pause, resume'),
 ];

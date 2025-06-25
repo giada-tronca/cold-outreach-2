@@ -26,7 +26,7 @@ router.get('/health', async (_req, res) => {
         // Get basic database stats
         const [campaigns, prospects] = await Promise.all([
             database_1.prisma.campaign.count().catch(() => 0),
-            database_1.prisma.prospect.count().catch(() => 0)
+            database_1.prisma.prospect.count().catch(() => 0),
         ]);
         apiResponse_1.ApiResponseBuilder.success(res, {
             status: 'healthy',
@@ -35,8 +35,8 @@ router.get('/health', async (_req, res) => {
             version: process.env.npm_package_version || '1.0.0',
             database: {
                 connected: dbHealthy,
-                stats: { campaigns, prospects }
-            }
+                stats: { campaigns, prospects },
+            },
         }, 'API is healthy');
     }
     catch (error) {
@@ -50,9 +50,9 @@ router.get('/health', async (_req, res) => {
                 version: process.env.npm_package_version || '1.0.0',
                 database: {
                     connected: false,
-                    error: error instanceof Error ? error.message : 'Unknown database error'
-                }
-            }
+                    error: error instanceof Error ? error.message : 'Unknown database error',
+                },
+            },
         });
     }
 });
@@ -65,13 +65,13 @@ router.get('/health/database', async (_req, res) => {
         const [campaigns, prospects, batches] = await Promise.all([
             database_1.prisma.campaign.count().catch(() => 0),
             database_1.prisma.prospect.count().catch(() => 0),
-            database_1.prisma.batch.count().catch(() => 0)
+            database_1.prisma.batch.count().catch(() => 0),
         ]);
         apiResponse_1.ApiResponseBuilder.success(res, {
             status: 'connected',
             timestamp: new Date().toISOString(),
             stats: { campaigns, prospects, batches },
-            database_url: process.env.DATABASE_URL ? 'configured' : 'missing'
+            database_url: process.env.DATABASE_URL ? 'configured' : 'missing',
         }, 'Database is healthy');
     }
     catch (error) {
@@ -82,8 +82,8 @@ router.get('/health/database', async (_req, res) => {
                 status: 'disconnected',
                 timestamp: new Date().toISOString(),
                 error: error instanceof Error ? error.message : 'Unknown database error',
-                database_url: process.env.DATABASE_URL ? 'configured' : 'missing'
-            }
+                database_url: process.env.DATABASE_URL ? 'configured' : 'missing',
+            },
         });
     }
 });
@@ -100,9 +100,9 @@ router.get('/info', (_req, res) => {
             uploads: '/api/uploads',
             workflow: '/api/workflow',
             enrichment: '/api/enrichment',
-            services: '/api/services'
+            services: '/api/services',
         },
-        documentation: process.env.API_DOCS_URL || null
+        documentation: process.env.API_DOCS_URL || null,
     }, 'API information');
 });
 // Temporary upload config endpoint (until full uploads route is fixed)
@@ -112,7 +112,7 @@ router.get('/uploads/config', (_req, res) => {
         maxFileSize,
         maxFileSizeMB: Math.floor(maxFileSize / 1024 / 1024),
         allowedFileTypes: ['text/csv', 'application/vnd.ms-excel', 'text/plain'],
-        allowedExtensions: ['.csv', '.txt']
+        allowedExtensions: ['.csv', '.txt'],
     }, 'Upload configuration retrieved');
 });
 // Temporary workflow sessions endpoint (until full workflow route is fixed)
@@ -128,16 +128,18 @@ router.post('/workflow/sessions', (req, res) => {
             progress: {
                 current: 0,
                 total: 4,
-                percentage: 0
+                percentage: 0,
             },
             metadata: {},
             createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
+            updatedAt: new Date().toISOString(),
         };
         apiResponse_1.ApiResponseBuilder.success(res, mockSession, 'Workflow session created successfully');
     }
     catch (error) {
-        apiResponse_1.ApiResponseBuilder.error(res, error instanceof Error ? error.message : 'Failed to create workflow session', 500);
+        apiResponse_1.ApiResponseBuilder.error(res, error instanceof Error
+            ? error.message
+            : 'Failed to create workflow session', 500);
     }
 });
 // Temporary workflow session update endpoint
@@ -149,7 +151,7 @@ router.patch('/workflow/sessions/:sessionId/step', (req, res) => {
             sessionId,
             currentStep: nextStep || step + 1,
             status: 'UPDATED',
-            updatedAt: new Date().toISOString()
+            updatedAt: new Date().toISOString(),
         }, 'Workflow step updated successfully');
     }
     catch (error) {
@@ -170,11 +172,13 @@ router.post('/workflow/sessions/:sessionId/steps/:stepName/start', (req, res) =>
             stepName,
             status: 'STARTED',
             data: data || {},
-            startedAt: new Date().toISOString()
+            startedAt: new Date().toISOString(),
         }, `Workflow step ${stepName} started successfully`);
     }
     catch (error) {
-        apiResponse_1.ApiResponseBuilder.error(res, error instanceof Error ? error.message : 'Failed to start workflow step', 500);
+        apiResponse_1.ApiResponseBuilder.error(res, error instanceof Error
+            ? error.message
+            : 'Failed to start workflow step', 500);
     }
 });
 // Temporary workflow step complete endpoint
@@ -192,11 +196,13 @@ router.post('/workflow/sessions/:sessionId/steps/:stepName/complete', (req, res)
             stepName,
             status: 'COMPLETED',
             stepData: stepData || {},
-            completedAt: new Date().toISOString()
+            completedAt: new Date().toISOString(),
         }, `Workflow step ${stepName} completed successfully`);
     }
     catch (error) {
-        apiResponse_1.ApiResponseBuilder.error(res, error instanceof Error ? error.message : 'Failed to complete workflow step', 500);
+        apiResponse_1.ApiResponseBuilder.error(res, error instanceof Error
+            ? error.message
+            : 'Failed to complete workflow step', 500);
     }
 });
 // Temporary upload validation endpoint

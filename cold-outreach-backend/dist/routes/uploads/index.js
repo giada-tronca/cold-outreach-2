@@ -99,75 +99,39 @@ router.post('/', security_1.fileUploadRateLimit, upload.single('file'), (0, vali
     };
     try {
         console.log(`🐛 [Upload Debug]: File details - mimetype: "${mimetype}", filename: "${originalname}", size: ${size}`);
-        // Add to CSV import queue if it's a CSV file
-        if (mimetype === 'text/csv') {
-            console.log(`✅ [Upload Debug]: Detected CSV file, queuing for CSV import processing`);
-            await queues_1.csvImportQueue.add('process-csv', {
-                filePath,
-                userId: jobData.userId,
-                mappingConfig: {}, // Default mapping
-                workflowSessionId: uploadId
-            }, {
-                priority: 5,
-                delay: 0,
-                attempts: 3,
-                backoff: {
-                    type: 'exponential',
-                    delay: 2000,
-                }
-            });
-            console.log(`📋 [Upload Debug]: CSV import job queued successfully`);
+        // Store CSV file information but don't process prospects yet
+        if (mimetype === 'text/csv' || originalname.toLowerCase().endsWith('.csv')) {
+            console.log(`✅ [Upload Debug]: Detected CSV file, storing for later enrichment processing`);
+            console.log(`📄 [Upload Debug]: CSV file will be processed when enrichment job is created`);
         }
         else {
             console.log(`⚠️ [Upload Debug]: Not a CSV file (mimetype: "${mimetype}"), using generic processing`);
-            // Check if it's actually a CSV by extension
-            const isCSVByExtension = originalname.toLowerCase().endsWith('.csv');
-            if (isCSVByExtension) {
-                console.log(`🔄 [Upload Debug]: File has .csv extension, forcing CSV processing despite mimetype`);
-                await queues_1.csvImportQueue.add('process-csv', {
-                    filePath,
-                    userId: jobData.userId,
-                    mappingConfig: {}, // Default mapping
-                    workflowSessionId: uploadId
-                }, {
-                    priority: 5,
-                    delay: 0,
-                    attempts: 3,
-                    backoff: {
-                        type: 'exponential',
-                        delay: 2000,
-                    }
-                });
-                console.log(`📋 [Upload Debug]: CSV import job queued successfully (by extension)`);
-            }
-            else {
-                // Add to general data export queue for processing
-                await queues_1.dataExportQueue.add('process-file', {
-                    userId: jobData.userId,
-                    exportType: 'prospects',
-                    filters: { uploadId },
-                    format: 'csv'
-                }, {
-                    priority: 3,
-                    delay: 0,
-                    attempts: 2
-                });
-            }
+            // Add to general data export queue for processing
+            await queues_1.dataExportQueue.add('process-file', {
+                userId: jobData.userId,
+                exportType: 'prospects',
+                filters: { uploadId },
+                format: 'csv'
+            }, {
+                priority: 3,
+                delay: 0,
+                attempts: 2
+            });
         }
         // Update progress
         const progressData = uploadProgress.get(uploadId);
         if (progressData) {
-            progressData.status = 'processing';
-            progressData.message = 'File queued for processing';
+            progressData.status = 'completed';
+            progressData.message = 'File uploaded successfully';
         }
     }
     catch (error) {
-        console.error('Failed to queue file for processing:', error);
+        console.error('Failed to process file upload:', error);
         // Update progress with error
         const progressData = uploadProgress.get(uploadId);
         if (progressData) {
             progressData.status = 'failed';
-            progressData.message = 'Failed to queue file for processing';
+            progressData.message = 'Failed to process file upload';
         }
     }
     return apiResponse_1.ApiResponseBuilder.success(res, {

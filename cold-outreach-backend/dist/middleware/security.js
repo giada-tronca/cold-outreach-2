@@ -18,7 +18,7 @@ exports.rateLimitConfig = (0, express_rate_limit_1.default)({
     legacyHeaders: false,
     handler: (req, res) => {
         throw new errors_1.TooManyRequestsError('Rate limit exceeded');
-    }
+    },
 });
 /**
  * Strict rate limiting for sensitive endpoints
@@ -31,7 +31,7 @@ exports.strictRateLimit = (0, express_rate_limit_1.default)({
     legacyHeaders: false,
     handler: (req, res) => {
         throw new errors_1.TooManyRequestsError('Rate limit exceeded for sensitive endpoint');
-    }
+    },
 });
 /**
  * Authentication rate limiting
@@ -45,7 +45,7 @@ exports.authRateLimit = (0, express_rate_limit_1.default)({
     skipSuccessfulRequests: true, // Don't count successful requests
     handler: (req, res) => {
         throw new errors_1.TooManyRequestsError('Too many authentication attempts');
-    }
+    },
 });
 /**
  * File upload rate limiting
@@ -58,7 +58,7 @@ exports.fileUploadRateLimit = (0, express_rate_limit_1.default)({
     legacyHeaders: false,
     handler: (req, res) => {
         throw new errors_1.TooManyRequestsError('File upload rate limit exceeded');
-    }
+    },
 });
 /**
  * Setup comprehensive security middleware
@@ -66,7 +66,9 @@ exports.fileUploadRateLimit = (0, express_rate_limit_1.default)({
 function setupSecurity(app) {
     // CORS handling
     app.use((req, res, next) => {
-        const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:5173'];
+        const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || [
+            'http://localhost:5173',
+        ];
         const origin = req.headers.origin;
         if (origin && allowedOrigins.includes(origin)) {
             res.setHeader('Access-Control-Allow-Origin', origin);

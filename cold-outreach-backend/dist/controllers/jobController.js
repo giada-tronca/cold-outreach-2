@@ -102,7 +102,7 @@ class JobController {
     static async getUserJobs(req, res) {
         try {
             const { userId } = req.params;
-            const { states = 'waiting,active,completed,failed', limit = '50', offset = '0', queueName } = req.query;
+            const { states = 'waiting,active,completed,failed', limit = '50', offset = '0', queueName, } = req.query;
             if (!userId) {
                 const response = (0, apiResponse_1.createErrorResponse)('User ID is required', 'User ID parameter is missing');
                 res.status(400).json(response);
@@ -140,10 +140,18 @@ class JobController {
                 failed: job.failedReason,
                 data: {
                     // Include only non-sensitive data
-                    ...(job.data.prospectId && { prospectId: job.data.prospectId }),
-                    ...(job.data.campaignId && { campaignId: job.data.campaignId }),
-                    ...(job.data.batchId && { batchId: job.data.batchId }),
-                    ...(job.data.workflowSessionId && { workflowSessionId: job.data.workflowSessionId }),
+                    ...(job.data.prospectId && {
+                        prospectId: job.data.prospectId,
+                    }),
+                    ...(job.data.campaignId && {
+                        campaignId: job.data.campaignId,
+                    }),
+                    ...(job.data.batchId && {
+                        batchId: job.data.batchId,
+                    }),
+                    ...(job.data.workflowSessionId && {
+                        workflowSessionId: job.data.workflowSessionId,
+                    }),
                 },
             })));
             const response = (0, apiResponse_1.createSuccessResponse)({
@@ -359,10 +367,10 @@ class JobController {
                 where: { id: batchIdInt },
                 include: {
                     campaign: {
-                        select: { id: true, name: true }
+                        select: { id: true, name: true },
                     },
                     prospects: {
-                        select: { id: true, status: true }
+                        select: { id: true, status: true },
                     },
                 },
             });

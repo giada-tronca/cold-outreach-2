@@ -100,9 +100,9 @@ class ProspectEnrichmentProcessor {
                     enrichmentStatus: 'PROCESSING'
                 }
             });
-            // Step 2: LinkedIn Data Enrichment (if enabled)
+            // Step 2: LinkedIn Data Enrichment (if enabled and LinkedIn URL is available)
             let linkedinSummary = null;
-            if (enabledServices.proxycurl) {
+            if (enabledServices.proxycurl && linkedinUrl) {
                 await job.updateProgress({
                     progress: 15,
                     total: 1,
@@ -139,6 +139,9 @@ class ProspectEnrichmentProcessor {
                     console.error(`❌ [Enrichment]: LinkedIn enrichment failed for prospect ${prospectId}:`, error);
                     // Continue with other enrichments
                 }
+            }
+            else if (!linkedinUrl) {
+                console.log(`⏭️ [Enrichment]: Skipping LinkedIn enrichment for prospect ${prospectId} (no LinkedIn URL provided)`);
             }
             else {
                 console.log(`⏭️ [Enrichment]: Skipping LinkedIn enrichment for prospect ${prospectId} (disabled)`);
@@ -529,12 +532,12 @@ class ProspectEnrichmentProcessor {
                 useTemperature = false; // o1-mini doesn't support temperature
                 break;
             case 'openrouter-gemini-2.5-pro':
-                actualModel = 'google/gemini-pro-2.5';
+                actualModel = 'google/gemini-2.5-pro';
                 maxTokens = 6000; // Increased from 3000 for more comprehensive responses
                 useTemperature = true;
                 break;
             case 'openrouter-gemini-2.5-flash':
-                actualModel = 'google/gemini-2.0-flash-exp';
+                actualModel = 'google/gemini-2.0-flash-001';
                 maxTokens = 6000; // Increased from 3000 for more comprehensive responses
                 useTemperature = true;
                 break;
@@ -554,9 +557,15 @@ class ProspectEnrichmentProcessor {
                             role: 'user',
                             content: prompt
                         }
-                    ],
-                    max_completion_tokens: maxTokens
+                    ]
                 };
+                // Add appropriate token parameter based on model type
+                if (actualModel.includes('gemini')) {
+                    requestBody.max_tokens = maxTokens; // Gemini models use max_tokens
+                }
+                else {
+                    requestBody.max_completion_tokens = maxTokens; // O1 models use max_completion_tokens
+                }
                 // Add temperature for models that support it
                 if (useTemperature) {
                     requestBody.temperature = 0.7;

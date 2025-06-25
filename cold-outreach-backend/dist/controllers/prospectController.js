@@ -10,7 +10,7 @@ const logger = {
     },
     info: (message, data) => {
         console.log(`[PROSPECT CONTROLLER] ${message}`, data);
-    }
+    },
 };
 // Helper function to convert BigInt values to numbers for JSON serialization
 function convertBigIntToNumber(obj) {
@@ -32,7 +32,7 @@ function convertBigIntToNumber(obj) {
 class ProspectController {
     async getProspects(req, res) {
         try {
-            const { page = '1', limit = '10', search, campaignId, batchId, uploadSession } = req.query;
+            const { page = '1', limit = '10', search, campaignId, batchId, uploadSession, } = req.query;
             const pageNum = parseInt(page);
             const limitNum = parseInt(limit);
             const skip = (pageNum - 1) * limitNum;
@@ -42,7 +42,7 @@ class ProspectController {
                 where.OR = [
                     { name: { contains: search, mode: 'insensitive' } },
                     { email: { contains: search, mode: 'insensitive' } },
-                    { company: { contains: search, mode: 'insensitive' } }
+                    { company: { contains: search, mode: 'insensitive' } },
                 ];
             }
             if (campaignId) {
@@ -55,7 +55,7 @@ class ProspectController {
             if (uploadSession) {
                 where.additionalData = {
                     path: ['uploadSession'],
-                    equals: uploadSession
+                    equals: uploadSession,
                 };
             }
             // Build dynamic SQL query with conditional filters
@@ -100,7 +100,7 @@ class ProspectController {
             `;
             const [prospectsResult, totalResult] = await Promise.all([
                 database_1.prisma.$queryRawUnsafe(prospectQuery, ...params),
-                database_1.prisma.$queryRawUnsafe(countQuery, ...params.slice(0, -2)) // Exclude limit and offset for count
+                database_1.prisma.$queryRawUnsafe(countQuery, ...params.slice(0, -2)), // Exclude limit and offset for count
             ]);
             const prospects = convertBigIntToNumber(prospectsResult);
             const total = Number(totalResult[0]?.total) || 0;
@@ -127,25 +127,29 @@ class ProspectController {
                 companyIndustries: prospect.company_industries,
                 companyKeywords: prospect.company_keywords,
                 usesFallback: prospect.uses_fallback,
-                enrichment: prospect.enrichment ? {
-                    ...prospect.enrichment,
-                    companyWebsite: prospect.enrichment.companyWebsite || undefined,
-                    companySummary: prospect.enrichment.companySummary || undefined,
-                    linkedinSummary: prospect.enrichment.linkedinSummary || undefined,
-                    prospectAnalysisSummary: prospect.enrichment.prospectAnalysisSummary || undefined,
-                    builtwithSummary: prospect.enrichment.builtwithSummary || undefined,
-                    enrichedAt: prospect.enrichment.enrichedAt || undefined,
-                    modelUsed: prospect.enrichment.modelUsed || undefined
-                } : undefined,
-                generatedEmail: prospect.generatedEmail ? {
-                    ...prospect.generatedEmail,
-                    errorMessage: prospect.generatedEmail.errorMessage || undefined,
-                    generatedAt: prospect.generatedEmail.generatedAt || undefined,
-                    modelUsed: prospect.generatedEmail.modelUsed || undefined,
-                    subject: prospect.generatedEmail.subject || undefined,
-                    body: prospect.generatedEmail.body || undefined,
-                    language: prospect.generatedEmail.language || undefined
-                } : undefined
+                enrichment: prospect.enrichment
+                    ? {
+                        ...prospect.enrichment,
+                        companyWebsite: prospect.enrichment.companyWebsite || undefined,
+                        companySummary: prospect.enrichment.companySummary || undefined,
+                        linkedinSummary: prospect.enrichment.linkedinSummary || undefined,
+                        prospectAnalysisSummary: prospect.enrichment.prospectAnalysisSummary || undefined,
+                        builtwithSummary: prospect.enrichment.builtwithSummary || undefined,
+                        enrichedAt: prospect.enrichment.enrichedAt || undefined,
+                        modelUsed: prospect.enrichment.modelUsed || undefined,
+                    }
+                    : undefined,
+                generatedEmail: prospect.generatedEmail
+                    ? {
+                        ...prospect.generatedEmail,
+                        errorMessage: prospect.generatedEmail.errorMessage || undefined,
+                        generatedAt: prospect.generatedEmail.generatedAt || undefined,
+                        modelUsed: prospect.generatedEmail.modelUsed || undefined,
+                        subject: prospect.generatedEmail.subject || undefined,
+                        body: prospect.generatedEmail.body || undefined,
+                        language: prospect.generatedEmail.language || undefined,
+                    }
+                    : undefined,
             }));
             const pagination = (0, apiResponse_1.calculatePagination)(total, pageNum, limitNum);
             apiResponse_1.ApiResponseBuilder.paginated(res, transformedProspects, pagination, 'Prospects retrieved successfully');
@@ -169,8 +173,8 @@ class ProspectController {
                     campaign: true,
                     batch: true,
                     enrichment: true,
-                    generatedEmail: true
-                }
+                    generatedEmail: true,
+                },
             });
             if (!prospect) {
                 apiResponse_1.ApiResponseBuilder.notFound(res, 'Prospect not found');
@@ -192,8 +196,12 @@ class ProspectController {
                 status: prospect.status,
                 additionalData: prospect.additionalData,
                 errorMessage: prospect.errorMessage,
-                createdAt: prospect.createdAt instanceof Date ? prospect.createdAt.toISOString() : prospect.createdAt,
-                updatedAt: prospect.updatedAt instanceof Date ? prospect.updatedAt.toISOString() : prospect.updatedAt,
+                createdAt: prospect.createdAt instanceof Date
+                    ? prospect.createdAt.toISOString()
+                    : prospect.createdAt,
+                updatedAt: prospect.updatedAt instanceof Date
+                    ? prospect.updatedAt.toISOString()
+                    : prospect.updatedAt,
                 jobTitle: prospect.jobTitle,
                 phone: prospect.phone,
                 location: prospect.location,
@@ -202,58 +210,90 @@ class ProspectController {
                 companyKeywords: prospect.companyKeywords,
                 usesFallback: prospect.usesFallback,
                 // Include campaign data
-                campaign: prospect.campaign ? {
-                    id: prospect.campaign.id,
-                    name: prospect.campaign.name,
-                    emailSubject: prospect.campaign.emailSubject,
-                    prompt: prospect.campaign.prompt,
-                    enrichmentFlags: prospect.campaign.enrichmentFlags,
-                    serviceId: prospect.campaign.serviceId,
-                    createdAt: prospect.campaign.createdAt instanceof Date ? prospect.campaign.createdAt.toISOString() : prospect.campaign.createdAt,
-                    updatedAt: prospect.campaign.updatedAt instanceof Date ? prospect.campaign.updatedAt.toISOString() : prospect.campaign.updatedAt
-                } : undefined,
+                campaign: prospect.campaign
+                    ? {
+                        id: prospect.campaign.id,
+                        name: prospect.campaign.name,
+                        emailSubject: prospect.campaign.emailSubject,
+                        prompt: prospect.campaign.prompt,
+                        enrichmentFlags: prospect.campaign.enrichmentFlags,
+                        serviceId: prospect.campaign.serviceId,
+                        createdAt: prospect.campaign.createdAt instanceof Date
+                            ? prospect.campaign.createdAt.toISOString()
+                            : prospect.campaign.createdAt,
+                        updatedAt: prospect.campaign.updatedAt instanceof Date
+                            ? prospect.campaign.updatedAt.toISOString()
+                            : prospect.campaign.updatedAt,
+                    }
+                    : undefined,
                 // Include batch data
-                batch: prospect.batch ? {
-                    id: prospect.batch.id,
-                    name: prospect.batch.name,
-                    status: prospect.batch.status,
-                    totalProspects: prospect.batch.totalProspects,
-                    enrichedProspects: prospect.batch.enrichedProspects,
-                    generatedEmails: prospect.batch.generatedEmails,
-                    failedProspects: prospect.batch.failedProspects,
-                    errorMessage: prospect.batch.errorMessage,
-                    createdAt: prospect.batch.createdAt instanceof Date ? prospect.batch.createdAt.toISOString() : prospect.batch.createdAt,
-                    updatedAt: prospect.batch.updatedAt instanceof Date ? prospect.batch.updatedAt.toISOString() : prospect.batch.updatedAt
-                } : undefined,
+                batch: prospect.batch
+                    ? {
+                        id: prospect.batch.id,
+                        name: prospect.batch.name,
+                        status: prospect.batch.status,
+                        totalProspects: prospect.batch.totalProspects,
+                        enrichedProspects: prospect.batch.enrichedProspects,
+                        generatedEmails: prospect.batch.generatedEmails,
+                        failedProspects: prospect.batch.failedProspects,
+                        errorMessage: prospect.batch.errorMessage,
+                        createdAt: prospect.batch.createdAt instanceof Date
+                            ? prospect.batch.createdAt.toISOString()
+                            : prospect.batch.createdAt,
+                        updatedAt: prospect.batch.updatedAt instanceof Date
+                            ? prospect.batch.updatedAt.toISOString()
+                            : prospect.batch.updatedAt,
+                    }
+                    : undefined,
                 // Include enrichment data
-                enrichment: prospect.enrichment ? {
-                    prospectId: prospect.enrichment.prospectId,
-                    companyWebsite: prospect.enrichment.companyWebsite || undefined,
-                    companySummary: prospect.enrichment.companySummary || undefined,
-                    linkedinSummary: prospect.enrichment.linkedinSummary || undefined,
-                    prospectAnalysisSummary: prospect.enrichment.prospectAnalysisSummary || undefined,
-                    techStack: prospect.enrichment.techStack || undefined,
-                    enrichmentStatus: prospect.enrichment.enrichmentStatus,
-                    builtwithSummary: prospect.enrichment.builtwithSummary || undefined,
-                    enrichedAt: prospect.enrichment.enrichedAt ? (prospect.enrichment.enrichedAt instanceof Date ? prospect.enrichment.enrichedAt.toISOString() : prospect.enrichment.enrichedAt) : undefined,
-                    modelUsed: prospect.enrichment.modelUsed || undefined,
-                    createdAt: prospect.enrichment.createdAt instanceof Date ? prospect.enrichment.createdAt.toISOString() : prospect.enrichment.createdAt,
-                    updatedAt: prospect.enrichment.updatedAt instanceof Date ? prospect.enrichment.updatedAt.toISOString() : prospect.enrichment.updatedAt
-                } : undefined,
+                enrichment: prospect.enrichment
+                    ? {
+                        prospectId: prospect.enrichment.prospectId,
+                        companyWebsite: prospect.enrichment.companyWebsite || undefined,
+                        companySummary: prospect.enrichment.companySummary || undefined,
+                        linkedinSummary: prospect.enrichment.linkedinSummary || undefined,
+                        prospectAnalysisSummary: prospect.enrichment.prospectAnalysisSummary || undefined,
+                        techStack: prospect.enrichment.techStack || undefined,
+                        enrichmentStatus: prospect.enrichment.enrichmentStatus,
+                        builtwithSummary: prospect.enrichment.builtwithSummary || undefined,
+                        enrichedAt: prospect.enrichment.enrichedAt
+                            ? prospect.enrichment.enrichedAt instanceof Date
+                                ? prospect.enrichment.enrichedAt.toISOString()
+                                : prospect.enrichment.enrichedAt
+                            : undefined,
+                        modelUsed: prospect.enrichment.modelUsed || undefined,
+                        createdAt: prospect.enrichment.createdAt instanceof Date
+                            ? prospect.enrichment.createdAt.toISOString()
+                            : prospect.enrichment.createdAt,
+                        updatedAt: prospect.enrichment.updatedAt instanceof Date
+                            ? prospect.enrichment.updatedAt.toISOString()
+                            : prospect.enrichment.updatedAt,
+                    }
+                    : undefined,
                 // Include generated email data
-                generatedEmail: prospect.generatedEmail ? {
-                    prospectId: prospect.generatedEmail.prospectId,
-                    subject: prospect.generatedEmail.subject || undefined,
-                    body: prospect.generatedEmail.body || undefined,
-                    generationStatus: prospect.generatedEmail.generationStatus,
-                    errorMessage: prospect.generatedEmail.errorMessage || undefined,
-                    language: prospect.generatedEmail.language || undefined,
-                    generatedAt: prospect.generatedEmail.generatedAt ? (prospect.generatedEmail.generatedAt instanceof Date ? prospect.generatedEmail.generatedAt.toISOString() : prospect.generatedEmail.generatedAt) : undefined,
-                    modelUsed: prospect.generatedEmail.modelUsed || undefined,
-                    generationMetadata: prospect.generatedEmail.generationMetadata || undefined,
-                    createdAt: prospect.generatedEmail.createdAt instanceof Date ? prospect.generatedEmail.createdAt.toISOString() : prospect.generatedEmail.createdAt,
-                    updatedAt: prospect.generatedEmail.updatedAt instanceof Date ? prospect.generatedEmail.updatedAt.toISOString() : prospect.generatedEmail.updatedAt
-                } : undefined
+                generatedEmail: prospect.generatedEmail
+                    ? {
+                        prospectId: prospect.generatedEmail.prospectId,
+                        subject: prospect.generatedEmail.subject || undefined,
+                        body: prospect.generatedEmail.body || undefined,
+                        generationStatus: prospect.generatedEmail.generationStatus,
+                        errorMessage: prospect.generatedEmail.errorMessage || undefined,
+                        language: prospect.generatedEmail.language || undefined,
+                        generatedAt: prospect.generatedEmail.generatedAt
+                            ? prospect.generatedEmail.generatedAt instanceof Date
+                                ? prospect.generatedEmail.generatedAt.toISOString()
+                                : prospect.generatedEmail.generatedAt
+                            : undefined,
+                        modelUsed: prospect.generatedEmail.modelUsed || undefined,
+                        generationMetadata: prospect.generatedEmail.generationMetadata || undefined,
+                        createdAt: prospect.generatedEmail.createdAt instanceof Date
+                            ? prospect.generatedEmail.createdAt.toISOString()
+                            : prospect.generatedEmail.createdAt,
+                        updatedAt: prospect.generatedEmail.updatedAt instanceof Date
+                            ? prospect.generatedEmail.updatedAt.toISOString()
+                            : prospect.generatedEmail.updatedAt,
+                    }
+                    : undefined,
             };
             apiResponse_1.ApiResponseBuilder.success(res, transformedProspect, 'Prospect retrieved successfully');
         }
@@ -276,7 +316,7 @@ class ProspectController {
             }
             // Fetch generated email for the prospect
             const generatedEmail = await database_1.prisma.cOGeneratedEmails.findUnique({
-                where: { prospectId: prospectIdNum }
+                where: { prospectId: prospectIdNum },
             });
             if (!generatedEmail) {
                 apiResponse_1.ApiResponseBuilder.notFound(res, 'Generated email not found for this prospect');
@@ -290,11 +330,19 @@ class ProspectController {
                 generationStatus: generatedEmail.generationStatus,
                 errorMessage: generatedEmail.errorMessage || undefined,
                 language: generatedEmail.language || undefined,
-                generatedAt: generatedEmail.generatedAt ? (generatedEmail.generatedAt instanceof Date ? generatedEmail.generatedAt.toISOString() : generatedEmail.generatedAt) : undefined,
+                generatedAt: generatedEmail.generatedAt
+                    ? generatedEmail.generatedAt instanceof Date
+                        ? generatedEmail.generatedAt.toISOString()
+                        : generatedEmail.generatedAt
+                    : undefined,
                 modelUsed: generatedEmail.modelUsed || undefined,
                 generationMetadata: generatedEmail.generationMetadata || undefined,
-                createdAt: generatedEmail.createdAt instanceof Date ? generatedEmail.createdAt.toISOString() : generatedEmail.createdAt,
-                updatedAt: generatedEmail.updatedAt instanceof Date ? generatedEmail.updatedAt.toISOString() : generatedEmail.updatedAt
+                createdAt: generatedEmail.createdAt instanceof Date
+                    ? generatedEmail.createdAt.toISOString()
+                    : generatedEmail.createdAt,
+                updatedAt: generatedEmail.updatedAt instanceof Date
+                    ? generatedEmail.updatedAt.toISOString()
+                    : generatedEmail.updatedAt,
             };
             apiResponse_1.ApiResponseBuilder.success(res, transformedGeneratedEmail, 'Generated email retrieved successfully');
         }
@@ -334,7 +382,7 @@ const deleteProspect = async (req, res) => {
         logger.info(`Attempting to delete prospect ${prospectId}`);
         // Check if prospect exists
         const existingProspect = await database_1.prisma.prospect.findUnique({
-            where: { id: prospectId }
+            where: { id: prospectId },
         });
         if (!existingProspect) {
             apiResponse_1.ApiResponseBuilder.notFound(res, 'Prospect not found');
@@ -344,15 +392,15 @@ const deleteProspect = async (req, res) => {
         await database_1.prisma.$transaction(async (tx) => {
             // Delete generated email if exists
             await tx.generatedEmail.deleteMany({
-                where: { prospectId }
+                where: { prospectId },
             });
             // Delete enrichment data if exists
             await tx.prospectEnrichment.deleteMany({
-                where: { prospectId }
+                where: { prospectId },
             });
             // Delete the prospect
             await tx.prospect.delete({
-                where: { id: prospectId }
+                where: { id: prospectId },
             });
         });
         logger.info(`Successfully deleted prospect ${prospectId}`);
@@ -388,7 +436,7 @@ const associateProspectsWithCampaign = async (req, res) => {
         console.log(`[PROSPECT CONTROLLER] Request body:`, req.body);
         // First verify the campaign exists
         const campaign = await database_1.prisma.cOCampaigns.findUnique({
-            where: { id: campaignIdNum }
+            where: { id: campaignIdNum },
         });
         if (!campaign) {
             apiResponse_1.ApiResponseBuilder.notFound(res, 'Campaign not found');
@@ -415,8 +463,8 @@ const associateProspectsWithCampaign = async (req, res) => {
                 name: `Upload ${uploadId} - Associated with Campaign`,
                 campaignId: campaignIdNum,
                 totalProspects: Number(result),
-                status: 'UPLOADED'
-            }
+                status: 'UPLOADED',
+            },
         });
         // Update the prospects with the batch ID as well
         if (result > 0) {
@@ -431,7 +479,7 @@ const associateProspectsWithCampaign = async (req, res) => {
             campaignId: campaignIdNum,
             prospectsUpdated: Number(result),
             batchId: batch.id,
-            uploadId
+            uploadId,
         }, `Successfully associated ${result} prospects with campaign`);
     }
     catch (error) {

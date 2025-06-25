@@ -186,11 +186,11 @@ class WorkerManager {
                     console.log(`📊 [${worker.name}]: Job ${job.id} progress: ${progress}%`);
                 }
             });
-            worker.on('stalled', (jobId) => {
+            worker.on('stalled', jobId => {
                 console.warn(`⚠️ [${worker.name}]: Job ${jobId} stalled`);
             });
             // Worker events
-            worker.on('error', (err) => {
+            worker.on('error', err => {
                 console.error(`❌ [${worker.name}]: Worker error:`, err);
             });
             worker.on('closing', () => {

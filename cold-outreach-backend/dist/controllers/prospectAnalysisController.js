@@ -11,7 +11,7 @@ const getProspectAnalyses = async (req, res) => {
             total: 0,
             pages: 0,
             hasNext: false,
-            hasPrev: false
+            hasPrev: false,
         };
         apiResponse_1.ApiResponseBuilder.paginated(res, [], pagination, 'No analyses found');
     }
@@ -39,7 +39,7 @@ const getAllAnalyses = async (req, res) => {
             total: 0,
             pages: 0,
             hasNext: false,
-            hasPrev: false
+            hasPrev: false,
         };
         apiResponse_1.ApiResponseBuilder.paginated(res, [], pagination, 'No analyses found');
     }
@@ -107,8 +107,8 @@ const getAnalysisStats = async (req, res) => {
             confidenceDistribution: {
                 high: 0,
                 medium: 0,
-                low: 0
-            }
+                low: 0,
+            },
         };
         apiResponse_1.ApiResponseBuilder.success(res, stats, 'Analysis stats retrieved successfully');
     }

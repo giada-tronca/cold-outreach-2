@@ -13,7 +13,7 @@ const errors_1 = require("../utils/errors");
  */
 async function getAllCampaigns(req, res) {
     try {
-        const { page = '1', limit = '10', search, sortBy = 'createdAt', sortOrder = 'desc' } = req.query;
+        const { page = '1', limit = '10', search, sortBy = 'createdAt', sortOrder = 'desc', } = req.query;
         const pageNum = parseInt(page);
         const limitNum = parseInt(limit);
         const skip = (pageNum - 1) * limitNum;
@@ -23,7 +23,7 @@ async function getAllCampaigns(req, res) {
         if (search) {
             where.OR = [
                 { name: { contains: search, mode: 'insensitive' } },
-                { emailSubject: { contains: search, mode: 'insensitive' } }
+                { emailSubject: { contains: search, mode: 'insensitive' } },
             ];
         }
         // Build orderBy clause
@@ -39,12 +39,12 @@ async function getAllCampaigns(req, res) {
                     _count: {
                         select: {
                             prospects: true,
-                            batches: true
-                        }
-                    }
-                }
+                            batches: true,
+                        },
+                    },
+                },
             }),
-            database_1.prisma.campaign.count({ where })
+            database_1.prisma.campaign.count({ where }),
         ]);
         const pagination = (0, apiResponse_1.calculatePagination)(totalCount, pageNum, limitNum);
         apiResponse_1.ApiResponseBuilder.paginated(res, campaigns, pagination, 'Campaigns retrieved successfully');
@@ -68,10 +68,10 @@ async function getCampaignById(req, res) {
                 _count: {
                     select: {
                         prospects: true,
-                        batches: true
-                    }
-                }
-            }
+                        batches: true,
+                    },
+                },
+            },
         });
         if (!campaign) {
             throw new errors_1.NotFoundError(`Campaign with ID ${campaignId} not found`);
@@ -98,8 +98,8 @@ async function createCampaign(req, res) {
                 emailSubject,
                 prompt,
                 enrichmentFlags,
-                serviceId
-            }
+                serviceId,
+            },
         });
         apiResponse_1.ApiResponseBuilder.created(res, campaign, 'Campaign created successfully');
     }
@@ -116,14 +116,14 @@ async function updateCampaign(req, res) {
         const campaignId = parseInt(req.params.id);
         const updateData = req.body;
         const existingCampaign = await database_1.prisma.campaign.findUnique({
-            where: { id: campaignId }
+            where: { id: campaignId },
         });
         if (!existingCampaign) {
             throw new errors_1.NotFoundError(`Campaign with ID ${campaignId} not found`);
         }
         const updatedCampaign = await database_1.prisma.campaign.update({
             where: { id: campaignId },
-            data: updateData
+            data: updateData,
         });
         apiResponse_1.ApiResponseBuilder.success(res, updatedCampaign, 'Campaign updated successfully');
     }
@@ -142,13 +142,13 @@ async function deleteCampaign(req, res) {
     try {
         const campaignId = parseInt(req.params.id);
         const existingCampaign = await database_1.prisma.campaign.findUnique({
-            where: { id: campaignId }
+            where: { id: campaignId },
         });
         if (!existingCampaign) {
             throw new errors_1.NotFoundError(`Campaign with ID ${campaignId} not found`);
         }
         await database_1.prisma.campaign.delete({
-            where: { id: campaignId }
+            where: { id: campaignId },
         });
         apiResponse_1.ApiResponseBuilder.success(res, { deletedCampaignId: campaignId }, 'Campaign deleted successfully');
     }

@@ -15,10 +15,10 @@ async function bulkDeleteProspects(req, res) {
     try {
         const { prospectIds } = req.body;
         const result = await prisma.prospect.deleteMany({
-            where: { id: { in: prospectIds } }
+            where: { id: { in: prospectIds } },
         });
         apiResponse_1.ApiResponseBuilder.success(res, {
-            deletedCount: result.count
+            deletedCount: result.count,
         }, `Successfully deleted ${result.count} prospects`);
     }
     catch (error) {
@@ -34,11 +34,11 @@ async function bulkUpdateProspectStatus(req, res) {
         const { prospectIds, status } = req.body;
         const result = await prisma.prospect.updateMany({
             where: { id: { in: prospectIds } },
-            data: { status }
+            data: { status },
         });
         apiResponse_1.ApiResponseBuilder.success(res, {
             updatedCount: result.count,
-            newStatus: status
+            newStatus: status,
         }, `Successfully updated status for ${result.count} prospects`);
     }
     catch (error) {
@@ -55,10 +55,10 @@ async function bulkStartEnrichment(req, res) {
         // Update prospects to ENRICHING status
         await prisma.prospect.updateMany({
             where: { id: { in: prospectIds } },
-            data: { status: 'ENRICHING' }
+            data: { status: 'ENRICHING' },
         });
         apiResponse_1.ApiResponseBuilder.success(res, {
-            queuedCount: prospectIds.length
+            queuedCount: prospectIds.length,
         }, `Successfully queued enrichment for ${prospectIds.length} prospects`);
     }
     catch (error) {

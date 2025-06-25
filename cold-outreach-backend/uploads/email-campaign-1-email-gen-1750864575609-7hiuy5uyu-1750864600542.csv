@@ -1,0 +1,34 @@
+Name,Email,Company,Position,LinkedIn URL,Phone,Location,Industry,Company Size,Tech Stack,Email Subject,Email Body
+"Test User","test@example.com","Test User","","https://linkedin.com/in/test","","","","","","Test User / Matteo - Quick Question","```
+Hi Test,
+
+I recently visited Test User's website and saw opportunities to enhance its user experience and performance. At Scalarly, we specialize in transforming digital presences through custom web development tailored to your business needs.
+
+We can help modernize your website's design and improve its mobile responsiveness, ensuring that your customers have a seamless experience across all devices. Our team has successfully increased engagement and conversion rates for companies similar to yours by implementing cutting-edge web technologies.
+
+Interested in seeing how we've helped similar companies improve their digital presence with increased user engagement and sales?
+
+Here is my calendar to directly book a slot of your preference: [calendar_link]
+```"
+"Elisa","elisa@aureatradings.com","fineflavorcacaofineflavorcocoa+77","Co- Founder","http://www.linkedin.com/in/elisa-parriciatu-9240a895","","","","","","Elisa, Let's Strengthen VAICACAO®'s Sustainable Supply","Buongiorno Elisa,
+
+Ho visitato il sito di VAICACAO® e apprezzo profondamente la vostra missione di creare una filiera del cacao trasparente e sostenibile. Tuttavia, ho notato che la piattaforma Wix attuale potrebbe limitare la narrazione completa della vostra storia e la scalabilità necessaria per supportare la crescita del vostro marchio.
+
+Presso Scalarly, ci specializziamo nella trasformazione digitale per aziende come la vostra. Possiamo migrare il vostro e-commerce su una piattaforma più robusta come Shopify Plus, permettendovi di offrire un’esperienza di acquisto immersiva che riflette la qualità e i valori del vostro marchio.
+
+Abbiamo aiutato altre aziende nel settore del commercio diretto a incrementare le vendite del 35% grazie a un’economia digitale ottimizzata e a una migliore integrazione con i sistemi di gestione.
+
+Interessata a vedere come abbiamo aiutato aziende simili a migliorare la loro presenza digitale con un aumento delle vendite e della fidelizzazione dei clienti?
+
+Ecco il mio calendario per prenotare una fascia oraria a voi comoda: ${calendar_link}"
+"Filippo","filippo@ruderecords.com","music industrydistributionar+62","Partner and Chief Executive Officer Methodos Group","http://www.linkedin.com/in/filippo-falconi","","","","","","Filippo / Matteo - Quick Question","Hi Filippo,
+
+I was impressed by Rude Records' strong e-commerce presence on Shopify and your innovative approach to digital marketing.
+
+At Scalarly, we excel in enhancing e-commerce platforms by modernizing front-end technologies. By upgrading from jQuery to a modern JavaScript framework, we can improve your site's performance and create a more engaging fan experience.
+
+This transformation can lead to increased sales, better user engagement, and a scalable platform to support your growth objectives.
+
+Interested in seeing how we've helped similar companies improve their digital presence with higher conversion rates and enhanced user experience?
+
+Here is my calendar to directly book a slot of your preference: [calendar_link]"

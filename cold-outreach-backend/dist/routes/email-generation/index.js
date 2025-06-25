@@ -150,14 +150,17 @@ async function generateEmailCSV(campaignId, jobId) {
         ];
         const csvRows = prospects.map(prospect => {
             const generatedEmail = prospect.generatedEmail;
+            // Safely access phone and location from additionalData or direct properties
+            const phone = prospect.phone || prospect.additionalData?.phone || '';
+            const location = prospect.location || prospect.additionalData?.location || '';
             return [
                 prospect.name || '',
                 prospect.email || '',
                 prospect.company || '',
                 prospect.position || '',
                 prospect.linkedinUrl || '',
-                prospect.phone || '',
-                prospect.location || '',
+                phone,
+                location,
                 prospect.enrichment?.industry || '',
                 prospect.enrichment?.companySize || '',
                 prospect.enrichment?.techStack?.join(', ') || '',

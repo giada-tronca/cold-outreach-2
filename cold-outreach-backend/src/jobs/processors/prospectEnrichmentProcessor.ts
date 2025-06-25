@@ -642,13 +642,10 @@ export class ProspectEnrichmentProcessor {
 
 
     private static async extractCompanyWebsite(prospect: any): Promise<string | null> {
-        // First try to extract from prospect email domain (most reliable)
+        // Use the new Firecrawl method to extract company website from email domain
         if (prospect.email) {
-            const emailDomain = prospect.email.split('@')[1]
-            if (emailDomain && !['gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'icloud.com', 'live.com'].includes(emailDomain)) {
-                // Use the email domain as the company website
-                const websiteUrl = `https://www.${emailDomain}`
-                console.log(`🔍 [Enrichment]: Extracted company website from email domain: ${websiteUrl}`)
+            const websiteUrl = FirecrawlService.extractCompanyWebsiteFromEmail(prospect.email)
+            if (websiteUrl) {
                 return websiteUrl
             }
         }

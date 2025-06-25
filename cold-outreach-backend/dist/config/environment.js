@@ -22,15 +22,15 @@ const getEnvConfig = () => {
         // Database Configuration
         DATABASE_URL: process.env.DATABASE_URL || 'postgresql://localhost:5432/cold_outreach',
         ...(process.env.DATABASE_POOL_SIZE && {
-            DATABASE_POOL_SIZE: parseInt(process.env.DATABASE_POOL_SIZE, 10)
+            DATABASE_POOL_SIZE: parseInt(process.env.DATABASE_POOL_SIZE, 10),
         }),
         ...(process.env.DATABASE_CONNECTION_TIMEOUT && {
-            DATABASE_CONNECTION_TIMEOUT: parseInt(process.env.DATABASE_CONNECTION_TIMEOUT, 10)
+            DATABASE_CONNECTION_TIMEOUT: parseInt(process.env.DATABASE_CONNECTION_TIMEOUT, 10),
         }),
         // Redis Configuration
         REDIS_URL: process.env.REDIS_URL || 'redis://localhost:6379',
         ...(process.env.REDIS_CONNECTION_POOL_SIZE && {
-            REDIS_CONNECTION_POOL_SIZE: parseInt(process.env.REDIS_CONNECTION_POOL_SIZE, 10)
+            REDIS_CONNECTION_POOL_SIZE: parseInt(process.env.REDIS_CONNECTION_POOL_SIZE, 10),
         }),
         // JWT Configuration
         JWT_SECRET: process.env.JWT_SECRET || 'fallback-secret-change-in-production',
@@ -46,7 +46,9 @@ const getEnvConfig = () => {
         RATE_LIMIT_MAX_REQUESTS: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '100', 10),
         // Email Configuration
         ...(process.env.SMTP_HOST && { SMTP_HOST: process.env.SMTP_HOST }),
-        ...(process.env.SMTP_PORT && { SMTP_PORT: parseInt(process.env.SMTP_PORT, 10) }),
+        ...(process.env.SMTP_PORT && {
+            SMTP_PORT: parseInt(process.env.SMTP_PORT, 10),
+        }),
         ...(process.env.SMTP_USER && { SMTP_USER: process.env.SMTP_USER }),
         ...(process.env.SMTP_PASS && { SMTP_PASS: process.env.SMTP_PASS }),
         // Feature Flags
@@ -56,9 +58,15 @@ const getEnvConfig = () => {
         ENABLE_DB_SEEDING: process.env.ENABLE_DB_SEEDING === 'true',
         SEED_SAMPLE_DATA: process.env.SEED_SAMPLE_DATA === 'true',
         // Security Configuration
-        ...(process.env.TRUST_PROXY && { TRUST_PROXY: process.env.TRUST_PROXY === 'true' }),
-        ...(process.env.SECURE_COOKIES && { SECURE_COOKIES: process.env.SECURE_COOKIES === 'true' }),
-        ...(process.env.HTTPS_ONLY && { HTTPS_ONLY: process.env.HTTPS_ONLY === 'true' }),
+        ...(process.env.TRUST_PROXY && {
+            TRUST_PROXY: process.env.TRUST_PROXY === 'true',
+        }),
+        ...(process.env.SECURE_COOKIES && {
+            SECURE_COOKIES: process.env.SECURE_COOKIES === 'true',
+        }),
+        ...(process.env.HTTPS_ONLY && {
+            HTTPS_ONLY: process.env.HTTPS_ONLY === 'true',
+        }),
         // API Configuration
         API_KEYS_SOURCE: process.env.API_KEYS_SOURCE || 'database',
         // Health Check Configuration
@@ -71,7 +79,7 @@ const validateEnvironmentConfig = (config) => {
     const requiredVars = [
         'DATABASE_URL',
         'REDIS_URL',
-        'JWT_SECRET'
+        'JWT_SECRET',
     ];
     const missingVars = requiredVars.filter(varName => {
         const value = config[varName];
@@ -121,7 +129,13 @@ const getJWTConfig = () => ({
 exports.getJWTConfig = getJWTConfig;
 const getCORSConfig = () => ({
     origin: (0, exports.isDevelopment)()
-        ? ['http://localhost:3000', 'http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175', 'http://localhost:5176']
+        ? [
+            'http://localhost:3000',
+            'http://localhost:5173',
+            'http://localhost:5174',
+            'http://localhost:5175',
+            'http://localhost:5176',
+        ]
         : process.env.FRONTEND_URL?.split(',') || false,
     credentials: true,
 });

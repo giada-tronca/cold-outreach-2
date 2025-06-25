@@ -35,7 +35,7 @@ exports.validateCreateProspect = [
         .isURL()
         .withMessage('LinkedIn URL must be a valid URL')
         .isLength({ max: 500 })
-        .withMessage('LinkedIn URL must not exceed 500 characters')
+        .withMessage('LinkedIn URL must not exceed 500 characters'),
 ];
 /**
  * Validation for updating a prospect
@@ -74,12 +74,19 @@ exports.validateUpdateProspect = [
         .withMessage('LinkedIn URL must not exceed 500 characters'),
     (0, express_validator_1.body)('status')
         .optional()
-        .isIn(['PENDING', 'ENRICHING', 'ENRICHED', 'GENERATING', 'COMPLETED', 'FAILED'])
+        .isIn([
+        'PENDING',
+        'ENRICHING',
+        'ENRICHED',
+        'GENERATING',
+        'COMPLETED',
+        'FAILED',
+    ])
         .withMessage('Status must be one of: PENDING, ENRICHING, ENRICHED, GENERATING, COMPLETED, FAILED'),
     (0, express_validator_1.body)('additionalData')
         .optional()
         .isObject()
-        .withMessage('Additional data must be a valid object')
+        .withMessage('Additional data must be a valid object'),
 ];
 /**
  * Validation for prospect ID parameter
@@ -87,7 +94,7 @@ exports.validateUpdateProspect = [
 exports.validateProspectId = [
     (0, express_validator_1.param)('id')
         .isInt({ min: 1 })
-        .withMessage('Prospect ID must be a positive integer')
+        .withMessage('Prospect ID must be a positive integer'),
 ];
 /**
  * Validation for prospect queries (list, search, filter)
@@ -116,7 +123,14 @@ exports.validateProspectQuery = [
         .withMessage('Batch ID must be a positive integer'),
     (0, express_validator_1.query)('status')
         .optional()
-        .isIn(['PENDING', 'ENRICHING', 'ENRICHED', 'GENERATING', 'COMPLETED', 'FAILED'])
+        .isIn([
+        'PENDING',
+        'ENRICHING',
+        'ENRICHED',
+        'GENERATING',
+        'COMPLETED',
+        'FAILED',
+    ])
         .withMessage('Status must be one of: PENDING, ENRICHING, ENRICHED, GENERATING, COMPLETED, FAILED'),
     (0, express_validator_1.query)('company')
         .optional()
@@ -133,7 +147,15 @@ exports.validateProspectQuery = [
         .withMessage('hasGeneratedEmail must be a boolean value'),
     (0, express_validator_1.query)('sortBy')
         .optional()
-        .isIn(['name', 'email', 'company', 'position', 'status', 'createdAt', 'updatedAt'])
+        .isIn([
+        'name',
+        'email',
+        'company',
+        'position',
+        'status',
+        'createdAt',
+        'updatedAt',
+    ])
         .withMessage('Sort field must be one of: name, email, company, position, status, createdAt, updatedAt'),
     (0, express_validator_1.query)('sortOrder')
         .optional()
@@ -146,7 +168,7 @@ exports.validateProspectQuery = [
     (0, express_validator_1.query)('endDate')
         .optional()
         .isISO8601()
-        .withMessage('End date must be a valid ISO8601 date')
+        .withMessage('End date must be a valid ISO8601 date'),
 ];
 /**
  * Validation for bulk prospect operations
@@ -159,7 +181,14 @@ exports.validateBulkProspectOperation = [
         .isInt({ min: 1 })
         .withMessage('Each prospect ID must be a positive integer'),
     (0, express_validator_1.body)('operation')
-        .isIn(['delete', 'updateStatus', 'assignToBatch', 'startEnrichment', 'generateEmails', 'export'])
+        .isIn([
+        'delete',
+        'updateStatus',
+        'assignToBatch',
+        'startEnrichment',
+        'generateEmails',
+        'export',
+    ])
         .withMessage('Operation must be one of: delete, updateStatus, assignToBatch, startEnrichment, generateEmails, export'),
     (0, express_validator_1.body)('data')
         .optional()
@@ -167,12 +196,19 @@ exports.validateBulkProspectOperation = [
         .withMessage('Operation data must be a valid object'),
     (0, express_validator_1.body)('data.status')
         .if((0, express_validator_1.body)('operation').equals('updateStatus'))
-        .isIn(['PENDING', 'ENRICHING', 'ENRICHED', 'GENERATING', 'COMPLETED', 'FAILED'])
+        .isIn([
+        'PENDING',
+        'ENRICHING',
+        'ENRICHED',
+        'GENERATING',
+        'COMPLETED',
+        'FAILED',
+    ])
         .withMessage('Status must be valid when operation is updateStatus'),
     (0, express_validator_1.body)('data.batchId')
         .if((0, express_validator_1.body)('operation').equals('assignToBatch'))
         .isInt({ min: 1 })
-        .withMessage('Batch ID must be provided when operation is assignToBatch')
+        .withMessage('Batch ID must be provided when operation is assignToBatch'),
 ];
 /**
  * Validation for CSV import
@@ -215,7 +251,7 @@ exports.validateCSVImport = [
     (0, express_validator_1.body)('validateEmails')
         .optional()
         .isBoolean()
-        .withMessage('Validate emails must be a boolean value')
+        .withMessage('Validate emails must be a boolean value'),
 ];
 /**
  * Validation for enrichment operations
@@ -239,7 +275,7 @@ exports.validateEnrichmentOperation = [
     (0, express_validator_1.body)('forceRefresh')
         .optional()
         .isBoolean()
-        .withMessage('Force refresh must be a boolean value')
+        .withMessage('Force refresh must be a boolean value'),
 ];
 /**
  * Validation for prospect export
@@ -255,7 +291,14 @@ exports.validateProspectExport = [
         .withMessage('Batch ID must be a positive integer'),
     (0, express_validator_1.query)('status')
         .optional()
-        .isIn(['PENDING', 'ENRICHING', 'ENRICHED', 'GENERATING', 'COMPLETED', 'FAILED'])
+        .isIn([
+        'PENDING',
+        'ENRICHING',
+        'ENRICHED',
+        'GENERATING',
+        'COMPLETED',
+        'FAILED',
+    ])
         .withMessage('Status filter must be valid'),
     (0, express_validator_1.query)('format')
         .optional()
@@ -271,11 +314,22 @@ exports.validateProspectExport = [
         .withMessage('Include emails must be a boolean value'),
     (0, express_validator_1.query)('columns')
         .optional()
-        .custom((value) => {
+        .custom(value => {
         const validColumns = [
-            'name', 'email', 'company', 'position', 'linkedinUrl', 'status',
-            'companyWebsite', 'companySummary', 'techStack', 'marketPosition',
-            'emailSubject', 'emailBody', 'createdAt', 'updatedAt'
+            'name',
+            'email',
+            'company',
+            'position',
+            'linkedinUrl',
+            'status',
+            'companyWebsite',
+            'companySummary',
+            'techStack',
+            'marketPosition',
+            'emailSubject',
+            'emailBody',
+            'createdAt',
+            'updatedAt',
         ];
         const columns = Array.isArray(value) ? value : [value];
         const isValid = columns.every(col => validColumns.includes(col));
@@ -283,7 +337,7 @@ exports.validateProspectExport = [
             throw new Error(`Invalid columns. Must be one of: ${validColumns.join(', ')}`);
         }
         return true;
-    })
+    }),
 ];
 /**
  * Validation for prospect analytics
@@ -311,10 +365,16 @@ exports.validateProspectAnalytics = [
         .withMessage('Group by must be one of: status, company, batch, date'),
     (0, express_validator_1.query)('metrics')
         .optional()
-        .custom((value) => {
+        .custom(value => {
         const validMetrics = [
-            'total', 'enriched', 'generated', 'failed', 'successRate',
-            'enrichmentRate', 'conversionRate', 'avgProcessingTime'
+            'total',
+            'enriched',
+            'generated',
+            'failed',
+            'successRate',
+            'enrichmentRate',
+            'conversionRate',
+            'avgProcessingTime',
         ];
         const metrics = Array.isArray(value) ? value : [value];
         const isValid = metrics.every(metric => validMetrics.includes(metric));
@@ -322,7 +382,7 @@ exports.validateProspectAnalytics = [
             throw new Error(`Invalid metrics. Must be one of: ${validMetrics.join(', ')}`);
         }
         return true;
-    })
+    }),
 ];
 /**
  * Validation for creating prospect enrichment
@@ -331,43 +391,43 @@ exports.createEnrichmentSchema = {
     prospectId: {
         isInt: {
             options: { min: 1 },
-            errorMessage: 'Prospect ID must be a positive integer'
-        }
+            errorMessage: 'Prospect ID must be a positive integer',
+        },
     },
     enrichmentStatus: {
         optional: true,
         isIn: {
             options: [['PENDING', 'PROCESSING', 'COMPLETED', 'FAILED']],
-            errorMessage: 'Enrichment status must be one of: PENDING, PROCESSING, COMPLETED, FAILED'
-        }
+            errorMessage: 'Enrichment status must be one of: PENDING, PROCESSING, COMPLETED, FAILED',
+        },
     },
     companyWebsite: {
         optional: true,
         isURL: {
-            errorMessage: 'Company website must be a valid URL'
-        }
+            errorMessage: 'Company website must be a valid URL',
+        },
     },
     companySummary: {
         optional: true,
         isLength: {
             options: { max: 10000 },
-            errorMessage: 'Company summary must not exceed 10000 characters'
-        }
+            errorMessage: 'Company summary must not exceed 10000 characters',
+        },
     },
     linkedinSummary: {
         optional: true,
         isLength: {
             options: { max: 10000 },
-            errorMessage: 'LinkedIn summary must not exceed 10000 characters'
-        }
+            errorMessage: 'LinkedIn summary must not exceed 10000 characters',
+        },
     },
     prospectAnalysisSummary: {
         optional: true,
         isLength: {
             options: { max: 10000 },
-            errorMessage: 'Prospect analysis summary must not exceed 10000 characters'
-        }
-    }
+            errorMessage: 'Prospect analysis summary must not exceed 10000 characters',
+        },
+    },
 };
 /**
  * Validation for updating prospect enrichment
@@ -377,36 +437,36 @@ exports.updateEnrichmentSchema = {
         optional: true,
         isIn: {
             options: [['PENDING', 'PROCESSING', 'COMPLETED', 'FAILED']],
-            errorMessage: 'Enrichment status must be one of: PENDING, PROCESSING, COMPLETED, FAILED'
-        }
+            errorMessage: 'Enrichment status must be one of: PENDING, PROCESSING, COMPLETED, FAILED',
+        },
     },
     companyWebsite: {
         optional: true,
         isURL: {
-            errorMessage: 'Company website must be a valid URL'
-        }
+            errorMessage: 'Company website must be a valid URL',
+        },
     },
     companySummary: {
         optional: true,
         isLength: {
             options: { max: 10000 },
-            errorMessage: 'Company summary must not exceed 10000 characters'
-        }
+            errorMessage: 'Company summary must not exceed 10000 characters',
+        },
     },
     linkedinSummary: {
         optional: true,
         isLength: {
             options: { max: 10000 },
-            errorMessage: 'LinkedIn summary must not exceed 10000 characters'
-        }
+            errorMessage: 'LinkedIn summary must not exceed 10000 characters',
+        },
     },
     prospectAnalysisSummary: {
         optional: true,
         isLength: {
             options: { max: 10000 },
-            errorMessage: 'Prospect analysis summary must not exceed 10000 characters'
-        }
-    }
+            errorMessage: 'Prospect analysis summary must not exceed 10000 characters',
+        },
+    },
 };
 /**
  * Validation for creating prospect analysis
@@ -415,37 +475,37 @@ exports.createAnalysisSchema = {
     prospectId: {
         isInt: {
             options: { min: 1 },
-            errorMessage: 'Prospect ID must be a positive integer'
-        }
+            errorMessage: 'Prospect ID must be a positive integer',
+        },
     },
     marketPosition: {
         optional: true,
         isLength: {
             options: { max: 5000 },
-            errorMessage: 'Market position must not exceed 5000 characters'
-        }
+            errorMessage: 'Market position must not exceed 5000 characters',
+        },
     },
     suggestedApproach: {
         optional: true,
         isLength: {
             options: { max: 5000 },
-            errorMessage: 'Suggested approach must not exceed 5000 characters'
-        }
+            errorMessage: 'Suggested approach must not exceed 5000 characters',
+        },
     },
     executiveSummary: {
         optional: true,
         isLength: {
             options: { max: 10000 },
-            errorMessage: 'Executive summary must not exceed 10000 characters'
-        }
+            errorMessage: 'Executive summary must not exceed 10000 characters',
+        },
     },
     confidenceScore: {
         optional: true,
         isFloat: {
             options: { min: 0, max: 1 },
-            errorMessage: 'Confidence score must be a number between 0 and 1'
-        }
-    }
+            errorMessage: 'Confidence score must be a number between 0 and 1',
+        },
+    },
 };
 /**
  * Validation for updating prospect analysis
@@ -455,30 +515,30 @@ exports.updateAnalysisSchema = {
         optional: true,
         isLength: {
             options: { max: 5000 },
-            errorMessage: 'Market position must not exceed 5000 characters'
-        }
+            errorMessage: 'Market position must not exceed 5000 characters',
+        },
     },
     suggestedApproach: {
         optional: true,
         isLength: {
             options: { max: 5000 },
-            errorMessage: 'Suggested approach must not exceed 5000 characters'
-        }
+            errorMessage: 'Suggested approach must not exceed 5000 characters',
+        },
     },
     executiveSummary: {
         optional: true,
         isLength: {
             options: { max: 10000 },
-            errorMessage: 'Executive summary must not exceed 10000 characters'
-        }
+            errorMessage: 'Executive summary must not exceed 10000 characters',
+        },
     },
     confidenceScore: {
         optional: true,
         isFloat: {
             options: { min: 0, max: 1 },
-            errorMessage: 'Confidence score must be a number between 0 and 1'
-        }
-    }
+            errorMessage: 'Confidence score must be a number between 0 and 1',
+        },
+    },
 };
 /**
  * Validation for upsert prospect analysis

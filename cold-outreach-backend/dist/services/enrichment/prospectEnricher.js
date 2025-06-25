@@ -1220,11 +1220,11 @@ class ProspectEnricher {
                                 role: 'user',
                                 content: prompt
                             }],
-                        max_completion_tokens: 3000,
+                        max_tokens: 3000,
                     };
                     break;
                 case 'openrouter-gemini-2.5-pro':
-                    modelId = 'google/gemini-pro-2.5';
+                    modelId = 'google/gemini-2.5-pro';
                     modelName = 'gemini-2.5-pro';
                     // Gemini models support temperature
                     requestBody = {
@@ -1233,13 +1233,13 @@ class ProspectEnricher {
                                 role: 'user',
                                 content: prompt
                             }],
-                        max_completion_tokens: 3000,
-                        temperature: 0.7, // Good balance for analysis
+                        max_tokens: 3000,
+                        temperature: 0.7,
                     };
                     break;
                 case 'openrouter-gemini-2.5-flash':
-                    modelId = 'google/gemini-2.0-flash-exp';
-                    modelName = 'gemini-2.5-flash';
+                    modelId = 'google/gemini-2.0-flash-001';
+                    modelName = 'gemini-2.0-flash-001';
                     // Gemini models support temperature
                     requestBody = {
                         model: modelId,
@@ -1247,8 +1247,8 @@ class ProspectEnricher {
                                 role: 'user',
                                 content: prompt
                             }],
-                        max_completion_tokens: 3000,
-                        temperature: 0.7, // Good balance for analysis
+                        max_tokens: 3000,
+                        temperature: 0.7,
                     };
                     break;
                 default:
@@ -1261,7 +1261,7 @@ class ProspectEnricher {
                                 role: 'user',
                                 content: prompt
                             }],
-                        max_completion_tokens: 3000,
+                        max_tokens: 3000,
                     };
                     break;
             }
@@ -1274,7 +1274,7 @@ class ProspectEnricher {
                         role: 'user',
                         content: prompt
                     }],
-                max_completion_tokens: 3000,
+                max_tokens: 3000,
             };
         }
         for (let attempt = 1; attempt <= maxRetries; attempt++) {

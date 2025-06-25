@@ -20,8 +20,8 @@ class BackgroundJobService {
                 total: 1,
                 processed: 0,
                 failed: 0,
-                status: 'Queued for processing'
-            }
+                status: 'Queued for processing',
+            },
         };
         this.jobs.set(jobId, job);
         console.log(`📝 [BackgroundJob]: Added prospect enrichment job ${jobId} for prospect ${data.prospectId}`);
@@ -84,12 +84,12 @@ class BackgroundJobService {
                 processed: 0,
                 failed: 0,
                 status: 'Starting LinkedIn enrichment...',
-                startTime: startTime
+                startTime: startTime,
             };
             // Get the prospect from database
             // Using imported prisma client
             const prospect = await database_1.prisma.prospect.findUnique({
-                where: { id: parseInt(job.data.prospectId) }
+                where: { id: parseInt(job.data.prospectId) },
             });
             if (!prospect) {
                 throw new Error(`Prospect with ID ${job.data.prospectId} not found`);
@@ -101,7 +101,7 @@ class BackgroundJobService {
                 processed: 0,
                 failed: 0,
                 status: 'Fetching LinkedIn profile data...',
-                startTime: startTime
+                startTime: startTime,
             };
             // Perform the enrichment (without creating prospect)
             const enrichmentResult = await prospectEnricher_1.ProspectEnricher.enrichExistingProspect(prospect.id, job.data.linkedinUrl, { aiProvider: job.data.aiProvider });
@@ -112,7 +112,7 @@ class BackgroundJobService {
                 processed: 0,
                 failed: 0,
                 status: 'Saving enrichment data...',
-                startTime: startTime
+                startTime: startTime,
             };
             // Complete the job
             job.status = 'completed';
@@ -123,7 +123,7 @@ class BackgroundJobService {
                 processed: 1,
                 failed: 0,
                 status: 'Enrichment completed successfully',
-                startTime: startTime
+                startTime: startTime,
             };
             job.result = {
                 success: true,
@@ -133,8 +133,8 @@ class BackgroundJobService {
                     total: 1,
                     processed: 1,
                     failed: 0,
-                    skipped: enrichmentResult.skipped ? 1 : 0
-                }
+                    skipped: enrichmentResult.skipped ? 1 : 0,
+                },
             };
             console.log(`✅ [BackgroundJob]: Completed job ${job.id} for prospect ${job.data.prospectId}`);
         }
@@ -148,7 +148,7 @@ class BackgroundJobService {
                 processed: 0,
                 failed: 1,
                 status: 'Enrichment failed',
-                startTime: startTime
+                startTime: startTime,
             };
             job.error = error instanceof Error ? error.message : String(error);
             job.result = {
@@ -159,8 +159,8 @@ class BackgroundJobService {
                     total: 1,
                     processed: 0,
                     failed: 1,
-                    skipped: 0
-                }
+                    skipped: 0,
+                },
             };
         }
     }
@@ -188,8 +188,7 @@ class BackgroundJobService {
      * Clean up old completed/failed jobs (keep last 50)
      */
     static cleanupOldJobs() {
-        const allJobs = Array.from(this.jobs.values())
-            .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+        const allJobs = Array.from(this.jobs.values()).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
         if (allJobs.length > 50) {
             const jobsToRemove = allJobs.slice(50);
             jobsToRemove.forEach(job => {
@@ -210,7 +209,7 @@ class BackgroundJobService {
             pending: jobs.filter(j => j.status === 'pending').length,
             processing: jobs.filter(j => j.status === 'processing').length,
             completed: jobs.filter(j => j.status === 'completed').length,
-            failed: jobs.filter(j => j.status === 'failed').length
+            failed: jobs.filter(j => j.status === 'failed').length,
         };
     }
 }

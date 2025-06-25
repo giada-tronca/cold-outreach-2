@@ -13,7 +13,7 @@ const apiResponse_1 = require("@/utils/apiResponse");
 async function queueProspectEnrichment(req, res) {
     try {
         const { linkedinUrl, aiProvider = 'openrouter', email, name, company, position, phone, userId = '1', // Default user ID
-        campaignId = 1 } = req.body;
+        campaignId = 1, } = req.body;
         if (!linkedinUrl) {
             throw new errors_1.BadRequestError('LinkedIn URL is required');
         }
@@ -50,8 +50,8 @@ async function queueProspectEnrichment(req, res) {
                 includeCompanyInfo: true,
                 includePersonalInfo: true,
                 includeContactDetails: true,
-                includeSocialProfiles: true
-            }
+                includeSocialProfiles: true,
+            },
         });
         console.log(`🚀 [ProspectEnrichment]: Queued background job ${jobId} for prospect ${prospect.id}`);
         // Step 3: Return immediate response with job ID
@@ -64,14 +64,16 @@ async function queueProspectEnrichment(req, res) {
                 company: prospect.company,
                 position: prospect.position,
                 linkedinUrl: prospect.linkedinUrl,
-                status: prospect.status
+                status: prospect.status,
             },
             message: 'Prospect created and enrichment job queued',
-            enrichmentStatus: 'QUEUED'
+            enrichmentStatus: 'QUEUED',
         }, 'Prospect enrichment started successfully');
     }
     catch (error) {
-        if (error instanceof errors_1.NotFoundError || error instanceof errors_1.BadRequestError || error instanceof errors_1.DatabaseError) {
+        if (error instanceof errors_1.NotFoundError ||
+            error instanceof errors_1.BadRequestError ||
+            error instanceof errors_1.DatabaseError) {
             throw error;
         }
         console.error('Error queueing prospect enrichment:', error);
@@ -99,7 +101,7 @@ async function getEnrichmentJobStatus(req, res) {
             startedAt: job.startedAt,
             completedAt: job.completedAt,
             result: job.result,
-            error: job.error
+            error: job.error,
         }, 'Job status retrieved successfully');
     }
     catch (error) {
@@ -129,9 +131,9 @@ async function getUserEnrichmentJobs(req, res) {
                 createdAt: job.createdAt,
                 startedAt: job.startedAt,
                 completedAt: job.completedAt,
-                error: job.error
+                error: job.error,
             })),
-            total: jobs.length
+            total: jobs.length,
         }, 'User jobs retrieved successfully');
     }
     catch (error) {
@@ -150,18 +152,22 @@ async function createProspectImmediately(data) {
     // Step 1: Check for existing prospect by email or phone
     let existingProspect = null;
     if (data.email) {
-        existingProspect = await database_1.prisma.prospect.findFirst({
-            where: { email: data.email }
+        existingProspect = await database_1.prisma.cOProspects.findFirst({
+            where: {
+                email: data.email,
+                campaignId: data.campaignId
+            },
         });
     }
     if (!existingProspect && data.phone) {
-        existingProspect = await database_1.prisma.prospect.findFirst({
+        existingProspect = await database_1.prisma.cOProspects.findFirst({
             where: {
                 additionalData: {
                     path: ['phone'],
-                    equals: data.phone
-                }
-            }
+                    equals: data.phone,
+                },
+                campaignId: data.campaignId
+            },
         });
     }
     // Step 2: If prospect exists, return it
@@ -182,16 +188,21 @@ async function createProspectImmediately(data) {
             throw new errors_1.BadRequestError('Email is required when LinkedIn URL format is invalid');
         }
     }
-    const newProspect = await database_1.prisma.prospect.create({
+    const newProspect = await database_1.prisma.cOProspects.create({
         data: {
-            name: data.name || null,
+            name: data.name || '',
             email: email,
-            company: data.company || null,
-            position: data.position || null,
+            company: data.company || '',
+            position: data.position || '',
             linkedinUrl: data.linkedinUrl,
             status: 'PENDING',
-            campaignId: data.campaignId,
+            campaign: {
+                connect: { id: data.campaignId }
+            },
             additionalData: data.phone ? { phone: data.phone } : {}
+        },
+        include: {
+            campaign: true
         }
     });
     console.log(`✅ [ProspectEnrichment]: Created new prospect ID ${newProspect.id}`);

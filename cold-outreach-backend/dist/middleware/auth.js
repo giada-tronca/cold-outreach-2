@@ -16,7 +16,9 @@ const errors_1 = require("@/utils/errors");
  */
 function authenticateToken(req, res, next) {
     const authHeader = req.headers.authorization;
-    const token = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : null;
+    const token = authHeader?.startsWith('Bearer ')
+        ? authHeader.substring(7)
+        : null;
     if (!token) {
         throw new errors_1.UnauthorizedError('Access token required');
     }
@@ -30,7 +32,7 @@ function authenticateToken(req, res, next) {
         req.user = {
             id: payload.userId,
             email: payload.email,
-            ...(payload.role && { role: payload.role })
+            ...(payload.role && { role: payload.role }),
         };
         next();
     }
@@ -84,7 +86,9 @@ function requireOwnershipOrAdmin(userIdField = 'userId') {
  */
 function optionalAuth(req, res, next) {
     const authHeader = req.headers.authorization;
-    const token = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : null;
+    const token = authHeader?.startsWith('Bearer ')
+        ? authHeader.substring(7)
+        : null;
     if (!token) {
         // No token provided, continue without authentication
         next();
@@ -101,7 +105,7 @@ function optionalAuth(req, res, next) {
         req.user = {
             id: payload.userId,
             email: payload.email,
-            ...(payload.role && { role: payload.role })
+            ...(payload.role && { role: payload.role }),
         };
         next();
     }

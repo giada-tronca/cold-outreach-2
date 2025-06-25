@@ -32,7 +32,7 @@ class SSEService extends events_1.EventEmitter {
         res.writeHead(200, {
             'Content-Type': 'text/event-stream',
             'Cache-Control': 'no-cache',
-            'Connection': 'keep-alive',
+            Connection: 'keep-alive',
             'Access-Control-Allow-Origin': '*',
             'Access-Control-Allow-Headers': 'Cache-Control',
         });
@@ -53,7 +53,7 @@ class SSEService extends events_1.EventEmitter {
         res.on('close', () => {
             this.removeConnection(connectionId, userId);
         });
-        res.on('error', (error) => {
+        res.on('error', error => {
             console.error(`SSE connection error for ${connectionId}:`, error);
             this.removeConnection(connectionId, userId);
         });

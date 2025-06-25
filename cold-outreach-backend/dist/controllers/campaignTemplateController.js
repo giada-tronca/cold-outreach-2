@@ -16,7 +16,7 @@ const prisma = new client_1.PrismaClient();
  */
 async function getAllTemplates(req, res) {
     try {
-        const { page = '1', limit = '10', search, category, isPublic, sortBy = 'usageCount', sortOrder = 'desc' } = req.query;
+        const { page = '1', limit = '10', search, category, isPublic, sortBy = 'usageCount', sortOrder = 'desc', } = req.query;
         const pageNum = parseInt(page);
         const limitNum = parseInt(limit);
         // For now, we'll create some mock templates since we don't have a templates table
@@ -36,12 +36,12 @@ async function getAllTemplates(req, res) {
                     includeTechStack: true,
                     includeCompanyInfo: true,
                     includeLinkedInData: true,
-                    includeMarketPosition: false
+                    includeMarketPosition: false,
                 },
                 isPublic: true,
                 usageCount: 245,
                 createdAt: new Date('2024-01-15'),
-                updatedAt: new Date('2024-06-20')
+                updatedAt: new Date('2024-06-20'),
             },
             {
                 id: '2',
@@ -57,12 +57,12 @@ async function getAllTemplates(req, res) {
                     includeTechStack: false,
                     includeCompanyInfo: true,
                     includeLinkedInData: true,
-                    includeMarketPosition: true
+                    includeMarketPosition: true,
                 },
                 isPublic: true,
                 usageCount: 189,
                 createdAt: new Date('2024-02-10'),
-                updatedAt: new Date('2024-06-18')
+                updatedAt: new Date('2024-06-18'),
             },
             {
                 id: '3',
@@ -78,12 +78,12 @@ async function getAllTemplates(req, res) {
                     includeTechStack: true,
                     includeCompanyInfo: true,
                     includeLinkedInData: false,
-                    includeMarketPosition: true
+                    includeMarketPosition: true,
                 },
                 isPublic: true,
                 usageCount: 156,
                 createdAt: new Date('2024-03-05'),
-                updatedAt: new Date('2024-06-15')
+                updatedAt: new Date('2024-06-15'),
             },
             {
                 id: '4',
@@ -99,12 +99,12 @@ async function getAllTemplates(req, res) {
                     includeTechStack: true,
                     includeCompanyInfo: true,
                     includeLinkedInData: true,
-                    includeMarketPosition: false
+                    includeMarketPosition: false,
                 },
                 isPublic: true,
                 usageCount: 312,
                 createdAt: new Date('2024-01-20'),
-                updatedAt: new Date('2024-06-22')
+                updatedAt: new Date('2024-06-22'),
             },
             {
                 id: '5',
@@ -120,13 +120,13 @@ async function getAllTemplates(req, res) {
                     includeTechStack: false,
                     includeCompanyInfo: true,
                     includeLinkedInData: true,
-                    includeMarketPosition: true
+                    includeMarketPosition: true,
                 },
                 isPublic: true,
                 usageCount: 98,
                 createdAt: new Date('2024-04-12'),
-                updatedAt: new Date('2024-06-10')
-            }
+                updatedAt: new Date('2024-06-10'),
+            },
         ];
         // Apply filtering
         let filteredTemplates = mockTemplates;
@@ -151,10 +151,14 @@ async function getAllTemplates(req, res) {
                 return (a.usageCount - b.usageCount) * direction;
             }
             if (sortField === 'createdAt' || sortField === 'updatedAt') {
-                return (new Date(a[sortField]).getTime() - new Date(b[sortField]).getTime()) * direction;
+                return ((new Date(a[sortField]).getTime() -
+                    new Date(b[sortField]).getTime()) *
+                    direction);
             }
-            if (typeof a[sortField] === 'string' && typeof b[sortField] === 'string') {
-                return a[sortField].localeCompare(b[sortField]) * direction;
+            if (typeof a[sortField] === 'string' &&
+                typeof b[sortField] === 'string') {
+                return (a[sortField].localeCompare(b[sortField]) *
+                    direction);
             }
             return 0;
         });
@@ -191,18 +195,34 @@ async function getTemplateById(req, res) {
                 includeTechStack: true,
                 includeCompanyInfo: true,
                 includeLinkedInData: true,
-                includeMarketPosition: false
+                includeMarketPosition: false,
             },
             isPublic: true,
             usageCount: 245,
             createdAt: new Date('2024-01-15'),
             updatedAt: new Date('2024-06-20'),
             variables: [
-                { name: 'prospect_name', description: 'Name of the prospect', required: true },
-                { name: 'company_name', description: 'Name of the company', required: true },
-                { name: 'tech_stack', description: 'Technologies used by the company', required: false },
-                { name: 'position', description: 'Prospect\'s job title', required: false }
-            ]
+                {
+                    name: 'prospect_name',
+                    description: 'Name of the prospect',
+                    required: true,
+                },
+                {
+                    name: 'company_name',
+                    description: 'Name of the company',
+                    required: true,
+                },
+                {
+                    name: 'tech_stack',
+                    description: 'Technologies used by the company',
+                    required: false,
+                },
+                {
+                    name: 'position',
+                    description: "Prospect's job title",
+                    required: false,
+                },
+            ],
         };
         apiResponse_1.ApiResponseBuilder.success(res, mockTemplate, 'Template retrieved successfully');
     }
@@ -224,7 +244,7 @@ async function createTemplate(req, res) {
             prompt,
             enrichmentFlags,
             usageCount: 0,
-            createdAt: new Date()
+            createdAt: new Date(),
         };
         apiResponse_1.ApiResponseBuilder.created(res, newTemplate, 'Template created successfully');
     }
@@ -244,7 +264,7 @@ async function updateTemplate(req, res) {
         const updatedTemplate = {
             id: templateId,
             ...updateData,
-            updatedAt: new Date()
+            updatedAt: new Date(),
         };
         apiResponse_1.ApiResponseBuilder.success(res, updatedTemplate, 'Template updated successfully');
     }
@@ -273,14 +293,46 @@ async function deleteTemplate(req, res) {
 async function getTemplateCategories(req, res) {
     try {
         const categories = [
-            { name: 'Software', count: 12, description: 'Software development and IT services' },
-            { name: 'Marketing', count: 8, description: 'Marketing agencies and digital marketing' },
-            { name: 'E-commerce', count: 15, description: 'Online retail and e-commerce platforms' },
-            { name: 'SaaS', count: 23, description: 'Software as a Service products' },
-            { name: 'Consulting', count: 7, description: 'Professional consulting services' },
-            { name: 'Finance', count: 9, description: 'Financial services and fintech' },
-            { name: 'Healthcare', count: 6, description: 'Healthcare and medical services' },
-            { name: 'Real Estate', count: 4, description: 'Real estate and property management' }
+            {
+                name: 'Software',
+                count: 12,
+                description: 'Software development and IT services',
+            },
+            {
+                name: 'Marketing',
+                count: 8,
+                description: 'Marketing agencies and digital marketing',
+            },
+            {
+                name: 'E-commerce',
+                count: 15,
+                description: 'Online retail and e-commerce platforms',
+            },
+            {
+                name: 'SaaS',
+                count: 23,
+                description: 'Software as a Service products',
+            },
+            {
+                name: 'Consulting',
+                count: 7,
+                description: 'Professional consulting services',
+            },
+            {
+                name: 'Finance',
+                count: 9,
+                description: 'Financial services and fintech',
+            },
+            {
+                name: 'Healthcare',
+                count: 6,
+                description: 'Healthcare and medical services',
+            },
+            {
+                name: 'Real Estate',
+                count: 4,
+                description: 'Real estate and property management',
+            },
         ];
         apiResponse_1.ApiResponseBuilder.success(res, categories, 'Template categories retrieved successfully');
     }
@@ -307,17 +359,18 @@ async function createCampaignFromTemplate(req, res) {
                 includeTechStack: true,
                 includeCompanyInfo: true,
                 includeLinkedInData: true,
-                includeMarketPosition: false
-            }
+                includeMarketPosition: false,
+            },
         };
         // Create campaign using template
         const campaign = await prisma.campaign.create({
             data: {
-                name: campaignName || `${template.name} - ${new Date().toISOString().split('T')[0]}`,
+                name: campaignName ||
+                    `${template.name} - ${new Date().toISOString().split('T')[0]}`,
                 emailSubject: customizations?.emailSubject || template.emailSubject,
                 prompt: customizations?.prompt || template.prompt,
-                enrichmentFlags: customizations?.enrichmentFlags || template.enrichmentFlags
-            }
+                enrichmentFlags: customizations?.enrichmentFlags || template.enrichmentFlags,
+            },
         });
         // In production, increment template usage count
         apiResponse_1.ApiResponseBuilder.created(res, campaign, 'Campaign created from template successfully');

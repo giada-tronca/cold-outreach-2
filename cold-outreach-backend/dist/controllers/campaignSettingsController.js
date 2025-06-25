@@ -17,7 +17,7 @@ async function getCampaignSettings(req, res) {
         const campaignId = parseInt(req.params.id);
         // Check if campaign exists
         const campaign = await prisma.campaign.findUnique({
-            where: { id: campaignId }
+            where: { id: campaignId },
         });
         if (!campaign) {
             throw new errors_1.NotFoundError(`Campaign with ID ${campaignId} not found`);
@@ -33,36 +33,36 @@ async function getCampaignSettings(req, res) {
                 includeTechStack: true,
                 includeCompanyInfo: true,
                 includeLinkedInData: true,
-                includeMarketPosition: false
+                includeMarketPosition: false,
             },
             emailSettings: {
                 personalizeSubject: true,
                 includeUnsubscribeLink: true,
                 trackOpens: true,
-                trackClicks: true
+                trackClicks: true,
             },
             schedulingSettings: {
                 timezone: 'UTC',
                 workingHours: {
                     start: '09:00',
-                    end: '17:00'
+                    end: '17:00',
                 },
                 workingDays: [1, 2, 3, 4, 5], // Monday to Friday
-                respectRecipientTimezone: false
-            }
+                respectRecipientTimezone: false,
+            },
         };
         // Merge with any stored settings from enrichmentFlags
         const settings = {
             ...defaultSettings,
             enrichmentSettings: {
                 ...defaultSettings.enrichmentSettings,
-                ...campaign.enrichmentFlags
-            }
+                ...campaign.enrichmentFlags,
+            },
         };
         apiResponse_1.ApiResponseBuilder.success(res, {
             campaignId,
             campaignName: campaign.name,
-            settings
+            settings,
         }, 'Campaign settings retrieved successfully');
     }
     catch (error) {
@@ -82,7 +82,7 @@ async function updateCampaignSettings(req, res) {
         const { settings } = req.body;
         // Check if campaign exists
         const campaign = await prisma.campaign.findUnique({
-            where: { id: campaignId }
+            where: { id: campaignId },
         });
         if (!campaign) {
             throw new errors_1.NotFoundError(`Campaign with ID ${campaignId} not found`);
@@ -90,23 +90,23 @@ async function updateCampaignSettings(req, res) {
         // Update enrichment flags with enrichment settings
         const updatedEnrichmentFlags = {
             ...campaign.enrichmentFlags,
-            ...settings.enrichmentSettings
+            ...settings.enrichmentSettings,
         };
         // Update campaign with new enrichment flags
         const updatedCampaign = await prisma.campaign.update({
             where: { id: campaignId },
             data: {
-                enrichmentFlags: updatedEnrichmentFlags
-            }
+                enrichmentFlags: updatedEnrichmentFlags,
+            },
         });
         // In production, you'd store the full settings in a separate table
         const responseSettings = {
             campaignId,
             settings: {
                 ...settings,
-                enrichmentSettings: updatedEnrichmentFlags
+                enrichmentSettings: updatedEnrichmentFlags,
             },
-            updatedAt: updatedCampaign.updatedAt
+            updatedAt: updatedCampaign.updatedAt,
         };
         apiResponse_1.ApiResponseBuilder.success(res, responseSettings, 'Campaign settings updated successfully');
     }
@@ -126,7 +126,7 @@ async function resetCampaignSettings(req, res) {
         const campaignId = parseInt(req.params.id);
         // Check if campaign exists
         const campaign = await prisma.campaign.findUnique({
-            where: { id: campaignId }
+            where: { id: campaignId },
         });
         if (!campaign) {
             throw new errors_1.NotFoundError(`Campaign with ID ${campaignId} not found`);
@@ -136,18 +136,18 @@ async function resetCampaignSettings(req, res) {
             includeTechStack: true,
             includeCompanyInfo: true,
             includeLinkedInData: true,
-            includeMarketPosition: false
+            includeMarketPosition: false,
         };
         const updatedCampaign = await prisma.campaign.update({
             where: { id: campaignId },
             data: {
-                enrichmentFlags: defaultEnrichmentFlags
-            }
+                enrichmentFlags: defaultEnrichmentFlags,
+            },
         });
         apiResponse_1.ApiResponseBuilder.success(res, {
             campaignId,
             message: 'Settings reset to defaults',
-            resetAt: updatedCampaign.updatedAt
+            resetAt: updatedCampaign.updatedAt,
         }, 'Campaign settings reset successfully');
     }
     catch (error) {
@@ -174,7 +174,7 @@ async function getCampaignSchedule(req, res) {
             nextExecutionTime: null,
             recurringSettings: null,
             estimatedDuration: '2-3 hours',
-            estimatedCompletion: '2024-06-23T15:30:00Z'
+            estimatedCompletion: '2024-06-23T15:30:00Z',
         };
         apiResponse_1.ApiResponseBuilder.success(res, schedule, 'Campaign schedule retrieved successfully');
     }
@@ -197,7 +197,7 @@ async function updateCampaignSchedule(req, res) {
             scheduledStart: scheduleSettings.startTime,
             scheduledEnd: scheduleSettings.endTime,
             status: 'scheduled',
-            updatedAt: new Date().toISOString()
+            updatedAt: new Date().toISOString(),
         };
         apiResponse_1.ApiResponseBuilder.success(res, updatedSchedule, 'Campaign schedule updated successfully');
     }

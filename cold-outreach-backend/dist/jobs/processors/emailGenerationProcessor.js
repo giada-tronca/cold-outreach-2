@@ -95,10 +95,10 @@ class EmailGenerationProcessor {
                         modelUsed = 'openai/o1-mini';
                         break;
                     case 'openrouter-gemini-2.5-pro':
-                        modelUsed = 'google/gemini-pro-2.5';
+                        modelUsed = 'google/gemini-2.5-pro';
                         break;
                     case 'openrouter-gemini-2.5-flash':
-                        modelUsed = 'google/gemini-2.0-flash-exp';
+                        modelUsed = 'google/gemini-2.0-flash-001';
                         break;
                     default:
                         modelUsed = 'openai/o1-mini'; // Default fallback

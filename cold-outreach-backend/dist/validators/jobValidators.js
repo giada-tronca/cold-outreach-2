@@ -86,7 +86,14 @@ exports.validateQueueNameParam = [
         .isString()
         .withMessage('Queue name must be a string')
         .trim()
-        .isIn(['prospect-enrichment', 'email-generation', 'batch-enrichment', 'batch-email-generation', 'csv-import', 'data-export'])
+        .isIn([
+        'prospect-enrichment',
+        'email-generation',
+        'batch-enrichment',
+        'batch-email-generation',
+        'csv-import',
+        'data-export',
+    ])
         .withMessage('Invalid queue name'),
 ];
 // Validate user jobs query parameters
@@ -95,8 +102,15 @@ exports.validateUserJobsQuery = [
         .optional()
         .isString()
         .withMessage('States must be a string')
-        .custom((value) => {
-        const validStates = ['waiting', 'active', 'completed', 'failed', 'delayed', 'paused'];
+        .custom(value => {
+        const validStates = [
+            'waiting',
+            'active',
+            'completed',
+            'failed',
+            'delayed',
+            'paused',
+        ];
         const states = value.split(',');
         const invalidStates = states.filter((state) => !validStates.includes(state.trim()));
         if (invalidStates.length > 0) {
@@ -116,7 +130,14 @@ exports.validateUserJobsQuery = [
         .optional()
         .isString()
         .withMessage('Queue name must be a string')
-        .isIn(['prospect-enrichment', 'email-generation', 'batch-enrichment', 'batch-email-generation', 'csv-import', 'data-export'])
+        .isIn([
+        'prospect-enrichment',
+        'email-generation',
+        'batch-enrichment',
+        'batch-email-generation',
+        'csv-import',
+        'data-export',
+    ])
         .withMessage('Invalid queue name'),
 ];
 // Validate job action body
@@ -125,7 +146,14 @@ exports.validateJobActionBody = [
         .optional()
         .isString()
         .withMessage('Queue name must be a string')
-        .isIn(['prospect-enrichment', 'email-generation', 'batch-enrichment', 'batch-email-generation', 'csv-import', 'data-export'])
+        .isIn([
+        'prospect-enrichment',
+        'email-generation',
+        'batch-enrichment',
+        'batch-email-generation',
+        'csv-import',
+        'data-export',
+    ])
         .withMessage('Invalid queue name'),
 ];
 // Validate prospect enrichment job data
@@ -201,7 +229,7 @@ exports.validateBatchEnrichmentJob = [
         .withMessage('Prospect IDs are required')
         .isArray()
         .withMessage('Prospect IDs must be an array')
-        .custom((value) => {
+        .custom(value => {
         if (value.length === 0) {
             throw new Error('At least one prospect ID is required');
         }
@@ -240,7 +268,7 @@ exports.validateBatchEmailGenerationJob = [
         .withMessage('Prospect IDs are required')
         .isArray()
         .withMessage('Prospect IDs must be an array')
-        .custom((value) => {
+        .custom(value => {
         if (value.length === 0) {
             throw new Error('At least one prospect ID is required');
         }

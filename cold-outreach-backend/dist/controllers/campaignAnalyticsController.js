@@ -21,11 +21,11 @@ async function getCampaignAnalytics(req, res) {
                 prospects: {
                     include: {
                         enrichment: true,
-                        generatedEmail: true
-                    }
+                        generatedEmail: true,
+                    },
                 },
-                batches: true
-            }
+                batches: true,
+            },
         });
         if (!campaign) {
             throw new errors_1.NotFoundError(`Campaign with ID ${campaignId} not found`);
@@ -50,7 +50,9 @@ async function getCampaignAnalytics(req, res) {
             enrichedProspects: batch.enrichedProspects,
             generatedEmails: batch.generatedEmails,
             failedProspects: batch.failedProspects,
-            successRate: batch.totalProspects > 0 ? (batch.generatedEmails / batch.totalProspects) * 100 : 0
+            successRate: batch.totalProspects > 0
+                ? (batch.generatedEmails / batch.totalProspects) * 100
+                : 0,
         }));
         const analytics = {
             campaignId,
@@ -61,18 +63,18 @@ async function getCampaignAnalytics(req, res) {
                 generatedEmails,
                 failedProspects,
                 pendingProspects,
-                processingProspects
+                processingProspects,
             },
             rates: {
                 successRate: Number(successRate.toFixed(2)),
                 enrichmentRate: Number(enrichmentRate.toFixed(2)),
-                failureRate: Number(failureRate.toFixed(2))
+                failureRate: Number(failureRate.toFixed(2)),
             },
             batches: batchStats,
             timeline: {
                 createdAt: campaign.createdAt,
-                updatedAt: campaign.updatedAt
-            }
+                updatedAt: campaign.updatedAt,
+            },
         };
         apiResponse_1.ApiResponseBuilder.success(res, analytics, 'Campaign analytics retrieved successfully');
     }
@@ -97,7 +99,7 @@ async function getCampaignMetrics(req, res) {
             period: {
                 startDate: startDate || '2024-06-01',
                 endDate: endDate || '2024-06-22',
-                granularity
+                granularity,
             },
             metrics: [
                 {
@@ -106,7 +108,7 @@ async function getCampaignMetrics(req, res) {
                     prospectsEnriched: 22,
                     emailsGenerated: 20,
                     failed: 3,
-                    successRate: 80
+                    successRate: 80,
                 },
                 {
                     date: '2024-06-21',
@@ -114,7 +116,7 @@ async function getCampaignMetrics(req, res) {
                     prospectsEnriched: 28,
                     emailsGenerated: 25,
                     failed: 2,
-                    successRate: 83.3
+                    successRate: 83.3,
                 },
                 {
                     date: '2024-06-22',
@@ -122,15 +124,15 @@ async function getCampaignMetrics(req, res) {
                     prospectsEnriched: 15,
                     emailsGenerated: 14,
                     failed: 1,
-                    successRate: 77.8
-                }
+                    successRate: 77.8,
+                },
             ],
             summary: {
                 totalPeriodProspects: 73,
                 averageSuccessRate: 80.4,
                 peakDay: '2024-06-21',
-                lowestDay: '2024-06-22'
-            }
+                lowestDay: '2024-06-22',
+            },
         };
         apiResponse_1.ApiResponseBuilder.success(res, mockMetrics, 'Campaign metrics retrieved successfully');
     }
@@ -144,7 +146,9 @@ async function getCampaignMetrics(req, res) {
  */
 async function compareCampaigns(req, res) {
     try {
-        const campaignIds = req.query.campaignIds?.split(',').map(id => parseInt(id));
+        const campaignIds = req.query.campaignIds
+            ?.split(',')
+            .map(id => parseInt(id));
         if (!campaignIds || campaignIds.length < 2) {
             apiResponse_1.ApiResponseBuilder.badRequest(res, 'At least 2 campaign IDs are required for comparison');
             return;
@@ -157,13 +161,13 @@ async function compareCampaigns(req, res) {
                 totalProspects: Math.floor(Math.random() * 500) + 100,
                 successRate: Math.floor(Math.random() * 40) + 60,
                 enrichmentRate: Math.floor(Math.random() * 30) + 70,
-                avgTimeToComplete: Math.floor(Math.random() * 120) + 60 // minutes
+                avgTimeToComplete: Math.floor(Math.random() * 120) + 60, // minutes
             })),
             insights: [
                 'Campaign with highest success rate shows 15% better prospect targeting',
                 'Enrichment quality correlates with 23% higher email generation success',
-                'Campaigns with custom prompts perform 18% better on average'
-            ]
+                'Campaigns with custom prompts perform 18% better on average',
+            ],
         };
         apiResponse_1.ApiResponseBuilder.success(res, comparison, 'Campaign comparison retrieved successfully');
     }
@@ -186,7 +190,7 @@ async function exportCampaignData(req, res) {
             downloadUrl: `/api/campaigns/${campaignId}/download/${format}`,
             generatedAt: new Date().toISOString(),
             estimatedSize: '2.3MB',
-            recordCount: 1247
+            recordCount: 1247,
         };
         apiResponse_1.ApiResponseBuilder.success(res, exportData, 'Export prepared successfully');
     }

@@ -2,34 +2,19 @@ import axios from 'axios'
 import { ApiConfigurationService } from './apiConfigurationService'
 import { AppError } from '@/utils/errors'
 
-
-
+// Updated interfaces to match Firecrawl V1 API documentation
 interface FirecrawlCrawlStatusResponse {
     success: boolean
     status: 'scraping' | 'completed' | 'failed'
     current?: number
     total?: number
     data?: Array<{
-        content: string
+        content?: string
         markdown: string
-        html: string
-        metadata: {
-            title: string
-            description: string
-            language: string
-            sourceURL: string
-            statusCode: number
-        }
-    }>
-    error?: string
-}
-
-interface FirecrawlScrapeResponse {
-    success: boolean
-    data?: {
-        content: string
-        markdown: string
-        html: string
+        html?: string
+        rawHtml?: string
+        screenshot?: string
+        links?: string[]
         metadata: {
             title: string
             description: string
@@ -40,11 +25,34 @@ interface FirecrawlScrapeResponse {
         }
         llm_extraction?: any
         warning?: string
-    }
+    }>
     error?: string
 }
 
-
+// Updated to match V1 API response format
+interface FirecrawlScrapeResponse {
+    success: boolean
+    data?: {
+        content?: string
+        markdown: string
+        html?: string
+        rawHtml?: string
+        screenshot?: string
+        links?: string[]
+        metadata: {
+            title: string
+            description: string
+            language: string
+            sourceURL: string
+            statusCode: number
+            error?: string
+        }
+        llm_extraction?: any
+        extract?: any
+        warning?: string
+    }
+    error?: string
+}
 
 export interface CompanyWebsiteData {
     url: string
@@ -79,72 +87,127 @@ export interface CompanyWebsiteData {
 }
 
 /**
- * Firecrawl API Service
- * Handles website content scraping and extraction
+ * Firecrawl API Service for V1 API
+ * Handles website content scraping and crawling according to official documentation
  */
 export class FirecrawlService {
 
+    /**
+     * Create axios instance with authentication
+     */
+    private static async createAxiosInstance(): Promise<any> {
+        const apiKey = await ApiConfigurationService.getApiKey('firecrawlApiKey')
+        const config = await ApiConfigurationService.getModelConfiguration()
 
-
-
+        return axios.create({
+            baseURL: 'https://api.firecrawl.dev',
+            timeout: Math.max(config.timeout || 60000, 60000), // Ensure at least 60 seconds for Firecrawl
+            headers: {
+                'Authorization': `Bearer ${apiKey}`,
+                'Content-Type': 'application/json',
+            },
+        })
+    }
 
     /**
-     * Scrape website content and extract company information
-     * TEMPORARILY DEACTIVATED - Returns dummy data to avoid API costs
+     * Retry request with exponential backoff
+     */
+    private static async retryRequest<T>(
+        requestFn: () => Promise<T>,
+        maxRetries: number = 3,
+        baseDelay: number = 1000
+    ): Promise<T> {
+        let lastError: Error | null = null
+
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                return await requestFn()
+            } catch (error) {
+                lastError = error instanceof Error ? error : new Error(String(error))
+
+                if (attempt === maxRetries) {
+                    break
+                }
+
+                // Exponential backoff
+                const delay = baseDelay * Math.pow(2, attempt - 1)
+                console.log(`⏳ [Firecrawl]: Attempt ${attempt} failed, retrying in ${delay}ms...`)
+                await new Promise(resolve => setTimeout(resolve, delay))
+            }
+        }
+
+        throw lastError
+    }
+
+    /**
+     * Extract company website URL from email domain
+     * This is the primary method to get company website URL
+     */
+    static extractCompanyWebsiteFromEmail(email: string): string | null {
+        try {
+            if (!email || !email.includes('@')) {
+                return null
+            }
+
+            const emailDomain = email.split('@')[1]?.toLowerCase()
+            if (!emailDomain) {
+                return null
+            }
+
+            // Skip common free email providers
+            const freeEmailProviders = [
+                'gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com',
+                'icloud.com', 'live.com', 'aol.com', 'protonmail.com',
+                'mail.com', 'yandex.com', 'zoho.com', 'mailinator.com',
+                'tempmail.org', '10minutemail.com'
+            ]
+
+            if (freeEmailProviders.includes(emailDomain)) {
+                return null
+            }
+
+            // Use the email domain as the company website
+            const websiteUrl = `https://www.${emailDomain}`
+            console.log(`🔍 [Firecrawl]: Extracted company website from email domain: ${websiteUrl}`)
+            return websiteUrl
+
+        } catch (error) {
+            console.error(`❌ [Firecrawl]: Failed to extract website from email ${email}:`, error)
+            return null
+        }
+    }
+
+    /**
+     * Scrape website content using V1 API
+     * Based on official documentation: https://docs.firecrawl.dev/api-reference/endpoint/scrape
      */
     static async scrapeCompanyWebsite(url: string): Promise<CompanyWebsiteData> {
         try {
-            console.log(`🔍 [Firecrawl]: DUMMY MODE - Simulating scraping website: ${url}`)
+            console.log(`🔍 [Firecrawl]: Scraping website: ${url}`)
 
-            // Return dummy data instead of making API call
-            const dummyData: CompanyWebsiteData = {
-                url: url,
-                title: 'Sample Company Inc.',
-                description: 'A leading technology company specializing in innovative solutions for modern businesses.',
-                content: 'Sample Company Inc. is a forward-thinking technology firm that has been serving clients worldwide since 2015. We specialize in software development, digital transformation, and cloud solutions. Our team of experienced professionals is dedicated to delivering high-quality products and services that help businesses grow and succeed in the digital age.',
-                markdown: '# Sample Company Inc.\n\nA leading technology company specializing in innovative solutions for modern businesses.\n\n## About Us\nSample Company Inc. is a forward-thinking technology firm that has been serving clients worldwide since 2015. We specialize in software development, digital transformation, and cloud solutions.\n\n## Our Services\n- Software Development\n- Digital Transformation\n- Cloud Solutions\n- Consulting Services\n\n## Contact\nEmail: contact@samplecompany.com\nPhone: +1-555-0123',
-                businessInfo: {
-                    industry: 'Technology',
-                    products: ['Software Solutions', 'Cloud Platforms', 'Digital Tools'],
-                    services: ['Software Development', 'Digital Transformation', 'Cloud Migration', 'Consulting'],
-                    keyPeople: ['John Smith - CEO', 'Jane Doe - CTO', 'Mike Johnson - VP Sales'],
-                    recentNews: ['Company launches new AI platform', 'Expands operations to Europe', 'Wins industry award'],
-                    contactInfo: {
-                        email: 'contact@samplecompany.com',
-                        phone: '+1-555-0123',
-                        address: '123 Tech Street, Silicon Valley, CA 94000'
-                    }
-                },
-                socialMedia: {
-                    linkedin: 'https://linkedin.com/company/samplecompany',
-                    twitter: 'https://twitter.com/samplecompany'
-                },
-                metadata: {
-                    language: 'en',
-                    statusCode: 200,
-                    scrapedAt: new Date().toISOString()
-                }
-            }
-
-            console.log(`✅ [Firecrawl]: DUMMY MODE - Returning sample data for: ${url}`)
-            return dummyData
-
-            // ORIGINAL CODE (commented out to avoid API costs):
-            /*
             const axiosInstance = await this.createAxiosInstance()
             const config = await ApiConfigurationService.getModelConfiguration()
 
-            // Prepare scraping request with correct parameters based on official documentation
+            // V1 API payload according to official documentation
             const scrapePayload = {
                 url: url,
-                formats: ['markdown'],
+                formats: ['markdown'], // V1 API uses 'formats' array
                 onlyMainContent: true,
-                timeout: 30000
+                includeTags: [], // Optional: specify HTML tags to include
+                excludeTags: ['script', 'style', 'nav', 'footer'], // Exclude non-content elements
+                timeout: 30000,
+                waitFor: 0, // Wait time in milliseconds before scraping
+                mobile: false, // Use desktop user agent
+                skipTlsVerification: false,
+                removeBase64Images: true, // Remove base64 images to reduce response size
+                blockAds: true // Block ads for cleaner content
             }
+
+            console.log(`🔍 [Firecrawl]: Making API request with ${config.retryAttempts || 3} retry attempts`)
 
             const response = await this.retryRequest(
                 () => axiosInstance.post('/v1/scrape', scrapePayload),
-                config.retryAttempts
+                config.retryAttempts || 3
             ) as any
 
             const data = response.data as FirecrawlScrapeResponse
@@ -154,10 +217,30 @@ export class FirecrawlService {
             }
 
             const scrapedData = data.data
-            // ... rest of original implementation
-            */
 
+            if (!scrapedData) {
+                throw new Error('No data returned from Firecrawl API')
+            }
 
+            // Extract and structure the company information
+            const websiteData: CompanyWebsiteData = {
+                url: url,
+                title: scrapedData.metadata?.title || '',
+                description: scrapedData.metadata?.description || '',
+                content: scrapedData.content || '',
+                markdown: scrapedData.markdown || '',
+                businessInfo: this.extractBusinessInfo(scrapedData.content || scrapedData.markdown || ''),
+                socialMedia: this.extractSocialMedia(scrapedData.content || scrapedData.markdown || ''),
+                metadata: {
+                    language: scrapedData.metadata?.language || 'en',
+                    statusCode: scrapedData.metadata?.statusCode || 200,
+                    scrapedAt: new Date().toISOString()
+                },
+                rawData: scrapedData
+            }
+
+            console.log(`✅ [Firecrawl]: Successfully scraped website: ${url}`)
+            return websiteData
 
         } catch (error) {
             console.error(`❌ [Firecrawl]: Failed to scrape website ${url}:`, error)
@@ -165,6 +248,14 @@ export class FirecrawlService {
             if (axios.isAxiosError(error) && error.response) {
                 const status = error.response.status
                 const message = error.response.data?.error || error.message
+
+                // Handle specific error codes
+                if (status === 402) {
+                    throw new AppError(`Firecrawl billing issue: ${message}. Please upgrade your plan.`)
+                } else if (status === 429) {
+                    throw new AppError(`Firecrawl rate limit exceeded: ${message}. Please try again later.`)
+                }
+
                 throw new AppError(`Firecrawl API error (${status}): ${message}`)
             }
 
@@ -173,30 +264,95 @@ export class FirecrawlService {
     }
 
     /**
-     * Extract structured data from a website using JSON mode
-     * TEMPORARILY DEACTIVATED - Returns dummy data to avoid API costs
+     * Extract structured data from a website using LLM extraction
+     * Based on V1 API with jsonOptions for structured extraction
      */
     static async extractCompanyData(url: string, extractionPrompt?: string): Promise<any> {
         try {
-            console.log(`🔍 [Firecrawl]: DUMMY MODE - Simulating data extraction from: ${url}`)
+            console.log(`🔍 [Firecrawl]: Extracting structured data from: ${url}`)
 
-            // Return dummy extracted company data
-            const dummyExtractedData = {
-                company_name: 'Sample Company Inc.',
-                description: 'A leading technology company specializing in innovative solutions',
-                industry: 'Technology',
-                services: ['Software Development', 'Cloud Solutions', 'Digital Transformation'],
-                products: ['Enterprise Software', 'Cloud Platform', 'Mobile Apps'],
-                key_people: ['John Smith - CEO', 'Jane Doe - CTO'],
-                contact_info: {
-                    email: 'contact@samplecompany.com',
-                    phone: '+1-555-0123',
-                    address: '123 Tech Street, Silicon Valley, CA'
-                }
+            const axiosInstance = await this.createAxiosInstance()
+            const config = await ApiConfigurationService.getModelConfiguration()
+
+            // Default extraction schema for company data
+            const defaultSchema = {
+                type: "object",
+                properties: {
+                    company_name: {
+                        type: "string",
+                        description: "The name of the company"
+                    },
+                    description: {
+                        type: "string",
+                        description: "Brief description of what the company does"
+                    },
+                    industry: {
+                        type: "string",
+                        description: "The industry or sector the company operates in"
+                    },
+                    services: {
+                        type: "array",
+                        items: { type: "string" },
+                        description: "List of services offered by the company"
+                    },
+                    products: {
+                        type: "array",
+                        items: { type: "string" },
+                        description: "List of products offered by the company"
+                    },
+                    key_people: {
+                        type: "array",
+                        items: { type: "string" },
+                        description: "Names of key executives or team members"
+                    },
+                    contact_info: {
+                        type: "object",
+                        properties: {
+                            email: { type: "string", description: "Contact email address" },
+                            phone: { type: "string", description: "Contact phone number" },
+                            address: { type: "string", description: "Physical address" }
+                        }
+                    },
+                    founded_year: {
+                        type: "string",
+                        description: "Year the company was founded"
+                    },
+                    company_size: {
+                        type: "string",
+                        description: "Size of the company (employees, revenue, etc.)"
+                    }
+                },
+                required: ["company_name", "description"]
             }
 
-            console.log(`✅ [Firecrawl]: DUMMY MODE - Returning sample extracted data for: ${url}`)
-            return dummyExtractedData
+            // V1 API payload with JSON extraction
+            const extractPayload = {
+                url: url,
+                formats: ['extract'],
+                onlyMainContent: true,
+                timeout: 30000,
+                extract: {
+                    schema: defaultSchema,
+                    systemPrompt: "You are an expert at extracting company information from websites. Extract accurate and relevant information only.",
+                    prompt: extractionPrompt || "Extract comprehensive company information from this website including company name, description, industry, services, products, key people, and contact information."
+                },
+                removeBase64Images: true,
+                blockAds: true
+            }
+
+            const response = await this.retryRequest(
+                () => axiosInstance.post('/v1/scrape', extractPayload),
+                config.retryAttempts || 3
+            ) as any
+
+            const data = response.data as FirecrawlScrapeResponse
+
+            if (!data.success) {
+                throw new Error(data.error || 'Extraction failed')
+            }
+
+            console.log(`✅ [Firecrawl]: Successfully extracted structured data from: ${url}`)
+            return data.data?.extract || data.data?.llm_extraction || {}
 
         } catch (error) {
             console.error(`❌ [Firecrawl]: Failed to extract data from ${url}:`, error)
@@ -212,78 +368,61 @@ export class FirecrawlService {
     }
 
     /**
-     * Search for company information - simplified to use basic scraping
-     * since the /search endpoint has different requirements
-     */
-    static async searchCompanyInfo(companyName: string, domain?: string): Promise<CompanyWebsiteData[]> {
-        try {
-            console.log(`🔍 [Firecrawl]: Searching for company info: ${companyName}`)
-
-            // If domain is provided, directly scrape the domain
-            if (domain) {
-                const websiteData = await this.scrapeCompanyWebsite(`https://${domain}`)
-                return [websiteData]
-            }
-
-            // For basic company search without domain, we'd need to use external search
-            // and then scrape results, which is complex. Return empty for now.
-            console.log(`⚠️ [Firecrawl]: Company search without domain not implemented`)
-            return []
-
-        } catch (error) {
-            console.error(`❌ [Firecrawl]: Failed to search for ${companyName}:`, error)
-            throw error
-        }
-    }
-
-    /**
-     * Get company summary from website content
-     */
-    static async getCompanySummary(url: string): Promise<string> {
-        try {
-            const websiteData = await this.scrapeCompanyWebsite(url)
-
-            // Extract relevant information for summary
-            const summary = [
-                websiteData.title && `Company: ${websiteData.title}`,
-                websiteData.businessInfo?.industry && `Industry: ${websiteData.businessInfo.industry}`,
-                websiteData.description && `Description: ${websiteData.description}`,
-                websiteData.businessInfo?.products?.length &&
-                `Products: ${websiteData.businessInfo.products.slice(0, 3).join(', ')}`,
-                websiteData.businessInfo?.services?.length &&
-                `Services: ${websiteData.businessInfo.services.slice(0, 3).join(', ')}`,
-            ].filter(Boolean).join('\n')
-
-            return summary || 'No summary available'
-
-        } catch (error) {
-            console.error(`❌ [Firecrawl]: Failed to get company summary for ${url}:`, error)
-            throw error
-        }
-    }
-
-
-
-    /**
-     * Start a crawl job for comprehensive website analysis
-     * TEMPORARILY DEACTIVATED - Returns dummy response to avoid API costs
+     * Start a crawl job using V1 API
+     * Based on official documentation: https://docs.firecrawl.dev/api-reference/endpoint/crawl-post
      */
     static async startCrawlJob(url: string, options: {
         maxPages?: number
         allowBackwardLinks?: boolean
         allowExternalLinks?: boolean
+        maxDepth?: number
+        excludePaths?: string[]
+        includePaths?: string[]
     } = {}): Promise<{ jobId: string; statusUrl: string }> {
         try {
-            console.log(`🚀 [Firecrawl]: DUMMY MODE - Simulating crawl job for: ${url}`)
+            console.log(`🚀 [Firecrawl]: Starting crawl job for: ${url}`)
 
-            // Return dummy job ID and status URL
-            const dummyJobId = `dummy-job-${Date.now()}`
+            const axiosInstance = await this.createAxiosInstance()
 
-            console.log(`✅ [Firecrawl]: DUMMY MODE - Crawl job simulated with ID: ${dummyJobId}`)
+            // V1 API crawl payload according to official documentation
+            const crawlPayload = {
+                url: url,
+                excludePaths: options.excludePaths || [
+                    "/admin/*", "/login/*", "/auth/*", "/api/*"
+                ],
+                includePaths: options.includePaths || [],
+                maxDepth: options.maxDepth || 3,
+                ignoreSitemap: false,
+                limit: options.maxPages || 10,
+                allowBackwardLinks: options.allowBackwardLinks || false,
+                allowExternalLinks: options.allowExternalLinks || false,
+                scrapeOptions: {
+                    formats: ['markdown'],
+                    onlyMainContent: true,
+                    excludeTags: ['script', 'style', 'nav', 'footer', 'header'],
+                    timeout: 30000,
+                    waitFor: 0,
+                    mobile: false,
+                    skipTlsVerification: false,
+                    removeBase64Images: true,
+                    blockAds: true
+                }
+            }
+
+            const response = await axiosInstance.post('/v1/crawl', crawlPayload)
+
+            if (!response.data?.success) {
+                throw new Error(response.data?.error || 'Failed to start crawl job')
+            }
+
+            const jobId = response.data.id
+            const statusUrl = response.data.url
+
+            console.log(`✅ [Firecrawl]: Crawl job started with ID: ${jobId}`)
 
             return {
-                jobId: dummyJobId,
-                statusUrl: `dummy-status-${dummyJobId}`
+                jobId,
+                statusUrl
             }
 
         } catch (error) {
@@ -295,8 +434,10 @@ export class FirecrawlService {
 
                 // Handle payment/billing errors specifically
                 if (status === 402) {
-                    console.log(`💳 [Firecrawl]: Payment required - please upgrade your Firecrawl plan at https://firecrawl.dev/pricing`)
-                    throw new AppError(`Firecrawl billing issue: ${message}. Please upgrade your plan at https://firecrawl.dev/pricing`)
+                    console.log(`💳 [Firecrawl]: Payment required - please upgrade your Firecrawl plan`)
+                    throw new AppError(`Firecrawl billing issue: ${message}. Please upgrade your plan.`)
+                } else if (status === 429) {
+                    throw new AppError(`Firecrawl rate limit exceeded: ${message}. Please try again later.`)
                 }
 
                 throw new AppError(`Firecrawl crawl start error (${status}): ${message}`)
@@ -307,61 +448,36 @@ export class FirecrawlService {
     }
 
     /**
-     * Poll crawl job status until completion
-     * TEMPORARILY DEACTIVATED - Returns dummy completed status to avoid API costs
+     * Poll crawl job status until completion using V1 API
      */
     static async pollCrawlStatus(jobId: string, maxWaitTime: number = 300000): Promise<FirecrawlCrawlStatusResponse> {
         try {
-            console.log(`🔍 [Firecrawl]: DUMMY MODE - Simulating poll crawl status for job: ${jobId}`)
+            console.log(`🔍 [Firecrawl]: Polling crawl status for job: ${jobId}`)
 
-            // Return dummy completed crawl result with sample pages
-            const dummyResult: FirecrawlCrawlStatusResponse = {
-                success: true,
-                status: 'completed',
-                current: 3,
-                total: 3,
-                data: [
-                    {
-                        content: 'Home page content for Sample Company Inc. We provide innovative technology solutions.',
-                        markdown: '# Sample Company Inc.\n\nWe provide innovative technology solutions for modern businesses.',
-                        html: '<h1>Sample Company Inc.</h1><p>We provide innovative technology solutions for modern businesses.</p>',
-                        metadata: {
-                            title: 'Sample Company Inc. - Home',
-                            description: 'Leading technology company',
-                            language: 'en',
-                            sourceURL: 'https://example.com',
-                            statusCode: 200
-                        }
-                    },
-                    {
-                        content: 'About page content - Our company was founded in 2015 with a mission to revolutionize business technology.',
-                        markdown: '# About Us\n\nOur company was founded in 2015 with a mission to revolutionize business technology.',
-                        html: '<h1>About Us</h1><p>Our company was founded in 2015 with a mission to revolutionize business technology.</p>',
-                        metadata: {
-                            title: 'About Us - Sample Company Inc.',
-                            description: 'Learn about our company',
-                            language: 'en',
-                            sourceURL: 'https://example.com/about',
-                            statusCode: 200
-                        }
-                    },
-                    {
-                        content: 'Services page content - We offer software development, cloud solutions, and digital transformation services.',
-                        markdown: '# Our Services\n\nWe offer software development, cloud solutions, and digital transformation services.',
-                        html: '<h1>Our Services</h1><p>We offer software development, cloud solutions, and digital transformation services.</p>',
-                        metadata: {
-                            title: 'Services - Sample Company Inc.',
-                            description: 'Our technology services',
-                            language: 'en',
-                            sourceURL: 'https://example.com/services',
-                            statusCode: 200
-                        }
-                    }
-                ]
+            const axiosInstance = await this.createAxiosInstance()
+            const startTime = Date.now()
+            const pollInterval = 3000 // 3 seconds
+
+            while (Date.now() - startTime < maxWaitTime) {
+                const response = await axiosInstance.get(`/v1/crawl/${jobId}`)
+                const status = response.data
+
+                console.log(`🔍 [Firecrawl]: Crawl status: ${status.status} (${status.current || 0}/${status.total || 0})`)
+
+                if (status.status === 'completed') {
+                    console.log(`✅ [Firecrawl]: Crawl job completed successfully: ${jobId}`)
+                    return status
+                }
+
+                if (status.status === 'failed') {
+                    throw new Error(status.error || 'Crawl job failed')
+                }
+
+                // Wait before next poll
+                await new Promise(resolve => setTimeout(resolve, pollInterval))
             }
 
-            console.log(`✅ [Firecrawl]: DUMMY MODE - Returning completed crawl status for job: ${jobId}`)
-            return dummyResult
+            throw new Error(`Crawl job timeout after ${maxWaitTime}ms`)
 
         } catch (error) {
             console.error(`❌ [Firecrawl]: Failed to poll crawl status for ${jobId}:`, error)
@@ -372,8 +488,8 @@ export class FirecrawlService {
 
                 // Handle payment/billing errors specifically
                 if (status === 402) {
-                    console.log(`💳 [Firecrawl]: Payment required - please upgrade your Firecrawl plan at https://firecrawl.dev/pricing`)
-                    throw new AppError(`Firecrawl billing issue: ${message}. Please upgrade your plan at https://firecrawl.dev/pricing`)
+                    console.log(`💳 [Firecrawl]: Payment required - please upgrade your Firecrawl plan`)
+                    throw new AppError(`Firecrawl billing issue: ${message}. Please upgrade your plan.`)
                 }
 
                 throw new AppError(`Firecrawl crawl status error (${status}): ${message}`)
@@ -385,6 +501,7 @@ export class FirecrawlService {
 
     /**
      * Crawl website and generate AI company summary using database prompt
+     * This method combines crawling multiple pages with AI analysis
      */
     static async crawlAndGenerateCompanySummary(url: string, aiProvider: 'gemini' | 'openrouter' = 'openrouter'): Promise<{
         companySummary: string
@@ -397,11 +514,16 @@ export class FirecrawlService {
         try {
             console.log(`🔍 [Firecrawl]: Starting comprehensive crawl and summary for: ${url}`)
 
-            // Start crawl job with 10 pages
+            // Start crawl job with optimized settings
             const { jobId } = await this.startCrawlJob(url, {
                 maxPages: 10,
+                maxDepth: 2,
                 allowBackwardLinks: false,
-                allowExternalLinks: false
+                allowExternalLinks: false,
+                excludePaths: [
+                    "/admin/*", "/login/*", "/auth/*", "/api/*", "/wp-admin/*",
+                    "/privacy*", "/terms*", "/cookie*", "/legal*"
+                ]
             })
 
             // Poll for completion
@@ -412,7 +534,7 @@ export class FirecrawlService {
             }
 
             // Extract content from all pages
-            const pagesContent = crawlResult.data.map(page => page.content || page.markdown)
+            const pagesContent = crawlResult.data.map(page => page.markdown || page.content || '')
 
             // Format content as requested: home page: content, pg1: content, pg2: content, etc.
             const formattedContent = this.formatMultiPageContent(crawlResult.data)
@@ -445,9 +567,9 @@ export class FirecrawlService {
      * home page: content, pg1: content, pg2: content, etc.
      */
     private static formatMultiPageContent(pages: Array<{
-        content: string
+        content?: string
         markdown: string
-        html: string
+        html?: string
         metadata: {
             title: string
             description: string
@@ -463,8 +585,6 @@ export class FirecrawlService {
             const content = page.markdown || page.content || ''
             const url = page.metadata?.sourceURL || ''
 
-            // Debug: console.log(`🔍 [Firecrawl]: Page ${index + 1} - markdown: ${page.markdown?.length || 0} chars, content: ${page.content?.length || 0} chars`)
-
             if (index === 0) {
                 // First page is the home page
                 formattedPages.push(`home page (${url}): ${content}`)
@@ -473,8 +593,6 @@ export class FirecrawlService {
                 formattedPages.push(`pg${index} (${url}): ${content}`)
             }
         })
-
-        // Debug: console.log(`🔍 [Firecrawl]: Formatted content total length: ${formattedPages.join('\n\n---PAGE_SEPARATOR---\n\n').length} chars`)
 
         return formattedPages.join('\n\n---PAGE_SEPARATOR---\n\n')
     }
@@ -491,7 +609,6 @@ export class FirecrawlService {
             const finalPrompt = prompt.replace('${WEBSITE_CONTENT}', multiPageContent)
 
             console.log(`🤖 [Firecrawl]: Generating company summary using ${aiProvider} with ${multiPageContent.length} characters of content`)
-            // Debug: console.log(`🔍 [Firecrawl]: Content preview: ${multiPageContent.substring(0, 200)}...`)
 
             return await this.generateAISummary(finalPrompt, aiProvider)
         } catch (error) {
@@ -501,7 +618,7 @@ export class FirecrawlService {
     }
 
     /**
-     * Generate AI summary using database prompt
+     * Generate AI summary using specified provider
      */
     private static async generateAISummary(prompt: string, aiProvider: 'gemini' | 'openrouter'): Promise<string> {
         switch (aiProvider) {
@@ -570,14 +687,13 @@ export class FirecrawlService {
                             content: prompt
                         }
                     ],
-                    max_completion_tokens: 8000 // Increased from 2000 to handle O1-Mini reasoning + response
-                    // Note: temperature is not supported by o1-mini model
+                    max_completion_tokens: 8000
                 }, {
                     headers: {
                         'Authorization': `Bearer ${apiKey}`,
                         'Content-Type': 'application/json'
                     },
-                    timeout: 120000 // Increased from 90s to 120s for O1-Mini reasoning
+                    timeout: 120000
                 })
 
                 console.log('🔍 [Firecrawl]: OpenRouter response status:', response.status)
@@ -608,21 +724,112 @@ export class FirecrawlService {
     }
 
     /**
-     * Generate company summary from scraped content
-     * @deprecated Use generateCompanySummaryFromMultiPageContent instead
+     * Extract business information from content using improved parsing
      */
-    static async generateCompanySummaryFromContent(content: string): Promise<string> {
-        try {
-            // Get company summary prompt from database
-            const prompt = await ApiConfigurationService.getPrompt('company_summary_prompt')
+    private static extractBusinessInfo(content: string): CompanyWebsiteData['businessInfo'] {
+        const lines = content.toLowerCase()
 
-            // Replace placeholder with the content
-            const finalPrompt = prompt.replace('${WEBSITE_CONTENT}', content.substring(0, 8000))
-
-            return await this.generateAISummary(finalPrompt, 'openrouter')
-        } catch (error) {
-            console.error('❌ [Firecrawl]: Failed to generate company summary:', error)
-            return 'Unable to generate company summary at this time.'
+        const businessInfo: CompanyWebsiteData['businessInfo'] = {
+            industry: '',
+            products: [],
+            services: [],
+            keyPeople: [],
+            recentNews: [],
+            contactInfo: {}
         }
+
+        // Enhanced industry detection
+        const industryKeywords = {
+            'Technology': ['technology', 'software', 'tech', 'ai', 'artificial intelligence', 'machine learning', 'saas', 'platform'],
+            'Healthcare': ['healthcare', 'medical', 'health', 'pharma', 'pharmaceutical', 'biotech', 'clinical'],
+            'Finance': ['finance', 'financial', 'fintech', 'banking', 'investment', 'trading', 'crypto'],
+            'E-commerce': ['ecommerce', 'e-commerce', 'retail', 'shopping', 'marketplace', 'store'],
+            'Education': ['education', 'learning', 'training', 'course', 'university', 'school'],
+            'Marketing': ['marketing', 'advertising', 'digital marketing', 'seo', 'social media'],
+            'Consulting': ['consulting', 'advisory', 'strategy', 'management consulting']
+        }
+
+        for (const [industry, keywords] of Object.entries(industryKeywords)) {
+            if (keywords.some(keyword => lines.includes(keyword))) {
+                businessInfo.industry = industry
+                break
+            }
+        }
+
+        // Extract contact information with improved regex
+        const emailMatch = content.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g)
+        if (emailMatch && emailMatch[0]) {
+            businessInfo.contactInfo!.email = emailMatch[0]
+        }
+
+        const phoneMatch = content.match(/(?:\+?1[-.\s]?)?\(?[0-9]{3}\)?[-.\s]?[0-9]{3}[-.\s]?[0-9]{4}/g)
+        if (phoneMatch && phoneMatch[0]) {
+            businessInfo.contactInfo!.phone = phoneMatch[0].trim()
+        }
+
+        // Extract products and services
+        const productKeywords = ['product', 'solution', 'offering', 'tool']
+        const serviceKeywords = ['service', 'consulting', 'support', 'management']
+
+        businessInfo.products = this.extractListItems(content, productKeywords)
+        businessInfo.services = this.extractListItems(content, serviceKeywords)
+
+        return businessInfo
+    }
+
+    /**
+     * Extract social media links from content with improved regex
+     */
+    private static extractSocialMedia(content: string): CompanyWebsiteData['socialMedia'] {
+        const socialMedia: CompanyWebsiteData['socialMedia'] = {}
+
+        // LinkedIn
+        const linkedinMatch = content.match(/https?:\/\/(?:www\.)?linkedin\.com\/company\/[^\s"'<>]+/i)
+        if (linkedinMatch) {
+            socialMedia.linkedin = linkedinMatch[0]
+        }
+
+        // Twitter/X
+        const twitterMatch = content.match(/https?:\/\/(?:www\.)?(?:twitter\.com|x\.com)\/[^\s"'<>]+/i)
+        if (twitterMatch) {
+            socialMedia.twitter = twitterMatch[0]
+        }
+
+        // Facebook
+        const facebookMatch = content.match(/https?:\/\/(?:www\.)?facebook\.com\/[^\s"'<>]+/i)
+        if (facebookMatch) {
+            socialMedia.facebook = facebookMatch[0]
+        }
+
+        // Instagram
+        const instagramMatch = content.match(/https?:\/\/(?:www\.)?instagram\.com\/[^\s"'<>]+/i)
+        if (instagramMatch) {
+            socialMedia.instagram = instagramMatch[0]
+        }
+
+        return socialMedia
+    }
+
+    /**
+     * Helper method to extract list items from content
+     */
+    private static extractListItems(content: string, keywords: string[]): string[] {
+        const items: string[] = []
+
+        for (const keyword of keywords) {
+            const regex = new RegExp(`${keyword}s?[:\\-]?\\s*([^\\n]{1,100})`, 'gi')
+            const matches = content.matchAll(regex)
+
+            for (const match of matches) {
+                if (match[1]) {
+                    const item = match[1].trim().replace(/[^\w\s-]/g, '').trim()
+                    if (item.length > 3 && !items.includes(item)) {
+                        items.push(item)
+                    }
+                }
+            }
+        }
+
+        return items.slice(0, 5) // Limit to 5 items
     }
 } 

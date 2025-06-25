@@ -90,42 +90,41 @@ class AIService {
                 case 'openrouter-o1-mini':
                     modelId = 'openai/o1-mini';
                     modelName = 'o1-mini';
-                    // o1-mini doesn't support temperature
+                    // o1-mini uses all tokens for reasoning, need much higher limits
                     requestBody = {
                         model: modelId,
                         messages: [{
                                 role: 'user',
                                 content: prompt
                             }],
-                        max_completion_tokens: options.maxTokens,
+                        max_completion_tokens: Math.max(options.maxTokens * 3, 1000), // Increase significantly for reasoning
                     };
                     break;
                 case 'openrouter-gemini-2.5-pro':
-                    modelId = 'google/gemini-pro-2.5';
+                    modelId = 'google/gemini-2.5-pro';
                     modelName = 'gemini-2.5-pro';
-                    // Gemini models support temperature
                     requestBody = {
                         model: modelId,
                         messages: [{
                                 role: 'user',
                                 content: prompt
                             }],
-                        max_completion_tokens: options.maxTokens,
-                        temperature: Math.min(options.temperature, 1.0), // Gemini max temp is 1.0
+                        max_tokens: options.maxTokens,
+                        temperature: Math.min(options.temperature, 1.0),
                     };
                     break;
                 case 'openrouter-gemini-2.5-flash':
-                    modelId = 'google/gemini-2.0-flash-exp';
-                    modelName = 'gemini-2.5-flash';
-                    // Gemini models support temperature
+                    // Use the correct Google Gemini 2.0 Flash model from official docs
+                    modelId = 'google/gemini-2.0-flash-001';
+                    modelName = 'gemini-2.0-flash-001';
                     requestBody = {
                         model: modelId,
                         messages: [{
                                 role: 'user',
                                 content: prompt
                             }],
-                        max_completion_tokens: options.maxTokens,
-                        temperature: Math.min(options.temperature, 1.0), // Gemini max temp is 1.0
+                        max_tokens: options.maxTokens,
+                        temperature: Math.min(options.temperature, 1.0),
                     };
                     break;
                 default:
@@ -133,6 +132,7 @@ class AIService {
             }
             console.log(`🤖 [AIService]: Generating content with OpenRouter ${modelName} (${options.maxTokens} tokens max)`);
             console.log(`🔍 [AIService]: Request config: maxTokens=${options.maxTokens}, temperature=${options.temperature}`);
+            console.log(`🔍 [AIService]: Using model ID: ${modelId}`);
             const response = await axios_1.default.post('https://openrouter.ai/api/v1/chat/completions', requestBody, {
                 headers: {
                     'Authorization': `Bearer ${apiKey}`,
@@ -142,19 +142,24 @@ class AIService {
                 },
                 timeout: options.timeout
             });
+            console.log(`🔍 [AIService]: OpenRouter response status: ${response.status}`);
             const content = response.data.choices?.[0]?.message?.content;
-            if (!content) {
-                const finishReason = response.data.choices?.[0]?.finish_reason;
-                const reasoningTokens = response.data.usage?.completion_tokens_details?.reasoning_tokens;
-                if (finishReason === 'length' && reasoningTokens > 0) {
+            const finishReason = response.data.choices?.[0]?.finish_reason;
+            const reasoningTokens = response.data.usage?.completion_tokens_details?.reasoning_tokens;
+            // Special handling for O1 models that use reasoning tokens
+            if (modelId.includes('o1') && finishReason === 'length' && reasoningTokens > 0) {
+                console.warn(`⚠️ [AIService]: ${modelName} used ${reasoningTokens} reasoning tokens, may need higher limits`);
+                if (!content || content.trim().length === 0) {
                     console.error(`❌ [AIService]: ${modelName} used all tokens for reasoning, no content generated:`, {
                         finishReason,
                         reasoningTokens,
-                        maxTokensRequested: options.maxTokens,
+                        maxTokensRequested: requestBody.max_completion_tokens,
                         totalTokensUsed: response.data.usage?.total_tokens
                     });
-                    throw new Error(`OpenRouter ${modelName} ran out of tokens: ${reasoningTokens} reasoning tokens consumed all of ${options.maxTokens} max tokens. Try increasing maxTokens significantly.`);
+                    throw new Error(`OpenRouter ${modelName} ran out of tokens: ${reasoningTokens} reasoning tokens consumed all available tokens. The prompt may be too complex for the current token limit.`);
                 }
+            }
+            if (!content || content.trim().length === 0) {
                 console.error(`❌ [AIService]: OpenRouter ${modelName} returned empty response:`, JSON.stringify(response.data, null, 2));
                 throw new Error(`No content returned from OpenRouter ${modelName} API`);
             }
@@ -182,7 +187,8 @@ class AIService {
      */
     static convertLLMModelToSpecificModel(llmModelId) {
         if (!llmModelId) {
-            throw new Error('LLM Model selection is required. Please select a model from the available options.');
+            console.warn('⚠️ [AIService]: No LLM model ID provided, using default openrouter-gemini-2.5-pro');
+            return 'openrouter-gemini-2.5-pro'; // Changed default to more reliable model
         }
         switch (llmModelId) {
             case 'gemini-2.0-flash':
@@ -194,7 +200,8 @@ class AIService {
             case 'openrouter-gemini-2.5-flash':
                 return 'openrouter-gemini-2.5-flash';
             default:
-                throw new Error(`Unknown LLM model ID '${llmModelId}'. Available models: gemini-2.0-flash, openrouter-o1-mini, openrouter-gemini-2.5-pro, openrouter-gemini-2.5-flash`);
+                console.warn(`⚠️ [AIService]: Unknown LLM model ID '${llmModelId}', using default openrouter-gemini-2.5-pro`);
+                return 'openrouter-gemini-2.5-pro'; // Changed default to more reliable model
         }
     }
     /**

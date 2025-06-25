@@ -29,10 +29,7 @@ function handleValidationErrors(req, res, next) {
  * Higher-order function to create validation middleware chain
  */
 function validate(validations) {
-    return [
-        ...validations,
-        handleValidationErrors
-    ];
+    return [...validations, handleValidationErrors];
 }
 /**
  * Pagination validation middleware

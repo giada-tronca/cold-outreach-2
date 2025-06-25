@@ -2,37 +2,65 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const apiResponse_1 = require("@/utils/apiResponse");
+const client_1 = require("@prisma/client");
 const router = (0, express_1.Router)();
+const prisma = new client_1.PrismaClient();
 // Simple in-memory store for workflow session configurations
 // In production, this would be stored in database
 const sessionConfigurations = new Map();
+const isObject = (item) => {
+    return (item && typeof item === 'object' && !Array.isArray(item));
+};
+const deepMerge = (target, source) => {
+    const output = { ...target };
+    if (isObject(target) && isObject(source)) {
+        Object.keys(source).forEach(key => {
+            const sourceKey = key;
+            if (isObject(source[sourceKey])) {
+                if (!(key in target)) {
+                    Object.assign(output, { [key]: source[sourceKey] });
+                }
+                else {
+                    output[key] = deepMerge(target[key], source[sourceKey]);
+                }
+            }
+            else {
+                Object.assign(output, { [key]: source[sourceKey] });
+            }
+        });
+    }
+    return output;
+};
 // Create new workflow session
-router.post('/sessions', (req, res) => {
+router.post('/sessions', async (req, res) => {
     try {
         const { userSessionId, campaignId } = req.body;
         if (!userSessionId) {
             apiResponse_1.ApiResponseBuilder.error(res, 'User session ID is required', 400);
             return;
         }
-        // TODO: Import and use WorkflowManager when imports are fixed
-        // const result = await WorkflowManager.createNewWorkflow(userSessionId, campaignId);
-        // Mock response for now
-        const mockSession = {
-            id: `ws_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-            userSessionId,
-            campaignId,
-            currentStep: 'UPLOAD_CSV',
-            status: 'ACTIVE',
-            configurationData: {},
-            stepsCompleted: [],
-            createdAt: new Date(),
-            updatedAt: new Date()
-        };
+        // Generate an ID similar to the previous mock implementation
+        const newSessionId = `ws_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        // Create workflow session in database
+        const createdSession = await prisma.cOWorkflowSessions.create({
+            data: {
+                id: newSessionId,
+                userSessionId,
+                campaignId: campaignId ?? null,
+                currentStep: 'UPLOAD_CSV',
+                status: 'ACTIVE',
+                configurationData: {},
+                stepsCompleted: [],
+            }
+        });
+        // Initialize in-memory cache
+        sessionConfigurations.set(newSessionId, {});
         apiResponse_1.ApiResponseBuilder.success(res, {
-            session: mockSession
+            session: createdSession
         }, 'Workflow session created successfully');
     }
     catch (error) {
+        console.error('❌ [Workflow] Failed to create workflow session:', error);
         apiResponse_1.ApiResponseBuilder.error(res, error instanceof Error ? error.message : 'Failed to create workflow session', 500);
     }
 });
@@ -70,31 +98,6 @@ router.patch('/sessions/:sessionId/step', (req, res) => {
         sessionId,
         currentStep: step
     }, 'Workflow step updated successfully');
-});
-// Update workflow session configuration
-router.patch('/sessions/:sessionId/configuration', (req, res) => {
-    const { sessionId } = req.params;
-    const configurationData = req.body;
-    if (!sessionId) {
-        apiResponse_1.ApiResponseBuilder.error(res, 'Session ID is required', 400);
-        return;
-    }
-    console.log(`📝 [Workflow] Updating configuration for session ${sessionId}:`, configurationData);
-    // Store configuration in memory (in production, store in database)
-    let existingConfig = sessionConfigurations.get(sessionId) || {};
-    // Merge new configuration with existing
-    existingConfig = {
-        ...existingConfig,
-        ...configurationData,
-        updatedAt: new Date()
-    };
-    sessionConfigurations.set(sessionId, existingConfig);
-    console.log(`✅ [Workflow] Configuration stored for session ${sessionId}`);
-    apiResponse_1.ApiResponseBuilder.success(res, {
-        sessionId,
-        configurationData: existingConfig,
-        updatedAt: new Date()
-    }, 'Workflow configuration updated successfully');
 });
 // Get workflow progress
 router.get('/sessions/:sessionId/progress', (req, res) => {

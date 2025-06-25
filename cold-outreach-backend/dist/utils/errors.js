@@ -1,88 +1,140 @@
 "use strict";
+var __extends = (this && this.__extends) || (function () {
+    var extendStatics = function (d, b) {
+        extendStatics = Object.setPrototypeOf ||
+            ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
+            function (d, b) { for (var p in b) if (Object.prototype.hasOwnProperty.call(b, p)) d[p] = b[p]; };
+        return extendStatics(d, b);
+    };
+    return function (d, b) {
+        if (typeof b !== "function" && b !== null)
+            throw new TypeError("Class extends value " + String(b) + " is not a constructor or null");
+        extendStatics(d, b);
+        function __() { this.constructor = d; }
+        d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+    };
+})();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.JobProcessingError = exports.ExternalServiceError = exports.DatabaseError = exports.TooManyRequestsError = exports.ConflictError = exports.ForbiddenError = exports.UnauthorizedError = exports.NotFoundError = exports.BadRequestError = exports.ValidationError = exports.AppError = void 0;
 exports.isOperationalError = isOperationalError;
 exports.getErrorDetails = getErrorDetails;
-class AppError extends Error {
-    constructor(message, statusCode = 500, isOperational = true, errors) {
-        super(message);
-        this.statusCode = statusCode;
-        this.isOperational = isOperational;
-        this.timestamp = new Date().toISOString();
+var AppError = /** @class */ (function (_super) {
+    __extends(AppError, _super);
+    function AppError(message, statusCode, isOperational, errors) {
+        if (statusCode === void 0) { statusCode = 500; }
+        if (isOperational === void 0) { isOperational = true; }
+        var _this = _super.call(this, message) || this;
+        _this.statusCode = statusCode;
+        _this.isOperational = isOperational;
+        _this.timestamp = new Date().toISOString();
         if (errors) {
-            this.errors = errors;
+            _this.errors = errors;
         }
         // Maintains proper stack trace for where our error was thrown
-        Error.captureStackTrace(this, this.constructor);
+        Error.captureStackTrace(_this, _this.constructor);
+        return _this;
     }
-}
+    return AppError;
+}(Error));
 exports.AppError = AppError;
-class ValidationError extends AppError {
-    constructor(message = 'Validation failed', errors) {
-        super(message, 422, true, errors);
+var ValidationError = /** @class */ (function (_super) {
+    __extends(ValidationError, _super);
+    function ValidationError(message, errors) {
+        if (message === void 0) { message = 'Validation failed'; }
+        return _super.call(this, message, 422, true, errors) || this;
     }
-}
+    return ValidationError;
+}(AppError));
 exports.ValidationError = ValidationError;
-class BadRequestError extends AppError {
-    constructor(message = 'Bad request') {
-        super(message, 400, true);
+var BadRequestError = /** @class */ (function (_super) {
+    __extends(BadRequestError, _super);
+    function BadRequestError(message) {
+        if (message === void 0) { message = 'Bad request'; }
+        return _super.call(this, message, 400, true) || this;
     }
-}
+    return BadRequestError;
+}(AppError));
 exports.BadRequestError = BadRequestError;
-class NotFoundError extends AppError {
-    constructor(message = 'Resource not found') {
-        super(message, 404, true);
+var NotFoundError = /** @class */ (function (_super) {
+    __extends(NotFoundError, _super);
+    function NotFoundError(message) {
+        if (message === void 0) { message = 'Resource not found'; }
+        return _super.call(this, message, 404, true) || this;
     }
-}
+    return NotFoundError;
+}(AppError));
 exports.NotFoundError = NotFoundError;
-class UnauthorizedError extends AppError {
-    constructor(message = 'Unauthorized') {
-        super(message, 401, true);
+var UnauthorizedError = /** @class */ (function (_super) {
+    __extends(UnauthorizedError, _super);
+    function UnauthorizedError(message) {
+        if (message === void 0) { message = 'Unauthorized'; }
+        return _super.call(this, message, 401, true) || this;
     }
-}
+    return UnauthorizedError;
+}(AppError));
 exports.UnauthorizedError = UnauthorizedError;
-class ForbiddenError extends AppError {
-    constructor(message = 'Forbidden') {
-        super(message, 403, true);
+var ForbiddenError = /** @class */ (function (_super) {
+    __extends(ForbiddenError, _super);
+    function ForbiddenError(message) {
+        if (message === void 0) { message = 'Forbidden'; }
+        return _super.call(this, message, 403, true) || this;
     }
-}
+    return ForbiddenError;
+}(AppError));
 exports.ForbiddenError = ForbiddenError;
-class ConflictError extends AppError {
-    constructor(message = 'Resource conflict') {
-        super(message, 409, true);
+var ConflictError = /** @class */ (function (_super) {
+    __extends(ConflictError, _super);
+    function ConflictError(message) {
+        if (message === void 0) { message = 'Resource conflict'; }
+        return _super.call(this, message, 409, true) || this;
     }
-}
+    return ConflictError;
+}(AppError));
 exports.ConflictError = ConflictError;
-class TooManyRequestsError extends AppError {
-    constructor(message = 'Too many requests') {
-        super(message, 429, true);
+var TooManyRequestsError = /** @class */ (function (_super) {
+    __extends(TooManyRequestsError, _super);
+    function TooManyRequestsError(message) {
+        if (message === void 0) { message = 'Too many requests'; }
+        return _super.call(this, message, 429, true) || this;
     }
-}
+    return TooManyRequestsError;
+}(AppError));
 exports.TooManyRequestsError = TooManyRequestsError;
-class DatabaseError extends AppError {
-    constructor(message = 'Database operation failed') {
-        super(message, 500, true);
+var DatabaseError = /** @class */ (function (_super) {
+    __extends(DatabaseError, _super);
+    function DatabaseError(message) {
+        if (message === void 0) { message = 'Database operation failed'; }
+        return _super.call(this, message, 500, true) || this;
     }
-}
+    return DatabaseError;
+}(AppError));
 exports.DatabaseError = DatabaseError;
-class ExternalServiceError extends AppError {
-    constructor(service, message = 'External service error') {
-        super(message, 502, true);
-        this.service = service;
+var ExternalServiceError = /** @class */ (function (_super) {
+    __extends(ExternalServiceError, _super);
+    function ExternalServiceError(service, message) {
+        if (message === void 0) { message = 'External service error'; }
+        var _this = _super.call(this, message, 502, true) || this;
+        _this.service = service;
+        return _this;
     }
-}
+    return ExternalServiceError;
+}(AppError));
 exports.ExternalServiceError = ExternalServiceError;
-class JobProcessingError extends AppError {
-    constructor(message = 'Job processing failed', jobId, jobType) {
-        super(message, 500, true);
+var JobProcessingError = /** @class */ (function (_super) {
+    __extends(JobProcessingError, _super);
+    function JobProcessingError(message, jobId, jobType) {
+        if (message === void 0) { message = 'Job processing failed'; }
+        var _this = _super.call(this, message, 500, true) || this;
         if (jobId) {
-            this.jobId = jobId;
+            _this.jobId = jobId;
         }
         if (jobType) {
-            this.jobType = jobType;
+            _this.jobType = jobType;
         }
+        return _this;
     }
-}
+    return JobProcessingError;
+}(AppError));
 exports.JobProcessingError = JobProcessingError;
 /**
  * Utility function to check if an error is operational (safe to expose to client)
@@ -97,9 +149,9 @@ function isOperationalError(error) {
  * Utility function to extract error details for logging
  */
 function getErrorDetails(error) {
-    const details = {
+    var details = {
         message: error.message,
-        stack: error.stack
+        stack: error.stack,
     };
     if (error instanceof AppError) {
         details.statusCode = error.statusCode;

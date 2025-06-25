@@ -20,7 +20,7 @@ async function getAllServices(req, res) {
         }
         const services = await database_1.prisma.service.findMany({
             where,
-            orderBy: { createdAt: 'desc' }
+            orderBy: { createdAt: 'desc' },
         });
         apiResponse_1.ApiResponseBuilder.success(res, services, 'Services retrieved successfully');
     }
@@ -36,7 +36,7 @@ async function getServiceById(req, res) {
     try {
         const serviceId = parseInt(req.params.id);
         const service = await database_1.prisma.service.findUnique({
-            where: { id: serviceId }
+            where: { id: serviceId },
         });
         if (!service) {
             throw new errors_1.NotFoundError(`Service with ID ${serviceId} not found`);
@@ -61,8 +61,8 @@ async function createService(req, res) {
             data: {
                 name,
                 promptTemplate,
-                isActive
-            }
+                isActive,
+            },
         });
         apiResponse_1.ApiResponseBuilder.created(res, service, 'Service created successfully');
     }
@@ -79,14 +79,14 @@ async function updateService(req, res) {
         const serviceId = parseInt(req.params.id);
         const updateData = req.body;
         const existingService = await database_1.prisma.service.findUnique({
-            where: { id: serviceId }
+            where: { id: serviceId },
         });
         if (!existingService) {
             throw new errors_1.NotFoundError(`Service with ID ${serviceId} not found`);
         }
         const updatedService = await database_1.prisma.service.update({
             where: { id: serviceId },
-            data: updateData
+            data: updateData,
         });
         apiResponse_1.ApiResponseBuilder.success(res, updatedService, 'Service updated successfully');
     }
@@ -105,16 +105,16 @@ async function deleteService(req, res) {
     try {
         const serviceId = parseInt(req.params.id);
         const existingService = await database_1.prisma.service.findUnique({
-            where: { id: serviceId }
+            where: { id: serviceId },
         });
         if (!existingService) {
             throw new errors_1.NotFoundError(`Service with ID ${serviceId} not found`);
         }
         await database_1.prisma.service.delete({
-            where: { id: serviceId }
+            where: { id: serviceId },
         });
         apiResponse_1.ApiResponseBuilder.success(res, {
-            deletedServiceId: serviceId
+            deletedServiceId: serviceId,
         }, 'Service deleted successfully');
     }
     catch (error) {
