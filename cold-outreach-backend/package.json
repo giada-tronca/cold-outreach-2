@@ -3,6 +3,16 @@
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
+  "_moduleAliases": {
+    "@": "dist",
+    "@/config": "dist/config",
+    "@/routes": "dist/routes",
+    "@/services": "dist/services",
+    "@/middleware": "dist/middleware",
+    "@/models": "dist/models",
+    "@/types": "dist/types",
+    "@/utils": "dist/utils"
+  },
   "scripts": {
     "dev": "nodemon src/index.ts",
     "build": "npx tsc",

@@ -23,15 +23,16 @@ import {
 import { WorkerManager } from './jobs/workers';
 
 // Add path aliases
+const rootDir = path.resolve(__dirname);
 moduleAlias.addAliases({
-    '@': path.join(__dirname),
-    '@/config': path.join(__dirname, 'config'),
-    '@/routes': path.join(__dirname, 'routes'),
-    '@/services': path.join(__dirname, 'services'),
-    '@/middleware': path.join(__dirname, 'middleware'),
-    '@/models': path.join(__dirname, 'models'),
-    '@/types': path.join(__dirname, 'types'),
-    '@/utils': path.join(__dirname, 'utils')
+    '@': rootDir,
+    '@/config': path.join(rootDir, 'config'),
+    '@/routes': path.join(rootDir, 'routes'),
+    '@/services': path.join(rootDir, 'services'),
+    '@/middleware': path.join(rootDir, 'middleware'),
+    '@/models': path.join(rootDir, 'models'),
+    '@/types': path.join(rootDir, 'types'),
+    '@/utils': path.join(rootDir, 'utils')
 });
 
 const app: Express = express();

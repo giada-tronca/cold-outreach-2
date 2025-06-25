@@ -50,15 +50,16 @@ const middleware_1 = require("./middleware");
 // Import workers for background job processing
 const workers_1 = require("./jobs/workers");
 // Add path aliases
+const rootDir = path_1.default.resolve(__dirname);
 module_alias_1.default.addAliases({
-    '@': path_1.default.join(__dirname),
-    '@/config': path_1.default.join(__dirname, 'config'),
-    '@/routes': path_1.default.join(__dirname, 'routes'),
-    '@/services': path_1.default.join(__dirname, 'services'),
-    '@/middleware': path_1.default.join(__dirname, 'middleware'),
-    '@/models': path_1.default.join(__dirname, 'models'),
-    '@/types': path_1.default.join(__dirname, 'types'),
-    '@/utils': path_1.default.join(__dirname, 'utils')
+    '@': rootDir,
+    '@/config': path_1.default.join(rootDir, 'config'),
+    '@/routes': path_1.default.join(rootDir, 'routes'),
+    '@/services': path_1.default.join(rootDir, 'services'),
+    '@/middleware': path_1.default.join(rootDir, 'middleware'),
+    '@/models': path_1.default.join(rootDir, 'models'),
+    '@/types': path_1.default.join(rootDir, 'types'),
+    '@/utils': path_1.default.join(rootDir, 'utils')
 });
 const app = (0, express_1.default)();
 const port = environment_1.default.PORT;

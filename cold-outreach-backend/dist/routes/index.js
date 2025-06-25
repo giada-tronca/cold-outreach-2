@@ -7,15 +7,15 @@ const express_1 = require("express");
 const apiResponse_1 = require("@/utils/apiResponse");
 const database_1 = require("@/config/database");
 // Import route modules
-const auth_1 = __importDefault(require("./auth"));
-const campaigns_1 = __importDefault(require("./campaigns"));
-const prospects_1 = __importDefault(require("./prospects"));
-const uploads_1 = __importDefault(require("./uploads"));
-const workflow_1 = __importDefault(require("./workflow"));
-const enrichment_1 = __importDefault(require("./enrichment"));
-const email_generation_1 = __importDefault(require("./email-generation"));
-const services_1 = __importDefault(require("./services"));
-const jobs_1 = __importDefault(require("./jobs"));
+const index_1 = __importDefault(require("./auth/index"));
+const index_2 = __importDefault(require("./campaigns/index"));
+const index_3 = __importDefault(require("./prospects/index"));
+const index_4 = __importDefault(require("./uploads/index"));
+const index_5 = __importDefault(require("./workflow/index"));
+const index_6 = __importDefault(require("./enrichment/index"));
+const index_7 = __importDefault(require("./email-generation/index"));
+const index_8 = __importDefault(require("./services/index"));
+const index_9 = __importDefault(require("./jobs/index"));
 const router = (0, express_1.Router)();
 // Health check endpoint
 router.get('/health', async (_req, res) => {
@@ -356,13 +356,13 @@ router.post('/uploads', upload.single('file'), async (req, res) => {
 // Temporary enrichment endpoints removed - using real enrichment routes
 // Temporary enrichment job progress endpoint removed - using real SSE endpoint from enrichmentRoutes
 // Mount route modules
-router.use('/auth', auth_1.default);
-router.use('/campaigns', campaigns_1.default);
-router.use('/prospects', prospects_1.default);
-router.use('/uploads', uploads_1.default); // Re-enabled - compilation errors are fixed
-router.use('/workflow', workflow_1.default);
-router.use('/enrichment', enrichment_1.default); // Re-enabled for SSE support
-router.use('/email-generation', email_generation_1.default);
-router.use('/services', services_1.default);
-router.use('/jobs', jobs_1.default); // SSE support for real-time job updates
+router.use('/auth', index_1.default);
+router.use('/campaigns', index_2.default);
+router.use('/prospects', index_3.default);
+router.use('/uploads', index_4.default); // Re-enabled - compilation errors are fixed
+router.use('/workflow', index_5.default);
+router.use('/enrichment', index_6.default); // Re-enabled for SSE support
+router.use('/email-generation', index_7.default);
+router.use('/services', index_8.default);
+router.use('/jobs', index_9.default); // SSE support for real-time job updates
 exports.default = router;

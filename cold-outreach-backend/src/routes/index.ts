@@ -3,15 +3,15 @@ import { ApiResponseBuilder } from '@/utils/apiResponse';
 import { prisma } from '@/config/database';
 
 // Import route modules
-import authRoutes from './auth';
-import campaignRoutes from './campaigns';
-import prospectRoutes from './prospects';
-import uploadRoutes from './uploads';
-import workflowRoutes from './workflow';
-import enrichmentRoutes from './enrichment';
-import emailGenerationRoutes from './email-generation';
-import serviceRoutes from './services';
-import jobRoutes from './jobs';
+import authRoutes from './auth/index';
+import campaignRoutes from './campaigns/index';
+import prospectRoutes from './prospects/index';
+import uploadRoutes from './uploads/index';
+import workflowRoutes from './workflow/index';
+import enrichmentRoutes from './enrichment/index';
+import emailGenerationRoutes from './email-generation/index';
+import serviceRoutes from './services/index';
+import jobRoutes from './jobs/index';
 
 const router = Router();
 
