@@ -146,7 +146,7 @@ export default function CampaignSettingsStep({
 
   // Validation and UI state
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSubmitting] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');

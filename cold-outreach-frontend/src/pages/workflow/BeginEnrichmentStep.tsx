@@ -43,7 +43,7 @@ import {
 import ReactMarkdown from 'react-markdown';
 
 import ProspectEnrichmentService from '@/services/prospectEnrichmentService';
-import type { EnrichmentJobStatus, ProspectEnrichmentStatus as ServiceProspectEnrichmentStatus } from '@/services/prospectEnrichmentService';
+import type { EnrichmentJobStatus } from '@/services/prospectEnrichmentService';
 
 interface CSVPreviewRow {
   [key: string]: string;
