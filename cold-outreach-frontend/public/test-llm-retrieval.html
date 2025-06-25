@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Test LLM Model Retrieval</title>
+</head>
+
+<body>
+    <h1>Test LLM Model Retrieval</h1>
+    <button onclick="testLLMRetrieval()">Test LLM Model Retrieval</button>
+    <div id="results"></div>
+
+    <script>
+        async function testLLMRetrieval() {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<p>Testing...</p>';
+
+            try {
+                // Test the session ID from the logs
+                const sessionId = 'ws_1750802880779_7pc1bihqs';
+                const response = await fetch(`http://localhost:3001/api/workflow/sessions/${sessionId}`);
+                const data = await response.json();
+
+                console.log('Full API response:', data);
+
+                let result = '<h2>API Response:</h2>';
+                result += `<p><strong>Success:</strong> ${data.success}</p>`;
+
+                if (data.success && data.data?.session?.configurationData?.campaignSettings) {
+                    const campaignSettings = data.data.session.configurationData.campaignSettings;
+                    result += `<p><strong>✅ Campaign Settings Found:</strong></p>`;
+                    result += `<p><strong>AI Provider:</strong> ${campaignSettings.aiProvider}</p>`;
+                    result += `<p><strong>LLM Model ID:</strong> ${campaignSettings.llmModelId}</p>`;
+                    result += `<p style="color: green;"><strong>✅ LLM Model Retrieval: SUCCESS</strong></p>`;
+                } else {
+                    result += `<p style="color: red;"><strong>❌ No Campaign Settings Found</strong></p>`;
+                    result += `<p><strong>Data Structure:</strong></p>`;
+                    result += `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+                }
+
+                resultsDiv.innerHTML = result;
+            } catch (error) {
+                console.error('Error:', error);
+                resultsDiv.innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+            }
+        }
+    </script>
+</body>
+
+</html>

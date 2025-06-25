@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>LLM Model Selection Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+
+        .step {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+
+        .success {
+            background-color: #d4edda;
+            border-color: #c3e6cb;
+        }
+
+        .error {
+            background-color: #f8d7da;
+            border-color: #f5c6cb;
+        }
+
+        button {
+            padding: 10px 15px;
+            margin: 5px;
+            cursor: pointer;
+        }
+
+        pre {
+            background: #f5f5f5;
+            padding: 10px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>🧪 LLM Model Selection Flow Test</h1>
+
+    <div class="step">
+        <h2>Step 1: Simulate Campaign Settings Step</h2>
+        <p>This simulates what the Campaign Settings Step does:</p>
+        <button onclick="simulateCampaignStep()">Set up Campaign Step Data</button>
+        <div id="step1-result"></div>
+    </div>
+
+    <div class="step">
+        <h2>Step 2: Test LLM Model Retrieval</h2>
+        <p>This simulates what the Begin Enrichment Step does:</p>
+        <button onclick="testLLMRetrieval()">Test LLM Model Retrieval</button>
+        <div id="step2-result"></div>
+    </div>
+
+    <div class="step">
+        <h2>Step 3: Debug Information</h2>
+        <button onclick="showDebugInfo()">Show Debug Info</button>
+        <div id="debug-result"></div>
+    </div>
+
+    <script>
+        function simulateCampaignStep() {
+            console.log('🔧 Simulating Campaign Settings Step...');
+
+            // Simulate the function that Campaign Settings Step creates
+            window.__campaignStepData = function () {
+                return {
+                    campaignId: 1,
+                    campaignMode: 'existing',
+                    campaignName: 'Test Campaign',
+                    emailSubject: 'Test Subject',
+                    prompt: 'Test Prompt',
+                    serviceId: null,
+                    enrichmentServices: [],
+                    estimatedCost: 0,
+                    prospectCount: 2,
+                    aiProvider: 'openrouter-gemini-2.5-pro' // This is the key field!
+                };
+            };
+
+            document.getElementById('step1-result').innerHTML = `
+                <div class="success">
+                    <strong>✅ Success!</strong> Campaign step data function created.
+                    <pre>${JSON.stringify(window.__campaignStepData(), null, 2)}</pre>
+                </div>
+            `;
+        }
+
+        function testLLMRetrieval() {
+            console.log('🔍 Testing LLM Model Retrieval...');
+
+            let result = '';
+            let success = false;
+
+            try {
+                // This is what BeginEnrichmentStep does
+                const campaignStepData = window.__campaignStepData;
+
+                if (campaignStepData && typeof campaignStepData === 'function') {
+                    const campaignData = campaignStepData();
+
+                    if (campaignData?.aiProvider) {
+                        result = `✅ SUCCESS: Found LLM model: ${campaignData.aiProvider}`;
+                        success = true;
+                    } else {
+                        result = `❌ FAILURE: Campaign data found but no aiProvider field`;
+                    }
+                } else {
+                    result = `❌ FAILURE: No campaign step data function found`;
+                }
+            } catch (error) {
+                result = `❌ ERROR: ${error.message}`;
+            }
+
+            document.getElementById('step2-result').innerHTML = `
+                <div class="${success ? 'success' : 'error'}">
+                    <strong>${result}</strong>
+                </div>
+            `;
+        }
+
+        function showDebugInfo() {
+            const campaignKeys = Object.keys(window).filter(key => key.toLowerCase().includes('campaign'));
+            const underscoreKeys = Object.keys(window).filter(key => key.includes('__'));
+
+            document.getElementById('debug-result').innerHTML = `
+                <div>
+                    <strong>Window properties with 'campaign':</strong>
+                    <pre>${JSON.stringify(campaignKeys, null, 2)}</pre>
+                    
+                    <strong>Window properties with '__':</strong>
+                    <pre>${JSON.stringify(underscoreKeys, null, 2)}</pre>
+                    
+                    <strong>Type of window.__campaignStepData:</strong>
+                    <pre>${typeof window.__campaignStepData}</pre>
+                    
+                    ${window.__campaignStepData ? `
+                    <strong>Current campaign data:</strong>
+                    <pre>${JSON.stringify(window.__campaignStepData(), null, 2)}</pre>
+                    ` : ''}
+                </div>
+            `;
+        }
+
+        // Auto-run the test on page load
+        window.onload = function () {
+            console.log('🧪 LLM Model Selection Test Page Loaded');
+        };
+    </script>
+</body>
+
+</html>

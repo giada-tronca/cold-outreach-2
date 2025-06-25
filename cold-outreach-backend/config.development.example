@@ -1,0 +1,49 @@
+# Development Environment Configuration Template
+# Copy this to .env.development and update values as needed
+
+NODE_ENV=development
+
+# Server Configuration
+PORT=3001
+HOST=localhost
+
+# Database Configuration (Update with your development database URL)
+DATABASE_URL="postgresql://username:password@localhost:5432/cold_outreach_dev"
+
+# Redis Configuration (for development)
+REDIS_URL="redis://localhost:6379"
+
+# JWT Configuration
+JWT_SECRET="dev-jwt-secret-change-in-production-12345"
+JWT_EXPIRES_IN="24h"
+
+# Development Logging
+LOG_LEVEL="debug"
+LOG_SQL_QUERIES=true
+
+# File Upload Limits
+MAX_FILE_SIZE=10485760
+ALLOWED_FILE_TYPES="text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+# Rate Limiting (Relaxed for development)
+RATE_LIMIT_WINDOW_MS=900000
+RATE_LIMIT_MAX_REQUESTS=1000
+
+# Email Configuration (Optional for development testing)
+SMTP_HOST="smtp.gmail.com"
+SMTP_PORT=587
+SMTP_USER="your-dev-email@gmail.com"
+SMTP_PASS="your-dev-app-password"
+
+# Development Features
+ENABLE_CORS=true
+ENABLE_REQUEST_LOGGING=true
+ENABLE_ERROR_DETAILS=true
+
+# API Configuration (Note: API keys are stored in database)
+# These are just for fallback/testing - production uses database values
+API_KEYS_SOURCE="database"
+
+# Development Database Seeding
+ENABLE_DB_SEEDING=true
+SEED_SAMPLE_DATA=true

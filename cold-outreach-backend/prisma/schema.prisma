@@ -1,0 +1,210 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model COApiConfigurations {
+  id                     Int      @id @default(autoincrement())
+  openrouterApiKey       String?  @db.VarChar(500) @map("openrouter_api_key")
+  geminiApiKey           String?  @db.VarChar(500) @map("gemini_api_key")
+  firecrawlApiKey        String?  @db.VarChar(500) @map("firecrawl_api_key")
+  proxycurlApiKey        String?  @db.VarChar(500) @map("proxycurl_api_key")
+  industryMappings       Json?    @map("industry_mappings")
+  isActive               Boolean  @default(true) @map("is_active")
+  createdAt              DateTime @default(now()) @map("created_at")
+  updatedAt              DateTime @updatedAt @map("updated_at")
+  defaultSignature       String?  @map("default_signature")
+  personalEmailDomains   String?  @default("gmail.com,yahoo.com,hotmail.com,outlook.com,aol.com,icloud.com,protonmail.com,zoho.com,gmx.com,mail.com") @map("personal_email_domains")
+  geminiTemperature      Float?   @default(0.7) @map("gemini_temperature")
+  geminiMaxOutputTokens  Int?     @default(8192) @map("gemini_max_output_tokens")
+  timeoutSeconds         Int?     @default(60) @map("timeout_seconds")
+  maxRetries             Int?     @default(3) @map("max_retries")
+  domainKeywordsIndustry String?  @map("domain_keywords_industry")
+
+  @@map("CO_api_configurations")
+}
+
+model COAutoServiceSettings {
+  id              Int       @id @default(autoincrement())
+  description     String?
+  promptTemplate  String?   @map("prompt_template")
+  createdAt       DateTime? @map("created_at")
+  updatedAt       DateTime? @updatedAt @map("updated_at")
+
+  @@map("CO_auto_service_settings")
+}
+
+model COBatches {
+  id                Int       @id @default(autoincrement())
+  campaignId        Int?      @map("campaign_id")
+  name              String
+  status            String    @default("PENDING")
+  totalProspects    Int       @default(0) @map("total_prospects")
+  enrichedProspects Int       @default(0) @map("enriched_prospects")
+  generatedEmails   Int       @default(0) @map("generated_emails")
+  failedProspects   Int       @default(0) @map("failed_prospects")
+  errorMessage      String?   @map("error_message")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  // Relationships
+  campaign          COCampaigns? @relation(fields: [campaignId], references: [id])
+  prospects         COProspects[]
+
+  @@map("CO_batches")
+}
+
+model COCampaigns {
+  id               Int       @id @default(autoincrement())
+  name             String    @db.VarChar(255)
+  emailSubject     String?   @db.VarChar(500) @map("email_subject")
+  prompt           String?
+  enrichmentFlags  Json?     @map("enrichment_flags")
+  serviceId        Int?      @map("service_id")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  // Relationships
+  batches          COBatches[]
+  prospects        COProspects[]
+  workflowSessions COWorkflowSessions[]
+
+  @@map("CO_campaigns")
+}
+
+model COGeneratedEmails {
+  prospectId          Int       @id @map("prospect_id")
+  subject             String?   @db.VarChar(500)
+  body                String?
+  generationStatus    String    @default("PENDING") @map("generation_status")
+  errorMessage        String?   @map("error_message")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+  language            String?   @default("english") @db.VarChar(50)
+  generatedAt         DateTime? @map("generated_at")
+  modelUsed           String?   @db.VarChar(100) @map("model_used")
+  generationMetadata  Json?     @default("{}") @map("generation_metadata")
+
+  // Relationships
+  prospect            COProspects @relation(fields: [prospectId], references: [id])
+
+  @@map("CO_generated_emails")
+}
+
+model COPrompts {
+  id                       Int       @id @default(autoincrement())
+  companySummaryPrompt     String?   @map("company_summary_prompt")
+  linkedinSummaryPrompt    String?   @map("linkedin_summary_prompt")
+  techStackPrompt          String?   @map("tech_stack_prompt")
+  prospectAnalysisPrompt   String?   @map("prospect_analysis_prompt")
+  isActive                 Boolean   @default(true) @map("is_active")
+  version                  String?   @db.VarChar(50)
+  description              String?
+  createdAt                DateTime  @default(now()) @map("created_at")
+  updatedAt                DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  @@map("CO_prompts")
+}
+
+model COProspectEnrichments {
+  prospectId                Int       @id @map("prospect_id")
+  companyWebsite            String?   @db.VarChar(500) @map("company_website")
+  companySummary            String?   @map("company_summary")
+  linkedinSummary           String?   @map("linkedin_summary")
+  prospectAnalysisSummary   String?   @map("prospect_analysis_summary")
+  techStack                 Json?     @map("tech_stack")
+  enrichmentStatus          String    @default("PENDING") @map("enrichment_status")
+  createdAt                 DateTime  @default(now()) @map("created_at")
+  updatedAt                 DateTime  @updatedAt @map("updated_at")
+  builtwithSummary          String?   @map("builtwith_summary")
+  enrichedAt                DateTime? @map("enriched_at")
+  modelUsed                 String?   @db.VarChar(100) @map("model_used")
+
+  // Relationships
+  prospect                  COProspects @relation(fields: [prospectId], references: [id])
+
+  @@map("CO_prospect_enrichments")
+}
+
+model COProspects {
+  id             Int       @id @default(autoincrement())
+  name           String
+  email          String
+  company        String?
+  position       String?
+  status         String    @default("PENDING")
+  uploadId       String?   @map("upload_id")
+  campaignId     Int?      @map("campaign_id")
+  batchId        Int?      @map("batch_id")
+  linkedinUrl    String?   @map("linkedin_url")
+  additionalData Json?     @map("additional_data")
+  usesFallback   Boolean?  @map("uses_fallback")
+  metadata       Json?
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  // Relationships
+  campaign       COCampaigns? @relation(fields: [campaignId], references: [id])
+  batch          COBatches? @relation(fields: [batchId], references: [id])
+  enrichment     COProspectEnrichments?
+  generatedEmail COGeneratedEmails?
+
+  @@map("CO_prospects")
+  @@index([campaignId])
+  @@index([uploadId])
+  @@index([batchId])
+}
+
+model COServices {
+  id              Int       @id @default(autoincrement())
+  name            String    @db.VarChar(255)
+  isActive        Boolean   @default(true) @map("is_active")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  promptTemplate  String?   @map("prompt_template")
+
+  @@map("CO_services")
+}
+
+model COWorkflowSessions {
+  id                 String    @id
+  userSessionId      String    @db.VarChar(255) @map("user_session_id")
+  campaignId         Int?      @map("campaign_id")
+  currentStep        String    @default("UPLOAD_CSV") @map("current_step")
+  status             String    @default("ACTIVE")
+  configurationData  Json?     @map("configuration_data")
+  stepsCompleted     Json?     @map("steps_completed")
+  errorMessage       String?   @map("error_message")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  // Relationships
+  campaign           COCampaigns? @relation(fields: [campaignId], references: [id])
+
+  @@map("CO_workflow_sessions")
+}
+
+model Profiles {
+  id                        Int       @id @default(autoincrement())
+  name                      String
+  apiKey                    String?   @map("api_key")
+  temperature               String?
+  maxTokens                 String?   @map("max_tokens")
+  topK                      String?   @map("top_k")
+  topP                      String?   @map("top_p")
+  maxEmailHistory           String?   @map("max_email_history")
+  emailHistoryMaxLength     String?   @map("email_history_max_length")
+  customPrompt              String?   @map("custom_prompt")
+  isActive                  Boolean?  @map("is_active")
+  createdAt                 DateTime? @default(now()) @map("created_at")
+  updatedAt                 DateTime? @updatedAt @map("updated_at")
+
+  @@map("profiles")
+}

@@ -1,0 +1,1964 @@
+{
+  "tables": {
+    "CO_api_configurations": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "integer",
+          "udtName": "int4",
+          "nullable": false,
+          "default": "nextval('api_configurations_id_seq'::regclass)",
+          "maxLength": null,
+          "precision": 32,
+          "scale": 0,
+          "isPrimaryKey": true
+        },
+        {
+          "name": "openrouter_api_key",
+          "type": "character varying",
+          "udtName": "varchar",
+          "nullable": true,
+          "default": null,
+          "maxLength": 500,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "gemini_api_key",
+          "type": "character varying",
+          "udtName": "varchar",
+          "nullable": true,
+          "default": null,
+          "maxLength": 500,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "firecrawl_api_key",
+          "type": "character varying",
+          "udtName": "varchar",
+          "nullable": true,
+          "default": null,
+          "maxLength": 500,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "proxycurl_api_key",
+          "type": "character varying",
+          "udtName": "varchar",
+          "nullable": true,
+          "default": null,
+          "maxLength": 500,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "industry_mappings",
+          "type": "jsonb",
+          "udtName": "jsonb",
+          "nullable": true,
+          "default": null,
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "is_active",
+          "type": "boolean",
+          "udtName": "bool",
+          "nullable": false,
+          "default": "true",
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp without time zone",
+          "udtName": "timestamp",
+          "nullable": false,
+          "default": "CURRENT_TIMESTAMP",
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp without time zone",
+          "udtName": "timestamp",
+          "nullable": false,
+          "default": null,
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "default_signature",
+          "type": "text",
+          "udtName": "text",
+          "nullable": true,
+          "default": null,
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "personal_email_domains",
+          "type": "text",
+          "udtName": "text",
+          "nullable": true,
+          "default": "'gmail.com,yahoo.com,hotmail.com,outlook.com,aol.com,icloud.com,protonmail.com,zoho.com,gmx.com,mail.com'::text",
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "gemini_temperature",
+          "type": "double precision",
+          "udtName": "float8",
+          "nullable": true,
+          "default": "0.7",
+          "maxLength": null,
+          "precision": 53,
+          "scale": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "gemini_max_output_tokens",
+          "type": "integer",
+          "udtName": "int4",
+          "nullable": true,
+          "default": "8192",
+          "maxLength": null,
+          "precision": 32,
+          "scale": 0,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "timeout_seconds",
+          "type": "integer",
+          "udtName": "int4",
+          "nullable": true,
+          "default": "60",
+          "maxLength": null,
+          "precision": 32,
+          "scale": 0,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "max_retries",
+          "type": "integer",
+          "udtName": "int4",
+          "nullable": true,
+          "default": "3",
+          "maxLength": null,
+          "precision": 32,
+          "scale": 0,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "domain_keywords_industry",
+          "type": "text",
+          "udtName": "text",
+          "nullable": true,
+          "default": null,
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        }
+      ],
+      "primaryKeys": [
+        "id"
+      ],
+      "foreignKeys": []
+    },
+    "CO_auto_service_settings": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "integer",
+          "udtName": "int4",
+          "nullable": false,
+          "default": "nextval('\"CO_auto_service_settings_id_seq\"'::regclass)",
+          "maxLength": null,
+          "precision": 32,
+          "scale": 0,
+          "isPrimaryKey": true
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "udtName": "text",
+          "nullable": true,
+          "default": null,
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "prompt_template",
+          "type": "text",
+          "udtName": "text",
+          "nullable": true,
+          "default": null,
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp without time zone",
+          "udtName": "timestamp",
+          "nullable": true,
+          "default": null,
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp without time zone",
+          "udtName": "timestamp",
+          "nullable": true,
+          "default": null,
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        }
+      ],
+      "primaryKeys": [
+        "id"
+      ],
+      "foreignKeys": []
+    },
+    "CO_batches": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "integer",
+          "udtName": "int4",
+          "nullable": false,
+          "default": "nextval('batches_id_seq'::regclass)",
+          "maxLength": null,
+          "precision": 32,
+          "scale": 0,
+          "isPrimaryKey": true
+        },
+        {
+          "name": "campaign_id",
+          "type": "integer",
+          "udtName": "int4",
+          "nullable": false,
+          "default": null,
+          "maxLength": null,
+          "precision": 32,
+          "scale": 0,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "name",
+          "type": "character varying",
+          "udtName": "varchar",
+          "nullable": false,
+          "default": null,
+          "maxLength": 255,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "status",
+          "type": "USER-DEFINED",
+          "udtName": "BatchStatus",
+          "nullable": false,
+          "default": "'UPLOADED'::\"BatchStatus\"",
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "total_prospects",
+          "type": "integer",
+          "udtName": "int4",
+          "nullable": false,
+          "default": "0",
+          "maxLength": null,
+          "precision": 32,
+          "scale": 0,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "enriched_prospects",
+          "type": "integer",
+          "udtName": "int4",
+          "nullable": false,
+          "default": "0",
+          "maxLength": null,
+          "precision": 32,
+          "scale": 0,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "generated_emails",
+          "type": "integer",
+          "udtName": "int4",
+          "nullable": false,
+          "default": "0",
+          "maxLength": null,
+          "precision": 32,
+          "scale": 0,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "failed_prospects",
+          "type": "integer",
+          "udtName": "int4",
+          "nullable": false,
+          "default": "0",
+          "maxLength": null,
+          "precision": 32,
+          "scale": 0,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "error_message",
+          "type": "text",
+          "udtName": "text",
+          "nullable": true,
+          "default": null,
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp without time zone",
+          "udtName": "timestamp",
+          "nullable": false,
+          "default": "CURRENT_TIMESTAMP",
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp without time zone",
+          "udtName": "timestamp",
+          "nullable": false,
+          "default": null,
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        }
+      ],
+      "primaryKeys": [
+        "id"
+      ],
+      "foreignKeys": [
+        {
+          "column": "campaign_id",
+          "referencesTable": "CO_campaigns",
+          "referencesColumn": "id",
+          "constraintName": "batches_campaign_id_fkey"
+        }
+      ]
+    },
+    "CO_campaigns": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "integer",
+          "udtName": "int4",
+          "nullable": false,
+          "default": "nextval('campaigns_id_seq'::regclass)",
+          "maxLength": null,
+          "precision": 32,
+          "scale": 0,
+          "isPrimaryKey": true
+        },
+        {
+          "name": "name",
+          "type": "character varying",
+          "udtName": "varchar",
+          "nullable": false,
+          "default": null,
+          "maxLength": 255,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "email_subject",
+          "type": "character varying",
+          "udtName": "varchar",
+          "nullable": true,
+          "default": null,
+          "maxLength": 500,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "prompt",
+          "type": "text",
+          "udtName": "text",
+          "nullable": true,
+          "default": null,
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "enrichment_flags",
+          "type": "jsonb",
+          "udtName": "jsonb",
+          "nullable": true,
+          "default": null,
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "service_id",
+          "type": "integer",
+          "udtName": "int4",
+          "nullable": true,
+          "default": null,
+          "maxLength": null,
+          "precision": 32,
+          "scale": 0,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp without time zone",
+          "udtName": "timestamp",
+          "nullable": false,
+          "default": "CURRENT_TIMESTAMP",
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp without time zone",
+          "udtName": "timestamp",
+          "nullable": false,
+          "default": null,
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        }
+      ],
+      "primaryKeys": [
+        "id"
+      ],
+      "foreignKeys": []
+    },
+    "CO_generated_emails": {
+      "columns": [
+        {
+          "name": "prospect_id",
+          "type": "integer",
+          "udtName": "int4",
+          "nullable": false,
+          "default": null,
+          "maxLength": null,
+          "precision": 32,
+          "scale": 0,
+          "isPrimaryKey": true
+        },
+        {
+          "name": "subject",
+          "type": "character varying",
+          "udtName": "varchar",
+          "nullable": true,
+          "default": null,
+          "maxLength": 500,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "body",
+          "type": "text",
+          "udtName": "text",
+          "nullable": true,
+          "default": null,
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "generation_status",
+          "type": "USER-DEFINED",
+          "udtName": "GenerationStatus",
+          "nullable": false,
+          "default": "'PENDING'::\"GenerationStatus\"",
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "error_message",
+          "type": "text",
+          "udtName": "text",
+          "nullable": true,
+          "default": null,
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp without time zone",
+          "udtName": "timestamp",
+          "nullable": false,
+          "default": "CURRENT_TIMESTAMP",
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp without time zone",
+          "udtName": "timestamp",
+          "nullable": false,
+          "default": null,
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "language",
+          "type": "character varying",
+          "udtName": "varchar",
+          "nullable": true,
+          "default": "'english'::character varying",
+          "maxLength": 50,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "generated_at",
+          "type": "timestamp without time zone",
+          "udtName": "timestamp",
+          "nullable": true,
+          "default": null,
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "model_used",
+          "type": "character varying",
+          "udtName": "varchar",
+          "nullable": true,
+          "default": null,
+          "maxLength": 100,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "generation_metadata",
+          "type": "json",
+          "udtName": "json",
+          "nullable": true,
+          "default": "'{}'::json",
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        }
+      ],
+      "primaryKeys": [
+        "prospect_id"
+      ],
+      "foreignKeys": [
+        {
+          "column": "prospect_id",
+          "referencesTable": "CO_prospects",
+          "referencesColumn": "id",
+          "constraintName": "generated_emails_prospect_id_fkey"
+        }
+      ]
+    },
+    "CO_prompts": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "integer",
+          "udtName": "int4",
+          "nullable": false,
+          "default": "nextval('\"CO_prompts_id_seq\"'::regclass)",
+          "maxLength": null,
+          "precision": 32,
+          "scale": 0,
+          "isPrimaryKey": true
+        },
+        {
+          "name": "company_summary_prompt",
+          "type": "text",
+          "udtName": "text",
+          "nullable": true,
+          "default": null,
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "linkedin_summary_prompt",
+          "type": "text",
+          "udtName": "text",
+          "nullable": true,
+          "default": null,
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "tech_stack_prompt",
+          "type": "text",
+          "udtName": "text",
+          "nullable": true,
+          "default": null,
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "prospect_analysis_prompt",
+          "type": "text",
+          "udtName": "text",
+          "nullable": true,
+          "default": null,
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "is_active",
+          "type": "boolean",
+          "udtName": "bool",
+          "nullable": false,
+          "default": "true",
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "version",
+          "type": "character varying",
+          "udtName": "varchar",
+          "nullable": true,
+          "default": null,
+          "maxLength": 50,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "udtName": "text",
+          "nullable": true,
+          "default": null,
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp without time zone",
+          "udtName": "timestamp",
+          "nullable": false,
+          "default": "CURRENT_TIMESTAMP",
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp without time zone",
+          "udtName": "timestamp",
+          "nullable": false,
+          "default": "CURRENT_TIMESTAMP",
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        }
+      ],
+      "primaryKeys": [
+        "id"
+      ],
+      "foreignKeys": []
+    },
+    "CO_prospect_enrichments": {
+      "columns": [
+        {
+          "name": "prospect_id",
+          "type": "integer",
+          "udtName": "int4",
+          "nullable": false,
+          "default": null,
+          "maxLength": null,
+          "precision": 32,
+          "scale": 0,
+          "isPrimaryKey": true
+        },
+        {
+          "name": "company_website",
+          "type": "character varying",
+          "udtName": "varchar",
+          "nullable": true,
+          "default": null,
+          "maxLength": 500,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "company_summary",
+          "type": "text",
+          "udtName": "text",
+          "nullable": true,
+          "default": null,
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "linkedin_summary",
+          "type": "text",
+          "udtName": "text",
+          "nullable": true,
+          "default": null,
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "prospect_analysis_summary",
+          "type": "text",
+          "udtName": "text",
+          "nullable": true,
+          "default": null,
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "tech_stack",
+          "type": "jsonb",
+          "udtName": "jsonb",
+          "nullable": true,
+          "default": null,
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "enrichment_status",
+          "type": "USER-DEFINED",
+          "udtName": "EnrichmentStatus",
+          "nullable": false,
+          "default": "'PENDING'::\"EnrichmentStatus\"",
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp without time zone",
+          "udtName": "timestamp",
+          "nullable": false,
+          "default": "CURRENT_TIMESTAMP",
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp without time zone",
+          "udtName": "timestamp",
+          "nullable": false,
+          "default": null,
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "builtwith_summary",
+          "type": "text",
+          "udtName": "text",
+          "nullable": true,
+          "default": null,
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "enriched_at",
+          "type": "timestamp without time zone",
+          "udtName": "timestamp",
+          "nullable": true,
+          "default": null,
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "model_used",
+          "type": "character varying",
+          "udtName": "varchar",
+          "nullable": true,
+          "default": null,
+          "maxLength": 100,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        }
+      ],
+      "primaryKeys": [
+        "prospect_id"
+      ],
+      "foreignKeys": [
+        {
+          "column": "prospect_id",
+          "referencesTable": "CO_prospects",
+          "referencesColumn": "id",
+          "constraintName": "prospect_enrichments_prospect_id_fkey"
+        }
+      ]
+    },
+    "CO_prospects": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "integer",
+          "udtName": "int4",
+          "nullable": false,
+          "default": "nextval('prospects_id_seq'::regclass)",
+          "maxLength": null,
+          "precision": 32,
+          "scale": 0,
+          "isPrimaryKey": true
+        },
+        {
+          "name": "campaign_id",
+          "type": "integer",
+          "udtName": "int4",
+          "nullable": false,
+          "default": null,
+          "maxLength": null,
+          "precision": 32,
+          "scale": 0,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "batch_id",
+          "type": "integer",
+          "udtName": "int4",
+          "nullable": true,
+          "default": null,
+          "maxLength": null,
+          "precision": 32,
+          "scale": 0,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "name",
+          "type": "character varying",
+          "udtName": "varchar",
+          "nullable": true,
+          "default": null,
+          "maxLength": 255,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "email",
+          "type": "character varying",
+          "udtName": "varchar",
+          "nullable": false,
+          "default": null,
+          "maxLength": 255,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "company",
+          "type": "character varying",
+          "udtName": "varchar",
+          "nullable": true,
+          "default": null,
+          "maxLength": 255,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "position",
+          "type": "character varying",
+          "udtName": "varchar",
+          "nullable": true,
+          "default": null,
+          "maxLength": 255,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "linkedin_url",
+          "type": "character varying",
+          "udtName": "varchar",
+          "nullable": true,
+          "default": null,
+          "maxLength": 500,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "status",
+          "type": "USER-DEFINED",
+          "udtName": "ProspectStatus",
+          "nullable": false,
+          "default": "'PENDING'::\"ProspectStatus\"",
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "additional_data",
+          "type": "jsonb",
+          "udtName": "jsonb",
+          "nullable": true,
+          "default": null,
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "error_message",
+          "type": "text",
+          "udtName": "text",
+          "nullable": true,
+          "default": null,
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp without time zone",
+          "udtName": "timestamp",
+          "nullable": false,
+          "default": "CURRENT_TIMESTAMP",
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp without time zone",
+          "udtName": "timestamp",
+          "nullable": false,
+          "default": null,
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "job_title",
+          "type": "character varying",
+          "udtName": "varchar",
+          "nullable": true,
+          "default": null,
+          "maxLength": 255,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "phone",
+          "type": "character varying",
+          "udtName": "varchar",
+          "nullable": true,
+          "default": null,
+          "maxLength": 100,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "location",
+          "type": "character varying",
+          "udtName": "varchar",
+          "nullable": true,
+          "default": null,
+          "maxLength": 255,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "company_employees",
+          "type": "character varying",
+          "udtName": "varchar",
+          "nullable": true,
+          "default": null,
+          "maxLength": 100,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "company_industries",
+          "type": "text",
+          "udtName": "text",
+          "nullable": true,
+          "default": null,
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "company_keywords",
+          "type": "text",
+          "udtName": "text",
+          "nullable": true,
+          "default": null,
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "uses_fallback",
+          "type": "boolean",
+          "udtName": "bool",
+          "nullable": true,
+          "default": "false",
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        }
+      ],
+      "primaryKeys": [
+        "id"
+      ],
+      "foreignKeys": [
+        {
+          "column": "campaign_id",
+          "referencesTable": "CO_campaigns",
+          "referencesColumn": "id",
+          "constraintName": "prospects_campaign_id_fkey"
+        },
+        {
+          "column": "batch_id",
+          "referencesTable": "CO_batches",
+          "referencesColumn": "id",
+          "constraintName": "prospects_batch_id_fkey"
+        }
+      ]
+    },
+    "CO_services": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "integer",
+          "udtName": "int4",
+          "nullable": false,
+          "default": "nextval('services_id_seq'::regclass)",
+          "maxLength": null,
+          "precision": 32,
+          "scale": 0,
+          "isPrimaryKey": true
+        },
+        {
+          "name": "name",
+          "type": "character varying",
+          "udtName": "varchar",
+          "nullable": false,
+          "default": null,
+          "maxLength": 255,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "is_active",
+          "type": "boolean",
+          "udtName": "bool",
+          "nullable": false,
+          "default": "true",
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp without time zone",
+          "udtName": "timestamp",
+          "nullable": false,
+          "default": "CURRENT_TIMESTAMP",
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp without time zone",
+          "udtName": "timestamp",
+          "nullable": false,
+          "default": null,
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "prompt_template",
+          "type": "text",
+          "udtName": "text",
+          "nullable": true,
+          "default": null,
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        }
+      ],
+      "primaryKeys": [
+        "id"
+      ],
+      "foreignKeys": []
+    },
+    "CO_workflow_sessions": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "text",
+          "udtName": "text",
+          "nullable": false,
+          "default": null,
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": true
+        },
+        {
+          "name": "user_session_id",
+          "type": "character varying",
+          "udtName": "varchar",
+          "nullable": false,
+          "default": null,
+          "maxLength": 255,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "campaign_id",
+          "type": "integer",
+          "udtName": "int4",
+          "nullable": true,
+          "default": null,
+          "maxLength": null,
+          "precision": 32,
+          "scale": 0,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "current_step",
+          "type": "USER-DEFINED",
+          "udtName": "WorkflowStep",
+          "nullable": false,
+          "default": "'UPLOAD_CSV'::\"WorkflowStep\"",
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "status",
+          "type": "USER-DEFINED",
+          "udtName": "WorkflowStatus",
+          "nullable": false,
+          "default": "'ACTIVE'::\"WorkflowStatus\"",
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "configuration_data",
+          "type": "jsonb",
+          "udtName": "jsonb",
+          "nullable": true,
+          "default": null,
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "steps_completed",
+          "type": "jsonb",
+          "udtName": "jsonb",
+          "nullable": true,
+          "default": null,
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "error_message",
+          "type": "text",
+          "udtName": "text",
+          "nullable": true,
+          "default": null,
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp without time zone",
+          "udtName": "timestamp",
+          "nullable": false,
+          "default": "CURRENT_TIMESTAMP",
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp without time zone",
+          "udtName": "timestamp",
+          "nullable": false,
+          "default": null,
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        }
+      ],
+      "primaryKeys": [
+        "id"
+      ],
+      "foreignKeys": [
+        {
+          "column": "campaign_id",
+          "referencesTable": "CO_campaigns",
+          "referencesColumn": "id",
+          "constraintName": "workflow_sessions_campaign_id_fkey"
+        }
+      ]
+    },
+    "profiles": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "integer",
+          "udtName": "int4",
+          "nullable": false,
+          "default": "nextval('profiles_id_seq'::regclass)",
+          "maxLength": null,
+          "precision": 32,
+          "scale": 0,
+          "isPrimaryKey": true
+        },
+        {
+          "name": "name",
+          "type": "character varying",
+          "udtName": "varchar",
+          "nullable": false,
+          "default": null,
+          "maxLength": 100,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "api_key",
+          "type": "character varying",
+          "udtName": "varchar",
+          "nullable": true,
+          "default": null,
+          "maxLength": 500,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "temperature",
+          "type": "character varying",
+          "udtName": "varchar",
+          "nullable": true,
+          "default": null,
+          "maxLength": 10,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "max_tokens",
+          "type": "character varying",
+          "udtName": "varchar",
+          "nullable": true,
+          "default": null,
+          "maxLength": 10,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "top_k",
+          "type": "character varying",
+          "udtName": "varchar",
+          "nullable": true,
+          "default": null,
+          "maxLength": 10,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "top_p",
+          "type": "character varying",
+          "udtName": "varchar",
+          "nullable": true,
+          "default": null,
+          "maxLength": 10,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "max_email_history",
+          "type": "character varying",
+          "udtName": "varchar",
+          "nullable": true,
+          "default": null,
+          "maxLength": 10,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "email_history_max_length",
+          "type": "character varying",
+          "udtName": "varchar",
+          "nullable": true,
+          "default": null,
+          "maxLength": 10,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "custom_prompt",
+          "type": "text",
+          "udtName": "text",
+          "nullable": true,
+          "default": null,
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "is_active",
+          "type": "boolean",
+          "udtName": "bool",
+          "nullable": true,
+          "default": null,
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp without time zone",
+          "udtName": "timestamp",
+          "nullable": true,
+          "default": null,
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp without time zone",
+          "udtName": "timestamp",
+          "nullable": true,
+          "default": null,
+          "maxLength": null,
+          "precision": null,
+          "scale": null,
+          "isPrimaryKey": false
+        }
+      ],
+      "primaryKeys": [
+        "id"
+      ],
+      "foreignKeys": []
+    }
+  },
+  "relationships": [
+    {
+      "table_name": "CO_workflow_sessions",
+      "column_name": "campaign_id",
+      "foreign_table_name": "CO_campaigns",
+      "foreign_column_name": "id",
+      "constraint_name": "workflow_sessions_campaign_id_fkey",
+      "update_rule": "CASCADE",
+      "delete_rule": "SET NULL"
+    },
+    {
+      "table_name": "CO_batches",
+      "column_name": "campaign_id",
+      "foreign_table_name": "CO_campaigns",
+      "foreign_column_name": "id",
+      "constraint_name": "batches_campaign_id_fkey",
+      "update_rule": "CASCADE",
+      "delete_rule": "RESTRICT"
+    },
+    {
+      "table_name": "CO_prospects",
+      "column_name": "campaign_id",
+      "foreign_table_name": "CO_campaigns",
+      "foreign_column_name": "id",
+      "constraint_name": "prospects_campaign_id_fkey",
+      "update_rule": "CASCADE",
+      "delete_rule": "RESTRICT"
+    },
+    {
+      "table_name": "CO_prospects",
+      "column_name": "batch_id",
+      "foreign_table_name": "CO_batches",
+      "foreign_column_name": "id",
+      "constraint_name": "prospects_batch_id_fkey",
+      "update_rule": "CASCADE",
+      "delete_rule": "SET NULL"
+    },
+    {
+      "table_name": "CO_prospect_enrichments",
+      "column_name": "prospect_id",
+      "foreign_table_name": "CO_prospects",
+      "foreign_column_name": "id",
+      "constraint_name": "prospect_enrichments_prospect_id_fkey",
+      "update_rule": "CASCADE",
+      "delete_rule": "CASCADE"
+    },
+    {
+      "table_name": "CO_generated_emails",
+      "column_name": "prospect_id",
+      "foreign_table_name": "CO_prospects",
+      "foreign_column_name": "id",
+      "constraint_name": "generated_emails_prospect_id_fkey",
+      "update_rule": "CASCADE",
+      "delete_rule": "CASCADE"
+    }
+  ],
+  "indexes": [
+    {
+      "schemaname": "public",
+      "tablename": "CO_api_configurations",
+      "indexname": "api_configurations_pkey",
+      "indexdef": "CREATE UNIQUE INDEX api_configurations_pkey ON public.\"CO_api_configurations\" USING btree (id)"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "CO_auto_service_settings",
+      "indexname": "CO_auto_service_settings_pkey",
+      "indexdef": "CREATE UNIQUE INDEX \"CO_auto_service_settings_pkey\" ON public.\"CO_auto_service_settings\" USING btree (id)"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "CO_batches",
+      "indexname": "batches_pkey",
+      "indexdef": "CREATE UNIQUE INDEX batches_pkey ON public.\"CO_batches\" USING btree (id)"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "CO_campaigns",
+      "indexname": "campaigns_pkey",
+      "indexdef": "CREATE UNIQUE INDEX campaigns_pkey ON public.\"CO_campaigns\" USING btree (id)"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "CO_generated_emails",
+      "indexname": "generated_emails_pkey",
+      "indexdef": "CREATE UNIQUE INDEX generated_emails_pkey ON public.\"CO_generated_emails\" USING btree (prospect_id)"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "CO_prompts",
+      "indexname": "CO_prompts_pkey",
+      "indexdef": "CREATE UNIQUE INDEX \"CO_prompts_pkey\" ON public.\"CO_prompts\" USING btree (id)"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "CO_prospect_enrichments",
+      "indexname": "prospect_enrichments_pkey",
+      "indexdef": "CREATE UNIQUE INDEX prospect_enrichments_pkey ON public.\"CO_prospect_enrichments\" USING btree (prospect_id)"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "CO_prospects",
+      "indexname": "prospects_pkey",
+      "indexdef": "CREATE UNIQUE INDEX prospects_pkey ON public.\"CO_prospects\" USING btree (id)"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "CO_services",
+      "indexname": "services_pkey",
+      "indexdef": "CREATE UNIQUE INDEX services_pkey ON public.\"CO_services\" USING btree (id)"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "CO_workflow_sessions",
+      "indexname": "workflow_sessions_pkey",
+      "indexdef": "CREATE UNIQUE INDEX workflow_sessions_pkey ON public.\"CO_workflow_sessions\" USING btree (id)"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "profiles",
+      "indexname": "profiles_name_key",
+      "indexdef": "CREATE UNIQUE INDEX profiles_name_key ON public.profiles USING btree (name)"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "profiles",
+      "indexname": "profiles_pkey",
+      "indexdef": "CREATE UNIQUE INDEX profiles_pkey ON public.profiles USING btree (id)"
+    }
+  ],
+  "constraints": [
+    {
+      "table_name": "CO_api_configurations",
+      "constraint_name": "19428_19655_10_not_null",
+      "constraint_type": "CHECK",
+      "column_name": null,
+      "check_clause": "created_at IS NOT NULL"
+    },
+    {
+      "table_name": "CO_api_configurations",
+      "constraint_name": "19428_19655_11_not_null",
+      "constraint_type": "CHECK",
+      "column_name": null,
+      "check_clause": "updated_at IS NOT NULL"
+    },
+    {
+      "table_name": "CO_api_configurations",
+      "constraint_name": "19428_19655_1_not_null",
+      "constraint_type": "CHECK",
+      "column_name": null,
+      "check_clause": "id IS NOT NULL"
+    },
+    {
+      "table_name": "CO_api_configurations",
+      "constraint_name": "19428_19655_9_not_null",
+      "constraint_type": "CHECK",
+      "column_name": null,
+      "check_clause": "is_active IS NOT NULL"
+    },
+    {
+      "table_name": "CO_auto_service_settings",
+      "constraint_name": "19428_19873_1_not_null",
+      "constraint_type": "CHECK",
+      "column_name": null,
+      "check_clause": "id IS NOT NULL"
+    },
+    {
+      "table_name": "CO_batches",
+      "constraint_name": "19428_19590_10_not_null",
+      "constraint_type": "CHECK",
+      "column_name": null,
+      "check_clause": "created_at IS NOT NULL"
+    },
+    {
+      "table_name": "CO_batches",
+      "constraint_name": "19428_19590_11_not_null",
+      "constraint_type": "CHECK",
+      "column_name": null,
+      "check_clause": "updated_at IS NOT NULL"
+    },
+    {
+      "table_name": "CO_batches",
+      "constraint_name": "19428_19590_1_not_null",
+      "constraint_type": "CHECK",
+      "column_name": null,
+      "check_clause": "id IS NOT NULL"
+    },
+    {
+      "table_name": "CO_batches",
+      "constraint_name": "19428_19590_2_not_null",
+      "constraint_type": "CHECK",
+      "column_name": null,
+      "check_clause": "campaign_id IS NOT NULL"
+    },
+    {
+      "table_name": "CO_batches",
+      "constraint_name": "19428_19590_3_not_null",
+      "constraint_type": "CHECK",
+      "column_name": null,
+      "check_clause": "name IS NOT NULL"
+    },
+    {
+      "table_name": "CO_batches",
+      "constraint_name": "19428_19590_4_not_null",
+      "constraint_type": "CHECK",
+      "column_name": null,
+      "check_clause": "status IS NOT NULL"
+    },
+    {
+      "table_name": "CO_batches",
+      "constraint_name": "19428_19590_5_not_null",
+      "constraint_type": "CHECK",
+      "column_name": null,
+      "check_clause": "total_prospects IS NOT NULL"
+    },
+    {
+      "table_name": "CO_batches",
+      "constraint_name": "19428_19590_6_not_null",
+      "constraint_type": "CHECK",
+      "column_name": null,
+      "check_clause": "enriched_prospects IS NOT NULL"
+    },
+    {
+      "table_name": "CO_batches",
+      "constraint_name": "19428_19590_7_not_null",
+      "constraint_type": "CHECK",
+      "column_name": null,
+      "check_clause": "generated_emails IS NOT NULL"
+    },
+    {
+      "table_name": "CO_batches",
+      "constraint_name": "19428_19590_8_not_null",
+      "constraint_type": "CHECK",
+      "column_name": null,
+      "check_clause": "failed_prospects IS NOT NULL"
+    },
+    {
+      "table_name": "CO_campaigns",
+      "constraint_name": "19428_19570_1_not_null",
+      "constraint_type": "CHECK",
+      "column_name": null,
+      "check_clause": "id IS NOT NULL"
+    },
+    {
+      "table_name": "CO_campaigns",
+      "constraint_name": "19428_19570_2_not_null",
+      "constraint_type": "CHECK",
+      "column_name": null,
+      "check_clause": "name IS NOT NULL"
+    },
+    {
+      "table_name": "CO_campaigns",
+      "constraint_name": "19428_19570_7_not_null",
+      "constraint_type": "CHECK",
+      "column_name": null,
+      "check_clause": "created_at IS NOT NULL"
+    },
+    {
+      "table_name": "CO_campaigns",
+      "constraint_name": "19428_19570_8_not_null",
+      "constraint_type": "CHECK",
+      "column_name": null,
+      "check_clause": "updated_at IS NOT NULL"
+    },
+    {
+      "table_name": "CO_generated_emails",
+      "constraint_name": "19428_19632_1_not_null",
+      "constraint_type": "CHECK",
+      "column_name": null,
+      "check_clause": "prospect_id IS NOT NULL"
+    },
+    {
+      "table_name": "CO_generated_emails",
+      "constraint_name": "19428_19632_4_not_null",
+      "constraint_type": "CHECK",
+      "column_name": null,
+      "check_clause": "generation_status IS NOT NULL"
+    },
+    {
+      "table_name": "CO_generated_emails",
+      "constraint_name": "19428_19632_6_not_null",
+      "constraint_type": "CHECK",
+      "column_name": null,
+      "check_clause": "created_at IS NOT NULL"
+    },
+    {
+      "table_name": "CO_generated_emails",
+      "constraint_name": "19428_19632_7_not_null",
+      "constraint_type": "CHECK",
+      "column_name": null,
+      "check_clause": "updated_at IS NOT NULL"
+    },
+    {
+      "table_name": "CO_prompts",
+      "constraint_name": "19428_19910_10_not_null",
+      "constraint_type": "CHECK",
+      "column_name": null,
+      "check_clause": "updated_at IS NOT NULL"
+    },
+    {
+      "table_name": "CO_prompts",
+      "constraint_name": "19428_19910_1_not_null",
+      "constraint_type": "CHECK",
+      "column_name": null,
+      "check_clause": "id IS NOT NULL"
+    },
+    {
+      "table_name": "CO_prompts",
+      "constraint_name": "19428_19910_6_not_null",
+      "constraint_type": "CHECK",
+      "column_name": null,
+      "check_clause": "is_active IS NOT NULL"
+    },
+    {
+      "table_name": "CO_prompts",
+      "constraint_name": "19428_19910_9_not_null",
+      "constraint_type": "CHECK",
+      "column_name": null,
+      "check_clause": "created_at IS NOT NULL"
+    },
+    {
+      "table_name": "CO_prospect_enrichments",
+      "constraint_name": "19428_19615_10_not_null",
+      "constraint_type": "CHECK",
+      "column_name": null,
+      "check_clause": "created_at IS NOT NULL"
+    },
+    {
+      "table_name": "CO_prospect_enrichments",
+      "constraint_name": "19428_19615_11_not_null",
+      "constraint_type": "CHECK",
+      "column_name": null,
+      "check_clause": "updated_at IS NOT NULL"
+    },
+    {
+      "table_name": "CO_prospect_enrichments",
+      "constraint_name": "19428_19615_1_not_null",
+      "constraint_type": "CHECK",
+      "column_name": null,
+      "check_clause": "prospect_id IS NOT NULL"
+    },
+    {
+      "table_name": "CO_prospect_enrichments",
+      "constraint_name": "19428_19615_8_not_null",
+      "constraint_type": "CHECK",
+      "column_name": null,
+      "check_clause": "enrichment_status IS NOT NULL"
+    },
+    {
+      "table_name": "CO_prospects",
+      "constraint_name": "19428_19605_12_not_null",
+      "constraint_type": "CHECK",
+      "column_name": null,
+      "check_clause": "created_at IS NOT NULL"
+    },
+    {
+      "table_name": "CO_prospects",
+      "constraint_name": "19428_19605_13_not_null",
+      "constraint_type": "CHECK",
+      "column_name": null,
+      "check_clause": "updated_at IS NOT NULL"
+    },
+    {
+      "table_name": "CO_prospects",
+      "constraint_name": "19428_19605_1_not_null",
+      "constraint_type": "CHECK",
+      "column_name": null,
+      "check_clause": "id IS NOT NULL"
+    },
+    {
+      "table_name": "CO_prospects",
+      "constraint_name": "19428_19605_2_not_null",
+      "constraint_type": "CHECK",
+      "column_name": null,
+      "check_clause": "campaign_id IS NOT NULL"
+    },
+    {
+      "table_name": "CO_prospects",
+      "constraint_name": "19428_19605_5_not_null",
+      "constraint_type": "CHECK",
+      "column_name": null,
+      "check_clause": "email IS NOT NULL"
+    },
+    {
+      "table_name": "CO_prospects",
+      "constraint_name": "19428_19605_9_not_null",
+      "constraint_type": "CHECK",
+      "column_name": null,
+      "check_clause": "status IS NOT NULL"
+    },
+    {
+      "table_name": "CO_services",
+      "constraint_name": "19428_19666_1_not_null",
+      "constraint_type": "CHECK",
+      "column_name": null,
+      "check_clause": "id IS NOT NULL"
+    },
+    {
+      "table_name": "CO_services",
+      "constraint_name": "19428_19666_2_not_null",
+      "constraint_type": "CHECK",
+      "column_name": null,
+      "check_clause": "name IS NOT NULL"
+    },
+    {
+      "table_name": "CO_services",
+      "constraint_name": "19428_19666_4_not_null",
+      "constraint_type": "CHECK",
+      "column_name": null,
+      "check_clause": "is_active IS NOT NULL"
+    },
+    {
+      "table_name": "CO_services",
+      "constraint_name": "19428_19666_5_not_null",
+      "constraint_type": "CHECK",
+      "column_name": null,
+      "check_clause": "created_at IS NOT NULL"
+    },
+    {
+      "table_name": "CO_services",
+      "constraint_name": "19428_19666_6_not_null",
+      "constraint_type": "CHECK",
+      "column_name": null,
+      "check_clause": "updated_at IS NOT NULL"
+    },
+    {
+      "table_name": "CO_workflow_sessions",
+      "constraint_name": "19428_19579_10_not_null",
+      "constraint_type": "CHECK",
+      "column_name": null,
+      "check_clause": "updated_at IS NOT NULL"
+    },
+    {
+      "table_name": "CO_workflow_sessions",
+      "constraint_name": "19428_19579_1_not_null",
+      "constraint_type": "CHECK",
+      "column_name": null,
+      "check_clause": "id IS NOT NULL"
+    },
+    {
+      "table_name": "CO_workflow_sessions",
+      "constraint_name": "19428_19579_2_not_null",
+      "constraint_type": "CHECK",
+      "column_name": null,
+      "check_clause": "user_session_id IS NOT NULL"
+    },
+    {
+      "table_name": "CO_workflow_sessions",
+      "constraint_name": "19428_19579_4_not_null",
+      "constraint_type": "CHECK",
+      "column_name": null,
+      "check_clause": "current_step IS NOT NULL"
+    },
+    {
+      "table_name": "CO_workflow_sessions",
+      "constraint_name": "19428_19579_5_not_null",
+      "constraint_type": "CHECK",
+      "column_name": null,
+      "check_clause": "status IS NOT NULL"
+    },
+    {
+      "table_name": "CO_workflow_sessions",
+      "constraint_name": "19428_19579_9_not_null",
+      "constraint_type": "CHECK",
+      "column_name": null,
+      "check_clause": "created_at IS NOT NULL"
+    },
+    {
+      "table_name": "profiles",
+      "constraint_name": "19428_19758_1_not_null",
+      "constraint_type": "CHECK",
+      "column_name": null,
+      "check_clause": "id IS NOT NULL"
+    },
+    {
+      "table_name": "profiles",
+      "constraint_name": "19428_19758_2_not_null",
+      "constraint_type": "CHECK",
+      "column_name": null,
+      "check_clause": "name IS NOT NULL"
+    },
+    {
+      "table_name": "profiles",
+      "constraint_name": "profiles_name_key",
+      "constraint_type": "UNIQUE",
+      "column_name": "name",
+      "check_clause": null
+    }
+  ]
+}

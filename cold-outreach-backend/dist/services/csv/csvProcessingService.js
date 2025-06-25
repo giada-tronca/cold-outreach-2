@@ -1,0 +1,216 @@
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.CSVProcessingService = void 0;
+const csvParser_1 = require("./csvParser");
+const dataMapper_1 = require("./dataMapper");
+const batchProcessor_1 = require("./batchProcessor");
+const errors_1 = require("@/utils/errors");
+const fs_1 = __importDefault(require("fs"));
+const path_1 = __importDefault(require("path"));
+class CSVProcessingService {
+    /**
+     * Validate CSV file before processing
+     */
+    static async validateCSVFile(filePath) {
+        const result = {
+            isValid: false,
+            errors: [],
+            warnings: [],
+            fileInfo: {
+                size: 0,
+                path: filePath,
+                exists: false,
+                readable: false
+            }
+        };
+        try {
+            // Check file existence and accessibility
+            if (!fs_1.default.existsSync(filePath)) {
+                result.errors.push('File does not exist');
+                return result;
+            }
+            const stats = fs_1.default.statSync(filePath);
+            result.fileInfo.exists = true;
+            result.fileInfo.size = stats.size;
+            // Check file permissions
+            try {
+                fs_1.default.accessSync(filePath, fs_1.default.constants.R_OK);
+                result.fileInfo.readable = true;
+            }
+            catch {
+                result.errors.push('File is not readable');
+                return result;
+            }
+            // Check file size
+            const maxSize = 100 * 1024 * 1024; // 100MB
+            if (stats.size > maxSize) {
+                result.errors.push(`File size exceeds maximum allowed size (100MB)`);
+            }
+            if (stats.size === 0) {
+                result.errors.push('File is empty');
+                return result;
+            }
+            // Check file extension
+            const ext = path_1.default.extname(filePath).toLowerCase();
+            if (ext !== '.csv') {
+                result.warnings.push(`File extension '${ext}' is not .csv`);
+            }
+            // Try to parse a preview
+            try {
+                const parseResult = await csvParser_1.CSVParserService.parseFromFile(filePath, {
+                    skipEmptyLines: true,
+                    maxFileSize: maxSize
+                });
+                if (parseResult.headers.length === 0) {
+                    result.errors.push('No headers found in CSV file');
+                }
+                if (parseResult.totalRows === 0) {
+                    result.errors.push('No data rows found in CSV file');
+                }
+                // Create preview
+                result.preview = {
+                    headers: parseResult.headers,
+                    sampleRows: parseResult.data.slice(0, 5).map(row => parseResult.headers.map(header => row[header] || '')),
+                    estimatedRows: parseResult.totalRows
+                };
+                // Check for common required fields
+                const lowerHeaders = parseResult.headers.map(h => h.toLowerCase());
+                const hasEmail = lowerHeaders.some(h => h.includes('email') || h.includes('mail'));
+                if (!hasEmail) {
+                    result.warnings.push('No email column detected');
+                }
+            }
+            catch (error) {
+                result.errors.push(`Failed to parse CSV: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            }
+            result.isValid = result.errors.length === 0;
+            return result;
+        }
+        catch (error) {
+            result.errors.push(`File validation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            return result;
+        }
+    }
+    /**
+     * Process CSV file with all steps
+     */
+    static async processCSVFile(options, progressCallback) {
+        const startTime = Date.now();
+        try {
+            // Step 1: Validate file
+            const validation = await this.validateCSVFile(options.filePath);
+            if (!validation.isValid) {
+                throw new errors_1.BadRequestError(`CSV validation failed: ${validation.errors.join(', ')}`);
+            }
+            // Step 2: Parse CSV
+            const parseResult = await csvParser_1.CSVParserService.parseFromFile(options.filePath, {
+                skipEmptyLines: true,
+                skipLinesWithError: true,
+                maxFileSize: 100 * 1024 * 1024,
+                ...options.parseOptions
+            });
+            if (parseResult.totalRows === 0) {
+                throw new errors_1.BadRequestError('No data found in CSV file');
+            }
+            // Step 3: Map data
+            const mappingConfig = options.mappingConfig ||
+                dataMapper_1.DataMapperService.createMappingConfig(parseResult.headers);
+            const mappingResult = dataMapper_1.DataMapperService.mapProspects(parseResult.data, mappingConfig);
+            if (mappingResult.prospects.length === 0) {
+                throw new errors_1.BadRequestError('No valid prospects found after data mapping');
+            }
+            // Step 4: Batch processing (if enabled)
+            let batchResult;
+            if (options.saveToDatabase !== false) {
+                const batchOptions = {
+                    campaignId: options.campaignId,
+                    fileName: options.fileName || path_1.default.basename(options.filePath),
+                    filePath: options.filePath,
+                    mappingConfig
+                };
+                if (options.batchConfig) {
+                    batchOptions.batchConfig = options.batchConfig;
+                }
+                batchResult = await batchProcessor_1.BatchProcessorService.processCSVFile(batchOptions, progressCallback);
+            }
+            // Step 5: Generate reports
+            const reports = this.generateReports(parseResult, mappingResult, batchResult);
+            const statistics = this.calculateStatistics(parseResult, mappingResult, startTime, batchResult);
+            return {
+                success: true,
+                parseResult,
+                mappingResult,
+                ...(batchResult && { batchResult }),
+                reports,
+                statistics
+            };
+        }
+        catch (error) {
+            throw error instanceof errors_1.AppError ? error : new errors_1.BadRequestError(`CSV processing failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    }
+    /**
+     * Generate comprehensive reports
+     */
+    static generateReports(parseResult, mappingResult, batchResult) {
+        const parseReport = csvParser_1.CSVParserService.generateErrorReport(parseResult);
+        const mappingReport = dataMapper_1.DataMapperService.generateMappingReport(mappingResult);
+        const batchReport = batchResult ? batchProcessor_1.BatchProcessorService.generateBatchReport(batchResult) : undefined;
+        // Generate summary report
+        let summary = `CSV Processing Summary\n`;
+        summary += `======================\n\n`;
+        if (batchResult) {
+            summary += `Batch ID: ${batchResult.batchId}\n`;
+            summary += `Status: ${batchResult.status.toUpperCase()}\n`;
+            summary += `Processing Time: ${(batchResult.duration / 1000).toFixed(2)} seconds\n\n`;
+        }
+        summary += `File Processing:\n`;
+        summary += `Total Rows in CSV: ${parseResult.totalRows}\n`;
+        summary += `Valid Rows Parsed: ${parseResult.validRows}\n`;
+        summary += `Parse Errors: ${parseResult.errors.length}\n\n`;
+        summary += `Data Mapping:\n`;
+        summary += `Successfully Mapped: ${mappingResult.prospects.length}\n`;
+        summary += `Mapping Errors: ${mappingResult.errors.length}\n`;
+        summary += `Skipped Rows: ${mappingResult.skippedRows}\n\n`;
+        if (batchResult) {
+            summary += `Batch Processing:\n`;
+            summary += `Successfully Processed: ${batchResult.successfulRows}\n`;
+            summary += `Failed Processing: ${batchResult.failedRows}\n`;
+            summary += `Total Chunks: ${batchResult.batches.length}\n\n`;
+        }
+        const successRate = parseResult.totalRows > 0 ?
+            ((batchResult?.successfulRows || mappingResult.prospects.length) / parseResult.totalRows) * 100 : 0;
+        summary += `Overall Success Rate: ${successRate.toFixed(2)}%\n`;
+        const reports = {
+            parseReport,
+            mappingReport,
+            summary
+        };
+        if (batchReport) {
+            reports.batchReport = batchReport;
+        }
+        return reports;
+    }
+    /**
+     * Calculate processing statistics
+     */
+    static calculateStatistics(parseResult, mappingResult, startTime, batchResult) {
+        const endTime = Date.now();
+        const processingTime = endTime - startTime;
+        const totalRows = parseResult.totalRows;
+        const successfulRows = batchResult?.successfulRows || mappingResult.prospects.length;
+        const failedRows = (batchResult?.failedRows || 0) + mappingResult.errors.length;
+        const successRate = totalRows > 0 ? (successfulRows / totalRows) * 100 : 0;
+        return {
+            totalRows,
+            successfulRows,
+            failedRows,
+            successRate,
+            processingTime
+        };
+    }
+}
+exports.CSVProcessingService = CSVProcessingService;

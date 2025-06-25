@@ -1,0 +1,10 @@
+node_modules
+dist
+build
+coverage
+.nyc_output
+*.log
+.env
+.env.*
+public/
+vite.config.ts.timestamp-* 

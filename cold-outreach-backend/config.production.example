@@ -1,0 +1,65 @@
+# Production Environment Configuration Template
+# Copy this to .env.production and update values as needed
+
+NODE_ENV=production
+
+# Server Configuration
+PORT=3001
+HOST=0.0.0.0
+
+# Database Configuration (Update with your production database URL)
+DATABASE_URL="postgresql://username:password@prod-host:5432/cold_outreach_prod"
+
+# Redis Configuration (production)
+REDIS_URL="redis://prod-redis-host:6379"
+
+# JWT Configuration (Use strong secret in production)
+JWT_SECRET="CHANGE-THIS-TO-A-STRONG-SECRET-IN-PRODUCTION"
+JWT_EXPIRES_IN="24h"
+
+# Production Logging
+LOG_LEVEL="info"
+LOG_SQL_QUERIES=false
+
+# File Upload Limits
+MAX_FILE_SIZE=10485760
+ALLOWED_FILE_TYPES="text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+# Rate Limiting (Strict for production)
+RATE_LIMIT_WINDOW_MS=900000
+RATE_LIMIT_MAX_REQUESTS=100
+
+# Email Configuration (Production SMTP)
+SMTP_HOST="smtp.gmail.com"
+SMTP_PORT=587
+SMTP_USER="your-production-email@yourdomain.com"
+SMTP_PASS="your-production-app-password"
+
+# Production Features
+ENABLE_CORS=false
+ENABLE_REQUEST_LOGGING=true
+ENABLE_ERROR_DETAILS=false
+
+# Security Headers
+TRUST_PROXY=true
+SECURE_COOKIES=true
+HTTPS_ONLY=true
+
+# API Configuration (Production uses database exclusively)
+API_KEYS_SOURCE="database"
+
+# Production Database Settings
+ENABLE_DB_SEEDING=false
+SEED_SAMPLE_DATA=false
+
+# Monitoring & Health Checks
+HEALTH_CHECK_TIMEOUT=5000
+DATABASE_CONNECTION_TIMEOUT=10000
+
+# Performance Settings
+DATABASE_POOL_SIZE=10
+REDIS_CONNECTION_POOL_SIZE=10
+
+# Error Reporting (Add your error tracking service)
+# SENTRY_DSN="your-sentry-dsn"
+# DATADOG_API_KEY="your-datadog-key" 

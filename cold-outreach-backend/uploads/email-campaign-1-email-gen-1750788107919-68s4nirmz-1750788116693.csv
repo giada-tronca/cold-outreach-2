@@ -1,0 +1,33 @@
+Name,Email,Company,Position,LinkedIn URL,Phone,Location,Industry,Company Size,Tech Stack,Email Subject,Email Body
+"Elisa","elisa@aureatradings.com","VAICACAO®","Co- Founder","http://www.linkedin.com/in/elisa-parriciatu-9240a895","","","","","","Elisa / Matteo - Sustainable Cacao?","Okay, I'm ready to craft a hyper-personalized email in Italian.
+
+```text
+SUBJECT: Opportunità notata sul sito di VAICACAO®
+
+Buongiorno Elisa,
+
+Ho notato che il sito di VAICACAO® è un ottimo punto di partenza, ma potrebbe beneficiare di alcune migliorie per supportare la vostra missione di tracciabilità e sostenibilità del cacao. In particolare, ho visto che non state usando un CMS (Content Management System) avanzato, il che potrebbe rendere più complessa la gestione dei contenuti e l'aggiornamento delle informazioni.
+
+Scalarly aiuta aziende come la vostra a trasformare la loro presenza digitale attraverso soluzioni web e software su misura. Possiamo integrare un CMS come WordPress o Drupal, che vi permetterebbe di aggiornare facilmente il sito, migliorare l'esperienza utente e comunicare in modo più efficace i vostri valori di sostenibilità.
+
+Immagina di poter mostrare in tempo reale la provenienza del vostro cacao, con dati verificabili e storie coinvolgenti dei coltivatori. Abbiamo visto aziende simili aumentare del 35% le vendite online ottimizzando la loro piattaforma e-commerce e migliorando la comunicazione dei loro valori.
+
+Interessata a scoprire come potremmo migliorare la vostra presenza digitale per supportare la tracciabilità e la sostenibilità del vostro cacao?
+
+Ecco il link al mio calendario per prenotare direttamente una chiamata quando preferisci: ${calendar_link}
+```"
+"Filippo","filippo@ruderecords.com","Rude Records","Partner and Chief Executive Officer Methodos Group","http://www.linkedin.com/in/filippo-falconi","","","","","","Filippo / Matteo - Contatto","```text
+SUBJECT: Idea per migliorare il sito di Rude Records
+
+Buongiorno Filippo,
+
+Ho notato che il sito di Rude Records è principalmente orientato alla diffusione di contenuti. Immagino che tu stia cercando modi per migliorare l'engagement degli utenti e ottenere dati più approfonditi sulle performance del sito.
+
+Scalarly può aiutarti a trasformare la tua presenza digitale con soluzioni di content management avanzate e piattaforme di analytics complete. Potremmo integrare un sistema CMS moderno per semplificare l'aggiornamento dei contenuti e implementare strumenti di analytics per monitorare le interazioni degli utenti e ottimizzare le strategie di marketing.
+
+Un cliente simile a Rude Records ha visto un aumento del 35% dell'engagement degli utenti dopo aver implementato una piattaforma di analytics personalizzata. Potremmo migliorare significativamente l'esperienza utente e fornirti insights preziosi per guidare le tue decisioni strategiche.
+
+Interessato a scoprire come potremmo migliorare la tua presenza digitale con un sistema CMS avanzato e analytics personalizzate?
+
+Ecco il mio calendario per prenotare direttamente un appuntamento: ${calendar_link}
+```"
