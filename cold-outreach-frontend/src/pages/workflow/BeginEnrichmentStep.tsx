@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Card,
   CardContent,
@@ -30,10 +30,6 @@ import {
   BarChart3,
   Timer,
   Settings2,
-  Settings,
-  Eye,
-  X,
-  ExternalLink,
   ArrowLeft,
 } from 'lucide-react';
 import {
@@ -47,7 +43,6 @@ import {
 import ReactMarkdown from 'react-markdown';
 
 import ProspectEnrichmentService from '@/services/prospectEnrichmentService';
-import { apiClient } from '@/services/api';
 import type {
   ProspectEnrichmentStatus,
   EnrichmentJobStatus,
@@ -121,6 +116,7 @@ export default function BeginEnrichmentStep({
       const headerMapping: { [key: string]: string } = {};
       csvFileInfo.preview.headers.forEach((header: string) => {
         const lowerHeader = header.toLowerCase().trim();
+        console.log(`Processing header: ${header}`);
 
         if (lowerHeader.includes('first') && lowerHeader.includes('name')) {
           headerMapping[header] = 'firstName';
@@ -145,9 +141,9 @@ export default function BeginEnrichmentStep({
         }
       });
 
-      const previewProspects = csvFileInfo.preview.rows.map((row: any, index: number) => {
+      const previewProspects = csvFileInfo.preview.rows.map((row: any, rowIndex: number) => {
         const rowData: any = {
-          id: index + 1, // Temporary ID
+          id: rowIndex + 1,
           status: 'pending',
           progress: 0,
           errors: [],
@@ -156,9 +152,9 @@ export default function BeginEnrichmentStep({
         };
 
         // Map the CSV data using the same logic
-        csvFileInfo.preview.headers.forEach((header: string, headerIndex: number) => {
+        csvFileInfo.preview.headers.forEach((header: string) => {
           const mappedField = headerMapping[header];
-          const value = row[headerIndex] || '';
+          const value = row[header] || '';
           if (mappedField) {
             rowData[mappedField] = value;
           }
@@ -193,163 +189,6 @@ export default function BeginEnrichmentStep({
   // const userId = 'user123'; // In real app, get from auth context - removed as unused
 
   // Move loadProspects function definition here but don't call it on mount
-  const loadProspects = async () => {
-    try {
-      setIsLoading(true);
-      console.log('🔍 [BeginEnrichment] Loading prospects with:', {
-        campaignId,
-        workflowSessionId,
-        csvFileInfo: csvFileInfo ? 'present' : 'not present'
-      });
-
-      // Pass csvFileInfo to getProspects
-      const prospectsData = await ProspectEnrichmentService.getProspects(
-        campaignId,
-        undefined, // batchId
-        workflowSessionId,
-        undefined, // uploadSession
-        csvFileInfo // Pass csvFileInfo
-      );
-
-      console.log('✅ [BeginEnrichment] Loaded prospects:', {
-        count: prospectsData.length,
-        prospects: prospectsData.map(p => ({
-          id: p.id,
-          name: p.name,
-          email: p.email,
-          company: p.company
-        }))
-      });
-
-      setProspects(prospectsData);
-      setError(null);
-    } catch (err) {
-      console.error('❌ [BeginEnrichment] Error loading prospects:', err);
-      setError('Failed to load prospects. Please try again.');
-      onError?.('Failed to load prospects');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Function to get the LLM model selection from multiple sources
-  const getLLMModelSelection = useCallback(async () => {
-    console.log('🔍 [BeginEnrichment] Getting LLM model selection...');
-    console.log('🔍 [BeginEnrichment] workflowSessionId:', workflowSessionId);
-
-    // Method 1: Try to get from workflow session configuration (most reliable)
-    if (workflowSessionId && workflowSessionId !== 'local-session') {
-      try {
-        console.log(
-          '🔍 [BeginEnrichment] Attempting to get LLM model from workflow session configuration...'
-        );
-        console.log(
-          '🔍 [BeginEnrichment] Making API call to:',
-          `/api/workflow/sessions/${workflowSessionId}`
-        );
-
-        const response = await apiClient.get(
-          `/api/workflow/sessions/${workflowSessionId}`
-        );
-        console.log(
-          '🔍 [BeginEnrichment] API response status:',
-          response.status
-        );
-        console.log('🔍 [BeginEnrichment] API response ok:', response.ok);
-
-        const data = await response.json();
-        console.log(
-          '🔍 [BeginEnrichment] Full API response data:',
-          JSON.stringify(data, null, 2)
-        );
-
-        if (
-          data.success &&
-          data.data?.session?.configurationData?.campaignSettings
-        ) {
-          const campaignSettings =
-            data.data.session.configurationData.campaignSettings;
-          console.log(
-            '🔍 [BeginEnrichment] Found campaignSettings:',
-            campaignSettings
-          );
-
-          if (campaignSettings.aiProvider) {
-            console.log(
-              '✅ [BeginEnrichment] Found aiProvider in workflow session:',
-              campaignSettings.aiProvider
-            );
-            return campaignSettings.aiProvider;
-          }
-
-          if (campaignSettings.llmModelId) {
-            console.log(
-              '✅ [BeginEnrichment] Found llmModelId in workflow session:',
-              campaignSettings.llmModelId
-            );
-            return campaignSettings.llmModelId;
-          }
-        } else {
-          console.log(
-            '⚠️ [BeginEnrichment] Invalid data structure or missing campaignSettings'
-          );
-          console.log('🔍 [BeginEnrichment] data.success:', data.success);
-          console.log('🔍 [BeginEnrichment] data.data:', data.data);
-          console.log('🔍 [BeginEnrichment] session:', data.data?.session);
-          console.log(
-            '🔍 [BeginEnrichment] configurationData:',
-            data.data?.session?.configurationData
-          );
-        }
-
-        console.log(
-          '⚠️ [BeginEnrichment] No LLM model found in workflow session configuration'
-        );
-      } catch (error) {
-        console.warn(
-          '⚠️ [BeginEnrichment] Error getting LLM model from workflow session:',
-          error
-        );
-      }
-    } else {
-      console.log('⚠️ [BeginEnrichment] No valid workflowSessionId provided');
-    }
-
-    // Method 2: Try to get from global function (fallback)
-    if (typeof (window as any).__campaignStepData === 'function') {
-      try {
-        console.log(
-          '🔍 [BeginEnrichment] Attempting to get LLM model from global function...'
-        );
-        const campaignData = (window as any).__campaignStepData();
-        if (campaignData?.aiProvider) {
-          console.log(
-            '✅ [BeginEnrichment] Found LLM model from global function:',
-            campaignData.aiProvider
-          );
-          return campaignData.aiProvider;
-        }
-        console.log(
-          '⚠️ [BeginEnrichment] No LLM model found in global function data'
-        );
-      } catch (error) {
-        console.warn(
-          '⚠️ [BeginEnrichment] Error calling global function:',
-          error
-        );
-      }
-    } else {
-      console.log(
-        '⚠️ [BeginEnrichment] Global __campaignStepData function not available'
-      );
-    }
-
-    console.log(
-      '❌ [BeginEnrichment] No LLM model selection found from any source'
-    );
-    return null;
-  }, [workflowSessionId]);
-
   const startEnrichment = async () => {
     console.log('🚀 BeginEnrichmentStep: startEnrichment function called');
     console.log('🔍 Initial enrichmentConfig received:', enrichmentConfig);
@@ -430,7 +269,7 @@ export default function BeginEnrichmentStep({
 
           // Create a header mapping to standardize field names
           const headerMapping: { [key: string]: string } = {};
-          csvFileInfo.preview.headers.forEach((header: string, index: number) => {
+          csvFileInfo.preview.headers.forEach((header: string) => {
             const lowerHeader = header.toLowerCase().trim();
 
             // Map various header variations to standard field names
@@ -462,15 +301,15 @@ export default function BeginEnrichmentStep({
 
           const csvData = csvFileInfo.preview.rows.map((row: any) => {
             const rowData: any = {};
-            csvFileInfo.preview.headers.forEach((header: string, headerIndex: number) => {
+            csvFileInfo.preview.headers.forEach((header: string) => {
               const mappedField = headerMapping[header];
-              const value = row[headerIndex] || '';
+              const value = row[header] || '';
               if (mappedField) {
                 rowData[mappedField] = value;
               }
             });
 
-            // Ensure we have a proper 'name' field by combining firstName and lastName if needed
+            // Create proper name field
             if (rowData.firstName && rowData.lastName && !rowData.name) {
               rowData.name = `${rowData.firstName} ${rowData.lastName}`.trim();
             }

@@ -45,9 +45,9 @@ import { serviceService, type Service } from '@/services/serviceService';
 interface Campaign {
   id: number;
   name: string;
-  emailSubject: string; // Matches Prisma camelCase
+  emailSubject: string;
   prompt: string;
-  enrichmentFlags: any; // JSON field from Prisma (can be null, array, or object)
+  enrichmentFlags: any;
   serviceId: number | null;
   createdAt: string;
 }
@@ -59,12 +59,6 @@ interface EnrichmentService {
   pricePerProspect: number;
   icon: React.ReactNode;
   enabled: boolean;
-}
-
-interface AIModel {
-  id: string;
-  name: string;
-  provider: string;
 }
 
 // interface CampaignSettingsData { // Removed unused interface
@@ -86,16 +80,14 @@ interface CampaignSettingsStepProps {
   workflowSessionId: string;
   prospectCount?: number;
   onStepComplete?: (data: any) => void;
-  onStepReady?: (data: any, isReady: boolean) => void;
   onError?: (error: string) => void;
   disabled?: boolean;
 }
 
 export default function CampaignSettingsStep({
   workflowSessionId,
-  prospectCount,
+  prospectCount = 0,
   onStepComplete,
-  // onStepReady, // No longer used
   onError,
   disabled = false,
 }: CampaignSettingsStepProps) {
@@ -107,21 +99,14 @@ export default function CampaignSettingsStep({
   // Campaign selection state
   const [campaignMode, setCampaignMode] = useState<'existing' | 'new'>('new');
   const [existingCampaigns, setExistingCampaigns] = useState<Campaign[]>([]);
-  const [selectedCampaignId, setSelectedCampaignId] = useState<number | null>(
-    null
-  );
+  const [selectedCampaignId, setSelectedCampaignId] = useState<number | null>(null);
   const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
   const [loadingCampaigns, setLoadingCampaigns] = useState(false);
 
   // Services and model state
   const [availableServices, setAvailableServices] = useState<Service[]>([]);
   const [loadingServices, setLoadingServices] = useState(false);
-  const [selectedModel, setSelectedModel] = useState<AIModel | null>(null);
   const [selectedLLMModel, setSelectedLLMModel] = useState('');
-
-  // Loading and error states
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   // New campaign form state
   const [newCampaign, setNewCampaign] = useState({
@@ -131,10 +116,8 @@ export default function CampaignSettingsStep({
     service_id: '',
   });
 
-  // Enrichment services state (based on your schema enrichment_flags)
-  const [enrichmentServices, setEnrichmentServices] = useState<
-    EnrichmentService[]
-  >([
+  // Enrichment services state
+  const [enrichmentServices, setEnrichmentServices] = useState<EnrichmentService[]>([
     {
       id: 'proxycurl',
       name: 'Proxycurl',
@@ -163,10 +146,12 @@ export default function CampaignSettingsStep({
 
   // Validation and UI state
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [isSubmitting] = useState(false); // setIsSubmitting removed as unused
+  const [isSubmitting] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
+
+  // Delete dialog state
   const [deleteDialog, setDeleteDialog] = useState<{
     isOpen: boolean;
     campaign: Campaign | null;
@@ -176,6 +161,16 @@ export default function CampaignSettingsStep({
     campaign: null,
     isDeleting: false,
   });
+
+  // Effect to update selectedCampaign when selectedCampaignId changes
+  useEffect(() => {
+    if (selectedCampaignId) {
+      const campaign = existingCampaigns.find(c => c.id === selectedCampaignId);
+      setSelectedCampaign(campaign || null);
+    } else {
+      setSelectedCampaign(null);
+    }
+  }, [selectedCampaignId, existingCampaigns]);
 
   // Load existing campaigns and services on component mount
   useEffect(() => {
@@ -375,17 +370,10 @@ export default function CampaignSettingsStep({
   };
 
   const calculateTotalCost = () => {
-    if (!prospectCount || prospectCount <= 0) {
-      return 0;
-    }
-    const enabledServices = enrichmentServices.filter(
-      service => service.enabled
-    );
-    const totalCostPerProspect = enabledServices.reduce(
-      (total, service) => total + service.pricePerProspect,
-      0
-    );
-    return totalCostPerProspect * prospectCount;
+    const totalCostPerProspect = enrichmentServices
+      .filter((service) => service.enabled)
+      .reduce((total, service) => total + service.pricePerProspect, 0);
+    return totalCostPerProspect * (prospectCount || 0);
   };
 
   const getEnabledServicesCount = () => {
@@ -675,91 +663,6 @@ export default function CampaignSettingsStep({
   }, [getCampaignStepData]);
 
   // Removed unused handleSubmit function
-
-  const handleCompleteStep = async () => {
-    if (!workflowSessionId || !selectedCampaign) return;
-
-    try {
-      setIsLoading(true);
-
-      // Get the upload ID from the previous step
-      const response = await fetch(`/api/workflow/sessions/${workflowSessionId}`);
-      const sessionData = await response.json();
-      const uploadId = sessionData.data?.steps?.UPLOAD_CSV?.data?.uploadId;
-
-      if (!uploadId) {
-        throw new Error('No upload ID found from previous step');
-      }
-
-      // Associate uploaded prospects with the campaign
-      const associateResponse = await fetch('/api/prospects/associate-campaign', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          uploadId,
-          campaignId: selectedCampaign.id
-        }),
-      });
-
-      if (!associateResponse.ok) {
-        throw new Error('Failed to associate prospects with campaign');
-      }
-
-      // Update workflow session with campaign info
-      const updateResponse = await fetch(
-        `/api/workflow/sessions/${workflowSessionId}/step`,
-        {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            step: 'CAMPAIGN_SETTINGS',
-            data: {
-              campaignId: selectedCampaign.id,
-              campaignName: selectedCampaign.name,
-              aiProvider: selectedLLMModel,
-            },
-          }),
-        }
-      );
-
-      const updateData = await updateResponse.json();
-      if (!updateData.success) {
-        throw new Error(updateData.message || 'Failed to update workflow session');
-      }
-
-      // Complete the step
-      const completeResponse = await fetch(
-        `/api/workflow/sessions/${workflowSessionId}/steps/CAMPAIGN_SETTINGS/complete`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-
-      const completeData = await completeResponse.json();
-      if (!completeData.success) {
-        throw new Error(completeData.message || 'Failed to complete step');
-      }
-
-      onStepComplete?.({
-        campaignId: selectedCampaign.id,
-        campaignName: selectedCampaign.name,
-        aiProvider: selectedLLMModel,
-      });
-    } catch (error) {
-      console.error('Failed to complete campaign settings step:', error);
-      setError(error instanceof Error ? error.message : 'Failed to complete step');
-      onError?.(error instanceof Error ? error.message : 'Failed to complete step');
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   return (
     <div className='max-w-4xl mx-auto space-y-6'>
@@ -1232,10 +1135,7 @@ export default function CampaignSettingsStep({
                           Cost for {prospectCount} prospects:
                         </span>
                         <span className='font-medium text-green-600'>
-                          $
-                          {(service.pricePerProspect * prospectCount).toFixed(
-                            2
-                          )}
+                          ${(service.pricePerProspect * (prospectCount || 0)).toFixed(2)}
                         </span>
                       </div>
                     </div>
