@@ -1,3 +1,6 @@
+import 'module-alias/register';
+import path from 'path';
+import moduleAlias from 'module-alias';
 import express, { Express, Request, Response } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -18,6 +21,18 @@ import {
 
 // Import workers for background job processing
 import { WorkerManager } from './jobs/workers';
+
+// Add path aliases
+moduleAlias.addAliases({
+    '@': path.join(__dirname),
+    '@/config': path.join(__dirname, 'config'),
+    '@/routes': path.join(__dirname, 'routes'),
+    '@/services': path.join(__dirname, 'services'),
+    '@/middleware': path.join(__dirname, 'middleware'),
+    '@/models': path.join(__dirname, 'models'),
+    '@/types': path.join(__dirname, 'types'),
+    '@/utils': path.join(__dirname, 'utils')
+});
 
 const app: Express = express();
 const port = envConfig.PORT;

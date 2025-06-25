@@ -36,6 +36,9 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+require("module-alias/register");
+const path_1 = __importDefault(require("path"));
+const module_alias_1 = __importDefault(require("module-alias"));
 const express_1 = __importDefault(require("express"));
 const cors_1 = __importDefault(require("cors"));
 const helmet_1 = __importDefault(require("helmet"));
@@ -46,6 +49,17 @@ const routes_1 = __importDefault(require("./routes"));
 const middleware_1 = require("./middleware");
 // Import workers for background job processing
 const workers_1 = require("./jobs/workers");
+// Add path aliases
+module_alias_1.default.addAliases({
+    '@': path_1.default.join(__dirname),
+    '@/config': path_1.default.join(__dirname, 'config'),
+    '@/routes': path_1.default.join(__dirname, 'routes'),
+    '@/services': path_1.default.join(__dirname, 'services'),
+    '@/middleware': path_1.default.join(__dirname, 'middleware'),
+    '@/models': path_1.default.join(__dirname, 'models'),
+    '@/types': path_1.default.join(__dirname, 'types'),
+    '@/utils': path_1.default.join(__dirname, 'utils')
+});
 const app = (0, express_1.default)();
 const port = environment_1.default.PORT;
 // Trust proxy if behind a reverse proxy
