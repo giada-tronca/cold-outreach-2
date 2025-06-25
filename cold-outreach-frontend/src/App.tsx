@@ -24,7 +24,7 @@ import SimpleWorkflow from './pages/workflow/SimpleWorkflow';
 
 function App() {
   return (
-    <Router>
+    <Router basename="/cold-outreach">
       <Routes>
         {/* Demo routes (keep these for development) */}
         <Route path='/demo/workflow' element={<WorkflowDemo />} />
