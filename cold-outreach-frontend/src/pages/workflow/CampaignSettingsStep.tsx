@@ -78,7 +78,7 @@ interface EnrichmentService {
 
 interface CampaignSettingsStepProps {
   workflowSessionId: string;
-  prospectCount?: number;
+  prospectCount: number;
   onStepComplete?: (data: any) => void;
   onError?: (error: string) => void;
   disabled?: boolean;
@@ -146,7 +146,7 @@ export default function CampaignSettingsStep({
 
   // Validation and UI state
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [isSubmitting] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');

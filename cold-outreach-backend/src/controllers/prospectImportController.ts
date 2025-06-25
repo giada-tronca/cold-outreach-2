@@ -8,6 +8,26 @@ import csvParser from 'csv-parser';
 import { existsSync } from 'fs';
 import { v4 as uuidv4 } from 'uuid';
 
+interface ProspectData {
+  name?: string;
+  email?: string;
+  company?: string;
+  position?: string;
+  linkedinUrl?: string;
+  additionalData?: Record<string, any>;
+}
+
+interface CSVRow {
+  [key: string]: string | undefined;
+}
+
+interface CSVImportRequest {
+  fileId?: string;
+  csvData?: CSVRow[];
+  filename: string;
+  campaignId: number;
+}
+
 /**
  * Upload CSV file for prospect import
  */
@@ -94,7 +114,7 @@ export class ProspectImportController {
         csvData,
         filename,
         campaignId: existingCampaignId,
-      } = req.body;
+      } = req.body as CSVImportRequest;
 
       if (!fileId && !csvData) {
         ApiResponseBuilder.badRequest(
@@ -117,12 +137,20 @@ export class ProspectImportController {
         return;
       }
 
-      let processedData: any[] = [];
+      let processedData: Record<string, string>[] = [];
       let filePath: string | null = null;
 
       // Handle direct CSV data (from local fallback uploads)
-      if (csvData && Array.isArray(csvData)) {
-        processedData = csvData;
+      if (csvData && Array.isArray(csvData) && csvData.length > 0) {
+        processedData = csvData.map(row => {
+          if (typeof row !== 'object' || row === null) {
+            throw new Error('Invalid CSV data format');
+          }
+          return Object.entries(row).reduce((acc, [key, value]) => {
+            acc[key] = String(value);
+            return acc;
+          }, {} as Record<string, string>);
+        });
         console.log(
           `📊 [Import]: Processing ${processedData.length} rows from direct CSV data`
         );
@@ -136,8 +164,8 @@ export class ProspectImportController {
         }
 
         // Read and parse the CSV file
-        processedData = await new Promise<any[]>((resolve, reject) => {
-          const results: any[] = [];
+        processedData = await new Promise<Record<string, string>[]>((resolve, reject) => {
+          const results: Record<string, string>[] = [];
           createReadStream(filePath!)
             .pipe(csvParser())
             .on('data', row => results.push(row))
@@ -171,11 +199,8 @@ export class ProspectImportController {
         `📋 [Import]: Using existing campaign: ${campaign.name} (ID: ${existingCampaignId})`
       );
 
-      // NOTE: We don't create batches here - batches are created when enrichment starts
-      // This ensures only the specific prospects from this upload are processed
-
       // Process and validate prospect data
-      const prospectsToCreate: any[] = [];
+      const prospectsToCreate: ProspectData[] = [];
       const errors: string[] = [];
 
       for (let i = 0; i < processedData.length; i++) {
@@ -199,163 +224,98 @@ export class ProspectImportController {
 
           // Validate email format if provided
           if (prospectData.email && !this.isValidEmail(prospectData.email)) {
-            errors.push(
-              `Row ${i + 1}: Invalid email format: ${prospectData.email}`
-            );
+            errors.push(`Row ${i + 1}: Invalid email format`);
             continue;
           }
 
-          prospectsToCreate.push({
-            ...prospectData,
-            campaignId: existingCampaignId,
-            batchId: null, // Batch will be created when enrichment starts
-            status: 'PENDING',
-            additionalData: {
-              ...prospectData.additionalData,
-              csvRowIndex: i + 1,
-              uploadSession: new Date().toISOString(), // Track which upload session this came from
-            },
-          });
+          // Add upload session ID to track this batch of prospects
+          prospectData.additionalData = {
+            ...prospectData.additionalData,
+            uploadSession: fileId || uuidv4(),
+          };
+
+          prospectsToCreate.push(prospectData);
         } catch (error) {
-          console.error(`❌ [Import]: Error processing row ${i + 1}:`, error);
-          errors.push(
-            `Row ${i + 1}: ${error instanceof Error ? error.message : 'Processing error'}`
-          );
+          errors.push(`Row ${i + 1}: ${(error as Error).message}`);
         }
       }
 
-      if (prospectsToCreate.length === 0) {
-        ApiResponseBuilder.badRequest(res, 'No valid prospects found in CSV');
-        return;
-      }
-
-      console.log('👥 Creating', prospectsToCreate.length, 'prospects');
-
-      // Create prospects in batches to avoid memory issues
-      const batchSize = 100;
-      let prospectsCreated = 0;
-      let prospectsSkipped = 0;
-
-      for (let i = 0; i < prospectsToCreate.length; i += batchSize) {
-        const batch = prospectsToCreate.slice(i, i + batchSize);
-
-        for (const prospectData of batch) {
-          try {
-            // Check for duplicates
-            if (prospectData.email && existingCampaignId) {
-              const existingProspect = await prisma.cOProspects.findFirst({
-                where: {
-                  email: prospectData.email,
-                  campaignId: existingCampaignId,
-                },
-              });
-
-              if (existingProspect) {
-                console.log(
-                  `⚠️ [Import]: Skipping duplicate email: ${prospectData.email}`
-                );
-                prospectsSkipped++;
-                continue;
-              }
-            }
-
-            await prisma.cOProspects.create({
-              data: prospectData,
-            });
-            prospectsCreated++;
-          } catch (error) {
-            console.error(`❌ [Import]: Error creating prospect:`, error);
-            prospectsSkipped++;
-          }
-        }
-      }
-
-      console.log(
-        `✅ [Import]: Import completed - ${prospectsCreated} created, ${prospectsSkipped} skipped`
+      // Create prospects in batches
+      const createdProspects = await prisma.$transaction(
+        prospectsToCreate.map(prospect =>
+          prisma.cOProspects.create({
+            data: {
+              name: prospect.name || '',
+              email: prospect.email || '',
+              company: prospect.company || '',
+              position: prospect.position || '',
+              linkedinUrl: prospect.linkedinUrl,
+              additionalData: prospect.additionalData || {},
+              campaign: {
+                connect: { id: existingCampaignId },
+              },
+            },
+          })
+        )
       );
 
       ApiResponseBuilder.success(
         res,
         {
-          campaignId: existingCampaignId,
-          batchId: null, // No batch created during import
-          prospectsCreated,
-          prospectsSkipped,
-          totalRows: processedData.length,
+          message: `Successfully imported ${createdProspects.length} prospects`,
+          data: {
+            totalRows: processedData.length,
+            importedRows: createdProspects.length,
+            errors,
+          },
         },
-        'CSV import completed successfully',
-        201
+        'Prospects imported successfully'
       );
+
+      // Clean up uploaded file if it exists
+      if (filePath && existsSync(filePath)) {
+        await fsPromises.unlink(filePath);
+      }
     } catch (error) {
-      console.error('❌ [Import]: CSV import failed:', error);
-      ApiResponseBuilder.error(res, 'CSV import failed');
+      console.error('Error importing prospects:', error);
+      ApiResponseBuilder.error(res, 'Failed to import prospects');
     }
   }
 
-  /**
-   * Extract prospect data from CSV row
-   */
-  private extractProspectFromRow(row: any): any {
-    // Common column name mappings
-    const fieldMappings = {
-      name: [
-        'name',
-        'full_name',
-        'fullname',
-        'contact_name',
-        'first_name',
-        'last_name',
-      ],
-      email: ['email', 'email_address', 'contact_email', 'work_email'],
-      company: ['company', 'company_name', 'organization', 'employer'],
-      position: ['position', 'title', 'job_title', 'role', 'job_role'],
-      linkedinUrl: [
-        'linkedin',
-        'linkedin_url',
-        'linkedin_profile',
-        'linkedin_link',
-      ],
-      phone: ['phone', 'phone_number', 'mobile', 'contact_number'],
-      location: ['location', 'city', 'country', 'address'],
+  private extractProspectFromRow(row: Record<string, string> | undefined): ProspectData {
+    if (!row) {
+      return {
+        name: '',
+        email: '',
+        company: '',
+        position: '',
+        linkedinUrl: '',
+        additionalData: {},
+      };
+    }
+
+    const prospect: ProspectData = {
+      name: row.name?.trim(),
+      email: row.email?.trim(),
+      company: row.company?.trim(),
+      position: row.position?.trim(),
+      linkedinUrl: row.linkedin_url?.trim() || row.linkedinUrl?.trim(),
+      additionalData: {},
     };
 
-    const prospect: any = {};
-    const additionalData: any = {};
-
-    // Extract mapped fields
-    for (const [field, possibleColumns] of Object.entries(fieldMappings)) {
-      for (const column of possibleColumns) {
-        const value =
-          row[column] || row[column.toLowerCase()] || row[column.toUpperCase()];
-        if (value && typeof value === 'string' && value.trim()) {
-          prospect[field] = value.trim();
-          break;
+    // Add any additional fields to additionalData
+    Object.entries(row).forEach(([key, value]) => {
+      if (!['name', 'email', 'company', 'position', 'linkedin_url', 'linkedinUrl'].includes(key)) {
+        if (!prospect.additionalData) {
+          prospect.additionalData = {};
         }
+        prospect.additionalData[key] = value;
       }
-    }
-
-    // Store unmapped columns as additional data
-    for (const [key, value] of Object.entries(row)) {
-      if (value && typeof value === 'string' && value.trim()) {
-        const isMappedField = Object.values(fieldMappings)
-          .flat()
-          .some(column => column.toLowerCase() === key.toLowerCase());
-        if (!isMappedField) {
-          additionalData[key] = value.trim();
-        }
-      }
-    }
-
-    if (Object.keys(additionalData).length > 0) {
-      prospect.additionalData = additionalData;
-    }
+    });
 
     return prospect;
   }
 
-  /**
-   * Validate email format
-   */
   private isValidEmail(email: string): boolean {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return emailRegex.test(email);

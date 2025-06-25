@@ -47,7 +47,7 @@ export function extractProspectFromRow(row: Record<string, any>): {
     prospect.location = findColumnValue(row, ['location', 'city', 'country', 'address']);
 
     // Store unmapped columns as additional data
-    const mappedKeys = new Set();
+    // const mappedKeys = new Set();
     for (const [key, value] of Object.entries(row)) {
         if (value && typeof value === 'string' && value.trim()) {
             const normalizedKey = normalizeColumnName(key);

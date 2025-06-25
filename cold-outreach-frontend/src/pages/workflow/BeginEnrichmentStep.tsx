@@ -43,25 +43,91 @@ import {
 import ReactMarkdown from 'react-markdown';
 
 import ProspectEnrichmentService from '@/services/prospectEnrichmentService';
-import type {
-  ProspectEnrichmentStatus,
-  EnrichmentJobStatus,
-} from '@/services/prospectEnrichmentService';
+import type { EnrichmentJobStatus, ProspectEnrichmentStatus as ServiceProspectEnrichmentStatus } from '@/services/prospectEnrichmentService';
+
+interface CSVPreviewRow {
+  [key: string]: string;
+}
+
+interface CSVPreview {
+  headers: string[];
+  rows: CSVPreviewRow[];
+  totalRows: number;
+}
+
+interface CSVFileInfo {
+  uploadId: string;
+  fileName: string;
+  fileSize: number;
+  preview?: CSVPreview;
+}
 
 interface EnrichmentConfig {
   selectedModel?: {
     id: string;
-    name?: string;
+    name: string;
   };
-  // Add other properties as needed
+  selectedServices?: string[];
+}
+
+interface ProspectData {
+  id: number;
+  name: string;
+  email: string;
+  company: string;
+  position: string;
+  linkedinUrl?: string;
+  status: 'pending' | 'processing' | 'completed' | 'failed' | 'retrying' | 'skipped';
+  progress: number;
+  enrichedData?: {
+    linkedinSummary?: string;
+    companySummary?: string;
+    techStack?: any[];
+    prospectAnalysisSummary?: string;
+  };
+  errors: string[];
+  retryCount: number;
+  processingTime?: number;
+  completedAt?: string;
+  batchId?: string;
+  firstName?: string;
+  lastName?: string;
+  location?: string;
+  phone?: string;
+}
+
+type ProspectEnrichmentStatus = ProspectData;
+
+interface JobConfig {
+  workflowSessionId: string;
+  configuration: {
+    aiProvider: 'gemini' | 'openrouter';
+    llmModelId?: string;
+    concurrency: number;
+    retryAttempts: number;
+    batchSize: number;
+    services: string[];
+    campaignId?: number;
+  };
+  csvData?: Prospect[];
+  fileName?: string;
+  fileId?: string;
+}
+
+interface Prospect {
+  name: string;
+  email: string;
+  company?: string;
+  position?: string;
+  [key: string]: any;
 }
 
 interface BeginEnrichmentStepProps {
-  workflowSessionId?: string;
-  prospectCount?: number;
+  workflowSessionId: string;
+  prospectCount: number;
   campaignId?: number;
   batchId?: number;
-  csvFileInfo?: any;
+  csvFileInfo?: CSVFileInfo;
   enrichmentConfig?: EnrichmentConfig;
   onStepComplete?: (data: any) => void;
   onError?: (error: string) => void;
@@ -109,74 +175,86 @@ export default function BeginEnrichmentStep({
 
   // Show CSV preview data without making API calls
   useEffect(() => {
-    if (csvFileInfo?.preview?.rows) {
-      console.log('📊 Setting up CSV preview with headers:', csvFileInfo.preview.headers);
-
-      // Create the same header mapping used in enrichment
-      const headerMapping: { [key: string]: string } = {};
-      csvFileInfo.preview.headers.forEach((header: string) => {
-        const lowerHeader = header.toLowerCase().trim();
-        console.log(`Processing header: ${header}`);
-
-        if (lowerHeader.includes('first') && lowerHeader.includes('name')) {
-          headerMapping[header] = 'firstName';
-        } else if (lowerHeader.includes('last') && lowerHeader.includes('name')) {
-          headerMapping[header] = 'lastName';
-        } else if (lowerHeader.includes('name') && !lowerHeader.includes('company')) {
-          headerMapping[header] = 'name';
-        } else if (lowerHeader.includes('email')) {
-          headerMapping[header] = 'email';
-        } else if (lowerHeader.includes('company')) {
-          headerMapping[header] = 'company';
-        } else if (lowerHeader.includes('title') || lowerHeader.includes('position') || lowerHeader.includes('role')) {
-          headerMapping[header] = 'position';
-        } else if (lowerHeader.includes('phone')) {
-          headerMapping[header] = 'phone';
-        } else if (lowerHeader.includes('linkedin')) {
-          headerMapping[header] = 'linkedinUrl';
-        } else if (lowerHeader.includes('location')) {
-          headerMapping[header] = 'location';
-        } else {
-          headerMapping[header] = header;
-        }
-      });
-
-      const previewProspects = csvFileInfo.preview.rows.map((row: any, rowIndex: number) => {
-        const rowData: any = {
-          id: rowIndex + 1,
-          status: 'pending',
-          progress: 0,
-          errors: [],
-          retryCount: 0,
-          processingTime: 0
-        };
-
-        // Map the CSV data using the same logic
-        csvFileInfo.preview.headers.forEach((header: string) => {
-          const mappedField = headerMapping[header];
-          const value = row[header] || '';
-          if (mappedField) {
-            rowData[mappedField] = value;
-          }
-        });
-
-        // Create proper name field
-        if (rowData.firstName && rowData.lastName && !rowData.name) {
-          rowData.name = `${rowData.firstName} ${rowData.lastName}`.trim();
-        }
-
-        // Ensure we have fallback values for display
-        rowData.name = rowData.name || rowData.firstName || 'Unknown Name';
-        rowData.email = rowData.email || 'No Email';
-        rowData.company = rowData.company || 'Unknown Company';
-        rowData.position = rowData.position || 'Unknown Position';
-
-        return rowData;
-      });
-
-      console.log('📊 Preview prospects with mapped data:', previewProspects);
-      setProspects(previewProspects);
+    if (!csvFileInfo?.preview?.rows || !csvFileInfo.preview.headers) {
+      console.log('⚠️ No CSV preview data available');
+      return;
     }
+
+    const { rows, headers } = csvFileInfo.preview;
+
+    // Create a header mapping to standardize field names
+    const headerMapping: { [key: string]: string } = {};
+    headers.forEach((header: string) => {
+      const lowerHeader = header.toLowerCase().trim();
+      console.log(`Processing header: ${header}`);
+
+      if (lowerHeader.includes('first') && lowerHeader.includes('name')) {
+        headerMapping[header] = 'firstName';
+      } else if (lowerHeader.includes('last') && lowerHeader.includes('name')) {
+        headerMapping[header] = 'lastName';
+      } else if (lowerHeader.includes('name') && !lowerHeader.includes('company')) {
+        headerMapping[header] = 'name';
+      } else if (lowerHeader.includes('email')) {
+        headerMapping[header] = 'email';
+      } else if (lowerHeader.includes('company')) {
+        headerMapping[header] = 'company';
+      } else if (lowerHeader.includes('title') || lowerHeader.includes('position') || lowerHeader.includes('role')) {
+        headerMapping[header] = 'position';
+      } else if (lowerHeader.includes('phone')) {
+        headerMapping[header] = 'phone';
+      } else if (lowerHeader.includes('linkedin')) {
+        headerMapping[header] = 'linkedinUrl';
+      } else if (lowerHeader.includes('location')) {
+        headerMapping[header] = 'location';
+      } else {
+        headerMapping[header] = header;
+      }
+    });
+
+    const previewProspects = rows.map((row: CSVPreviewRow, rowIndex: number) => {
+      const rowData: ProspectData = {
+        id: rowIndex + 1,
+        name: '',
+        email: '',
+        company: '',
+        position: '',
+        status: 'pending',
+        progress: 0,
+        errors: [],
+        retryCount: 0,
+        processingTime: 0,
+        firstName: '',
+        lastName: '',
+        linkedinUrl: '',
+        location: '',
+        phone: ''
+      };
+
+      // Map the CSV data using the same logic
+      headers.forEach((header: string) => {
+        const mappedField = headerMapping[header];
+        const value = row[header] || '';
+        if (mappedField) {
+          (rowData as any)[mappedField] = value;
+        }
+      });
+
+      // Create proper name field
+      if (rowData.firstName && rowData.lastName && !rowData.name) {
+        rowData.name = `${rowData.firstName} ${rowData.lastName}`.trim();
+      }
+
+      // Ensure we have fallback values for display
+      rowData.name = rowData.name || rowData.firstName || 'Unknown Name';
+      rowData.email = rowData.email || 'No Email';
+      rowData.company = rowData.company || 'Unknown Company';
+      rowData.position = rowData.position || 'Unknown Position';
+
+      return rowData as ProspectEnrichmentStatus;
+    });
+
+    console.log('📊 Preview prospects:', previewProspects);
+    setProspects(previewProspects);
   }, [csvFileInfo]);
 
   // Configuration state
@@ -208,8 +286,8 @@ export default function BeginEnrichmentStep({
       let finalCampaignId = campaignId;
 
       // Validate that we have either a campaign ID or CSV data
-      if (!finalCampaignId && !csvFileInfo) {
-        throw new Error('Either campaign ID or CSV data is required to start enrichment');
+      if (!finalCampaignId && !csvFileInfo?.preview?.rows) {
+        throw new Error('Either campaign ID or valid CSV data is required to start enrichment');
       }
 
       console.log('🚀 Starting enrichment with:', {
@@ -245,96 +323,66 @@ export default function BeginEnrichmentStep({
         source: 'Step 2 enrichmentConfig'
       });
 
-      const jobConfig: any = {
+      const jobConfig: JobConfig = {
         workflowSessionId: workflowSessionId || `workflow-${Date.now()}`,
         configuration: {
-          aiProvider: selectedAiProvider,
-          llmModelId: selectedLLMModel,
+          aiProvider: 'openrouter', // Default to openrouter
           concurrency: concurrency[0] || 3,
           retryAttempts: retryAttempts[0] || 2,
           batchSize: 10,
           services: ['LinkedIn', 'Company', 'TechStack', 'Analysis'],
-        },
+        }
       };
+
+      // Add AI provider and model if available
+      if (enrichmentConfig?.selectedModel?.id) {
+        jobConfig.configuration.llmModelId = enrichmentConfig.selectedModel.id;
+      }
 
       // Add CSV data if available
       if (csvFileInfo) {
         console.log('📊 Adding CSV data to enrichment job config');
         const isLocalFallback = csvFileInfo.uploadId?.includes('fallback');
 
-        if (isLocalFallback && csvFileInfo.preview?.rows && csvFileInfo.preview?.headers) {
+        if (isLocalFallback && csvFileInfo.preview?.rows) {
           console.log('📄 Using local CSV data for enrichment');
           console.log('📄 CSV Headers:', csvFileInfo.preview.headers);
           console.log('📄 CSV Sample row:', csvFileInfo.preview.rows[0]);
 
-          // Create a header mapping to standardize field names
-          const headerMapping: { [key: string]: string } = {};
-          csvFileInfo.preview.headers.forEach((header: string) => {
-            const lowerHeader = header.toLowerCase().trim();
+          // Transform CSV data to match Prospect interface
+          const csvData: Prospect[] = csvFileInfo.preview.rows.map((row: CSVPreviewRow) => {
+            const name = row.name || `${row.firstName || ''} ${row.lastName || ''}`.trim();
+            const email = row.email || '';
 
-            // Map various header variations to standard field names
-            if (lowerHeader.includes('first') && lowerHeader.includes('name')) {
-              headerMapping[header] = 'firstName';
-            } else if (lowerHeader.includes('last') && lowerHeader.includes('name')) {
-              headerMapping[header] = 'lastName';
-            } else if (lowerHeader.includes('name') && !lowerHeader.includes('company')) {
-              headerMapping[header] = 'name';
-            } else if (lowerHeader.includes('email')) {
-              headerMapping[header] = 'email';
-            } else if (lowerHeader.includes('company')) {
-              headerMapping[header] = 'company';
-            } else if (lowerHeader.includes('title') || lowerHeader.includes('position') || lowerHeader.includes('role')) {
-              headerMapping[header] = 'position';
-            } else if (lowerHeader.includes('phone')) {
-              headerMapping[header] = 'phone';
-            } else if (lowerHeader.includes('linkedin')) {
-              headerMapping[header] = 'linkedinUrl';
-            } else if (lowerHeader.includes('location')) {
-              headerMapping[header] = 'location';
-            } else {
-              // Keep original header for unmapped fields
-              headerMapping[header] = header;
-            }
-          });
-
-          console.log('📄 Header mapping:', headerMapping);
-
-          const csvData = csvFileInfo.preview.rows.map((row: any) => {
-            const rowData: any = {};
-            csvFileInfo.preview.headers.forEach((header: string) => {
-              const mappedField = headerMapping[header];
-              const value = row[header] || '';
-              if (mappedField) {
-                rowData[mappedField] = value;
-              }
-            });
-
-            // Create proper name field
-            if (rowData.firstName && rowData.lastName && !rowData.name) {
-              rowData.name = `${rowData.firstName} ${rowData.lastName}`.trim();
+            if (!name || !email) {
+              console.warn('⚠️ Row missing required name or email:', row);
             }
 
-            // Clean up the data
-            if (rowData.email) {
-              rowData.email = rowData.email.trim().toLowerCase();
-            }
-            if (rowData.company) {
-              rowData.company = rowData.company.trim();
-            }
-            if (rowData.position) {
-              rowData.position = rowData.position.trim();
-            }
-
-            console.log('📄 Transformed row:', rowData);
-            return rowData;
+            const prospect: Prospect = {
+              name: name || 'Unknown',
+              email: email || 'unknown@example.com',
+              ...(row.company && { company: row.company }),
+              ...(row.position || row.title ? { position: row.position || row.title } : {}),
+              ...(row.linkedinUrl || row.linkedin ? { linkedinUrl: row.linkedinUrl || row.linkedin } : {}),
+              ...(row.phone && { phone: row.phone }),
+              ...(row.location && { location: row.location }),
+              // Add any additional fields that exist in the row
+              ...Object.entries(row).reduce((acc, [key, value]) => {
+                if (!['name', 'email', 'company', 'position', 'title', 'linkedinUrl', 'linkedin', 'phone', 'location'].includes(key) && value) {
+                  acc[key] = value;
+                }
+                return acc;
+              }, {} as Record<string, any>)
+            };
+            return prospect;
           });
 
           console.log('📄 Final CSV data sample:', csvData[0]);
           jobConfig.csvData = csvData;
-          jobConfig.filename = csvFileInfo.filename;
+          jobConfig.fileName = csvFileInfo.fileName;
         } else if (!isLocalFallback) {
           jobConfig.fileId = csvFileInfo.uploadId;
-          jobConfig.filename = csvFileInfo.filename;
+          jobConfig.fileName = csvFileInfo.fileName;
         } else {
           throw new Error('CSV preview data is missing. Please re-upload your CSV file.');
         }
@@ -342,7 +390,7 @@ export default function BeginEnrichmentStep({
 
       // Add campaign ID if available
       if (finalCampaignId) {
-        jobConfig.campaignId = finalCampaignId;
+        jobConfig.configuration.campaignId = finalCampaignId;
       }
 
       console.log('🚀 Starting enrichment job with config:', {

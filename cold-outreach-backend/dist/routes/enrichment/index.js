@@ -272,7 +272,7 @@ async function updateEnrichmentJobProgress(workflowSessionId, prospectId, succes
  * Create enrichment jobs using proper BullMQ background job system
  */
 router.post('/jobs', (0, asyncHandler_1.asyncHandler)(async (req, res) => {
-    const { workflowSessionId, configuration, campaignId, prospectIds, csvData, filename } = req.body;
+    const { workflowSessionId, configuration, campaignId, prospectIds, csvData } = req.body;
     if (!workflowSessionId || !configuration) {
         throw new errors_1.BadRequestError('Missing required fields: workflowSessionId and configuration');
     }

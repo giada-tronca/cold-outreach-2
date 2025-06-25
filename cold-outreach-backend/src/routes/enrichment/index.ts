@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express'
-import { z } from 'zod'
+
 import { prisma } from '@/config/database'
 import { ApiResponseBuilder } from '@/utils/apiResponse'
 import { asyncHandler } from '@/middleware/asyncHandler'
@@ -8,8 +8,7 @@ import { Prisma, COProspects, COBatches } from '@prisma/client'
 import { prospectEnrichmentQueue, ProspectEnrichmentJobData } from '@/jobs/queues'
 import { extractProspectFromRow } from '../../utils/csvHelpers'
 import { v4 as uuidv4 } from 'uuid'
-import { createEnrichmentBatch } from '@/controllers/prospectEnrichmentController'
-import { isValidEmail } from '../../utils/validation'
+
 
 const router = Router()
 
@@ -309,7 +308,7 @@ export async function updateEnrichmentJobProgress(workflowSessionId: string, pro
  * Create enrichment jobs using proper BullMQ background job system
  */
 router.post('/jobs', asyncHandler(async (req: Request, res: Response) => {
-    const { workflowSessionId, configuration, campaignId, prospectIds, csvData, filename } = req.body;
+    const { workflowSessionId, configuration, campaignId, prospectIds, csvData } = req.body;
 
     if (!workflowSessionId || !configuration) {
         throw new BadRequestError('Missing required fields: workflowSessionId and configuration');

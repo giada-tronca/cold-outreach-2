@@ -2,7 +2,6 @@ import { Router, Request, Response } from 'express'
 import { ApiResponseBuilder } from '../../utils/apiResponse'
 import { PrismaClient, Prisma } from '@prisma/client'
 import { validate } from '../../middleware/validation'
-import { z } from 'zod'
 import { BadRequestError } from '../../utils/errors'
 import { body } from 'express-validator'
 
@@ -13,8 +12,7 @@ import {
     getGeneratedEmailByProspectId,
     createProspect,
     updateProspect,
-    deleteProspect,
-    associateProspectsWithCampaign
+    deleteProspect
 } from '../../controllers/prospectController'
 
 const router = Router()
@@ -26,15 +24,15 @@ router.get('/health', (_req, res) => {
 })
 
 // Define prospect input type
-type ProspectInput = {
-    name: string;
-    email: string;
-    company?: string;
-    position?: string;
-    linkedinUrl?: string;
-    status?: string;
-    additionalData?: Record<string, any>;
-}
+// type ProspectInput = {
+//     name: string;
+//     email: string;
+//     company?: string;
+//     position?: string;
+//     linkedinUrl?: string;
+//     status?: string;
+//     additionalData?: Record<string, any>;
+// }
 
 // Bulk operations
 router.post('/bulk', validate([
@@ -239,5 +237,4 @@ router.post('/import/csv', prospectImportController.importFromCSV.bind(prospectI
 router.post('/upload/csv', uploadCSV)
 router.get('/import/template', getImportTemplate)
 
-export default router
 export default router 

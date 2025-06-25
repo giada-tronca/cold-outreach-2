@@ -624,13 +624,10 @@ class ProspectEnrichmentProcessor {
     // Note: formatCompanyData removed - company data is now formatted directly by FirecrawlService
     // Note: formatTechStackData method removed - data formatting now handled by BuiltWithService.formatBuiltWithDataForAI()
     static async extractCompanyWebsite(prospect) {
-        // First try to extract from prospect email domain (most reliable)
+        // Use the new Firecrawl method to extract company website from email domain
         if (prospect.email) {
-            const emailDomain = prospect.email.split('@')[1];
-            if (emailDomain && !['gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'icloud.com', 'live.com'].includes(emailDomain)) {
-                // Use the email domain as the company website
-                const websiteUrl = `https://www.${emailDomain}`;
-                console.log(`🔍 [Enrichment]: Extracted company website from email domain: ${websiteUrl}`);
+            const websiteUrl = firecrawlService_1.FirecrawlService.extractCompanyWebsiteFromEmail(prospect.email);
+            if (websiteUrl) {
                 return websiteUrl;
             }
         }

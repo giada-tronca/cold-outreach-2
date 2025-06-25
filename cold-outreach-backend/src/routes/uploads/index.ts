@@ -9,7 +9,7 @@ import { validateFileUpload } from '@/middleware/validation'
 import { fileUploadRateLimit } from '@/middleware/security'
 import { BadRequestError, ValidationError } from '@/utils/errors'
 import envConfig from '@/config/environment'
-import { csvImportQueue, dataExportQueue } from '@/jobs/queues'
+import { dataExportQueue } from '@/jobs/queues'
 import csvParser from 'csv-parser'
 import { createReadStream } from 'fs'
 

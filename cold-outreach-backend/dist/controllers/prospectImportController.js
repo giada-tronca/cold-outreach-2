@@ -91,8 +91,16 @@ class ProspectImportController {
             let processedData = [];
             let filePath = null;
             // Handle direct CSV data (from local fallback uploads)
-            if (csvData && Array.isArray(csvData)) {
-                processedData = csvData;
+            if (csvData && Array.isArray(csvData) && csvData.length > 0) {
+                processedData = csvData.map(row => {
+                    if (typeof row !== 'object' || row === null) {
+                        throw new Error('Invalid CSV data format');
+                    }
+                    return Object.entries(row).reduce((acc, [key, value]) => {
+                        acc[key] = String(value);
+                        return acc;
+                    }, {});
+                });
                 console.log(`📊 [Import]: Processing ${processedData.length} rows from direct CSV data`);
             }
             else if (fileId) {
@@ -126,8 +134,6 @@ class ProspectImportController {
                 return;
             }
             console.log(`📋 [Import]: Using existing campaign: ${campaign.name} (ID: ${existingCampaignId})`);
-            // NOTE: We don't create batches here - batches are created when enrichment starts
-            // This ensures only the specific prospects from this upload are processed
             // Process and validate prospect data
             const prospectsToCreate = [];
             const errors = [];
@@ -145,135 +151,82 @@ class ProspectImportController {
                     }
                     // Validate email format if provided
                     if (prospectData.email && !this.isValidEmail(prospectData.email)) {
-                        errors.push(`Row ${i + 1}: Invalid email format: ${prospectData.email}`);
+                        errors.push(`Row ${i + 1}: Invalid email format`);
                         continue;
                     }
-                    prospectsToCreate.push({
-                        ...prospectData,
-                        campaignId: existingCampaignId,
-                        batchId: null, // Batch will be created when enrichment starts
-                        status: 'PENDING',
-                        additionalData: {
-                            ...prospectData.additionalData,
-                            csvRowIndex: i + 1,
-                            uploadSession: new Date().toISOString(), // Track which upload session this came from
-                        },
-                    });
+                    // Add upload session ID to track this batch of prospects
+                    prospectData.additionalData = {
+                        ...prospectData.additionalData,
+                        uploadSession: fileId || (0, uuid_1.v4)(),
+                    };
+                    prospectsToCreate.push(prospectData);
                 }
                 catch (error) {
-                    console.error(`❌ [Import]: Error processing row ${i + 1}:`, error);
-                    errors.push(`Row ${i + 1}: ${error instanceof Error ? error.message : 'Processing error'}`);
+                    errors.push(`Row ${i + 1}: ${error.message}`);
                 }
             }
-            if (prospectsToCreate.length === 0) {
-                apiResponse_1.ApiResponseBuilder.badRequest(res, 'No valid prospects found in CSV');
-                return;
-            }
-            console.log('👥 Creating', prospectsToCreate.length, 'prospects');
-            // Create prospects in batches to avoid memory issues
-            const batchSize = 100;
-            let prospectsCreated = 0;
-            let prospectsSkipped = 0;
-            for (let i = 0; i < prospectsToCreate.length; i += batchSize) {
-                const batch = prospectsToCreate.slice(i, i + batchSize);
-                for (const prospectData of batch) {
-                    try {
-                        // Check for duplicates
-                        if (prospectData.email && existingCampaignId) {
-                            const existingProspect = await database_1.prisma.cOProspects.findFirst({
-                                where: {
-                                    email: prospectData.email,
-                                    campaignId: existingCampaignId,
-                                },
-                            });
-                            if (existingProspect) {
-                                console.log(`⚠️ [Import]: Skipping duplicate email: ${prospectData.email}`);
-                                prospectsSkipped++;
-                                continue;
-                            }
-                        }
-                        await database_1.prisma.cOProspects.create({
-                            data: prospectData,
-                        });
-                        prospectsCreated++;
-                    }
-                    catch (error) {
-                        console.error(`❌ [Import]: Error creating prospect:`, error);
-                        prospectsSkipped++;
-                    }
-                }
-            }
-            console.log(`✅ [Import]: Import completed - ${prospectsCreated} created, ${prospectsSkipped} skipped`);
+            // Create prospects in batches
+            const createdProspects = await database_1.prisma.$transaction(prospectsToCreate.map(prospect => database_1.prisma.cOProspects.create({
+                data: {
+                    name: prospect.name || '',
+                    email: prospect.email || '',
+                    company: prospect.company || '',
+                    position: prospect.position || '',
+                    linkedinUrl: prospect.linkedinUrl,
+                    additionalData: prospect.additionalData || {},
+                    campaign: {
+                        connect: { id: existingCampaignId },
+                    },
+                },
+            })));
             apiResponse_1.ApiResponseBuilder.success(res, {
-                campaignId: existingCampaignId,
-                batchId: null, // No batch created during import
-                prospectsCreated,
-                prospectsSkipped,
-                totalRows: processedData.length,
-            }, 'CSV import completed successfully', 201);
+                message: `Successfully imported ${createdProspects.length} prospects`,
+                data: {
+                    totalRows: processedData.length,
+                    importedRows: createdProspects.length,
+                    errors,
+                },
+            }, 'Prospects imported successfully');
+            // Clean up uploaded file if it exists
+            if (filePath && (0, fs_2.existsSync)(filePath)) {
+                await fs_1.promises.unlink(filePath);
+            }
         }
         catch (error) {
-            console.error('❌ [Import]: CSV import failed:', error);
-            apiResponse_1.ApiResponseBuilder.error(res, 'CSV import failed');
+            console.error('Error importing prospects:', error);
+            apiResponse_1.ApiResponseBuilder.error(res, 'Failed to import prospects');
         }
     }
-    /**
-     * Extract prospect data from CSV row
-     */
     extractProspectFromRow(row) {
-        // Common column name mappings
-        const fieldMappings = {
-            name: [
-                'name',
-                'full_name',
-                'fullname',
-                'contact_name',
-                'first_name',
-                'last_name',
-            ],
-            email: ['email', 'email_address', 'contact_email', 'work_email'],
-            company: ['company', 'company_name', 'organization', 'employer'],
-            position: ['position', 'title', 'job_title', 'role', 'job_role'],
-            linkedinUrl: [
-                'linkedin',
-                'linkedin_url',
-                'linkedin_profile',
-                'linkedin_link',
-            ],
-            phone: ['phone', 'phone_number', 'mobile', 'contact_number'],
-            location: ['location', 'city', 'country', 'address'],
+        if (!row) {
+            return {
+                name: '',
+                email: '',
+                company: '',
+                position: '',
+                linkedinUrl: '',
+                additionalData: {},
+            };
+        }
+        const prospect = {
+            name: row.name?.trim(),
+            email: row.email?.trim(),
+            company: row.company?.trim(),
+            position: row.position?.trim(),
+            linkedinUrl: row.linkedin_url?.trim() || row.linkedinUrl?.trim(),
+            additionalData: {},
         };
-        const prospect = {};
-        const additionalData = {};
-        // Extract mapped fields
-        for (const [field, possibleColumns] of Object.entries(fieldMappings)) {
-            for (const column of possibleColumns) {
-                const value = row[column] || row[column.toLowerCase()] || row[column.toUpperCase()];
-                if (value && typeof value === 'string' && value.trim()) {
-                    prospect[field] = value.trim();
-                    break;
+        // Add any additional fields to additionalData
+        Object.entries(row).forEach(([key, value]) => {
+            if (!['name', 'email', 'company', 'position', 'linkedin_url', 'linkedinUrl'].includes(key)) {
+                if (!prospect.additionalData) {
+                    prospect.additionalData = {};
                 }
+                prospect.additionalData[key] = value;
             }
-        }
-        // Store unmapped columns as additional data
-        for (const [key, value] of Object.entries(row)) {
-            if (value && typeof value === 'string' && value.trim()) {
-                const isMappedField = Object.values(fieldMappings)
-                    .flat()
-                    .some(column => column.toLowerCase() === key.toLowerCase());
-                if (!isMappedField) {
-                    additionalData[key] = value.trim();
-                }
-            }
-        }
-        if (Object.keys(additionalData).length > 0) {
-            prospect.additionalData = additionalData;
-        }
+        });
         return prospect;
     }
-    /**
-     * Validate email format
-     */
     isValidEmail(email) {
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         return emailRegex.test(email);

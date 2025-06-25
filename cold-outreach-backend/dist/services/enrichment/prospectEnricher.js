@@ -521,9 +521,14 @@ class ProspectEnricher {
             if (prospect.additionalData?.companyWebsite) {
                 return this.normalizeUrl(prospect.additionalData.companyWebsite);
             }
-            // 2. Try to extract from prospect's LinkedIn URL or company field
-            // Note: enrichmentData field no longer exists in schema, using available fields
-            // 3. Generate potential website URLs from company name
+            // 2. Use the new Firecrawl method to extract company website from email domain
+            if (prospect.email) {
+                const websiteUrl = firecrawlService_1.FirecrawlService.extractCompanyWebsiteFromEmail(prospect.email);
+                if (websiteUrl) {
+                    return websiteUrl;
+                }
+            }
+            // 3. Fallback: Generate potential website URLs from company name
             if (prospect.company) {
                 const generatedUrl = this.generateCompanyWebsiteUrl(prospect.company);
                 if (generatedUrl)

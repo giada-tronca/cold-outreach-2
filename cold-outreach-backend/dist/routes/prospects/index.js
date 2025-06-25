@@ -14,6 +14,16 @@ const prisma = new client_1.PrismaClient();
 router.get('/health', (_req, res) => {
     apiResponse_1.ApiResponseBuilder.success(res, { status: 'ok' }, 'Prospects API is healthy');
 });
+// Define prospect input type
+// type ProspectInput = {
+//     name: string;
+//     email: string;
+//     company?: string;
+//     position?: string;
+//     linkedinUrl?: string;
+//     status?: string;
+//     additionalData?: Record<string, any>;
+// }
 // Bulk operations
 router.post('/bulk', (0, validation_1.validate)([
     (0, express_validator_1.body)('prospects').isArray().withMessage('Prospects must be an array'),
@@ -168,5 +178,4 @@ const prospectImportController = new prospectImportController_1.ProspectImportCo
 router.post('/import/csv', prospectImportController.importFromCSV.bind(prospectImportController));
 router.post('/upload/csv', prospectImportController_1.uploadCSV);
 router.get('/import/template', prospectImportController_1.getImportTemplate);
-exports.default = router;
 exports.default = router;
