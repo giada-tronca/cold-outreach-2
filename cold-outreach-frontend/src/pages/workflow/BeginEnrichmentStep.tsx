@@ -32,14 +32,7 @@ import {
   Settings2,
   ArrowLeft,
 } from 'lucide-react';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
+
 import ReactMarkdown from 'react-markdown';
 
 import ProspectEnrichmentService from '@/services/prospectEnrichmentService';
@@ -99,19 +92,18 @@ interface ProspectData {
 type ProspectEnrichmentStatus = ProspectData;
 
 interface JobConfig {
-  workflowSessionId: string;
+  campaignId?: number;
+  csvData?: Prospect[];
+  filename?: string;
+  fileId?: string;
   configuration: {
     aiProvider: 'gemini' | 'openrouter';
     llmModelId?: string;
     concurrency: number;
     retryAttempts: number;
-    batchSize: number;
+    websitePages: number;
     services: string[];
-    campaignId?: number;
   };
-  csvData?: Prospect[];
-  fileName?: string;
-  fileId?: string;
 }
 
 interface Prospect {
@@ -123,38 +115,32 @@ interface Prospect {
 }
 
 interface BeginEnrichmentStepProps {
-  workflowSessionId: string;
   prospectCount: number;
   campaignId?: number;
-  batchId?: number;
   csvFileInfo?: CSVFileInfo;
   enrichmentConfig?: EnrichmentConfig;
+  stepData?: any; // Complete data from previous steps
   onStepComplete?: (data: any) => void;
   onError?: (error: string) => void;
   disabled?: boolean;
 }
 
 export default function BeginEnrichmentStep({
-  workflowSessionId,
   prospectCount = 0,
   campaignId,
-  batchId,
   csvFileInfo,
   enrichmentConfig,
+  stepData,
   onStepComplete,
   onError,
   disabled = false,
 }: BeginEnrichmentStepProps) {
-  // Log props received from step 2
-  console.log('🔍 [BeginEnrichmentStep] Received props:', {
-    workflowSessionId,
-    prospectCount,
-    campaignId,
-    batchId,
-    csvFileInfo,
-    enrichmentConfig,
-    disabled
-  });
+  // Log configuration received from previous steps
+  console.log('[Step 3] Initialized with configuration:');
+  console.log('  • Prospect Count:', prospectCount);
+  console.log('  • AI Model:', enrichmentConfig?.selectedModel?.name || 'Not specified');
+  console.log('  • CSV Data:', csvFileInfo ? 'Available' : 'Missing');
+  console.log('  • Campaign ID:', campaignId || 'Not specified');
 
   const [isStarted, setIsStarted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -163,6 +149,9 @@ export default function BeginEnrichmentStep({
   const [prospects, setProspects] = useState<ProspectEnrichmentStatus[]>([]);
   const [selectedTab, setSelectedTab] = useState<'overview' | 'prospects' | 'errors' | 'settings'>('overview');
   const eventSourceRef = useRef<EventSource | null>(null);
+
+  // SSE connection for real-time updates
+  const userId = 'default-user'; // Use consistent userId - TODO: Get from auth context
 
   // Only keep the cleanup effect for SSE
   useEffect(() => {
@@ -176,7 +165,7 @@ export default function BeginEnrichmentStep({
   // Show CSV preview data without making API calls
   useEffect(() => {
     if (!csvFileInfo?.preview?.rows || !csvFileInfo.preview.headers) {
-      console.log('⚠️ No CSV preview data available');
+      console.log('[Step 3] No CSV preview data available');
       return;
     }
 
@@ -186,7 +175,7 @@ export default function BeginEnrichmentStep({
     const headerMapping: { [key: string]: string } = {};
     headers.forEach((header: string) => {
       const lowerHeader = header.toLowerCase().trim();
-      console.log(`Processing header: ${header}`);
+      console.log('[Step 3] Processing header:', header);
 
       if (lowerHeader.includes('first') && lowerHeader.includes('name')) {
         headerMapping[header] = 'firstName';
@@ -253,29 +242,23 @@ export default function BeginEnrichmentStep({
       return rowData as ProspectEnrichmentStatus;
     });
 
-    console.log('📊 Preview prospects:', previewProspects);
+    console.log('[Step 3] Preview prospects loaded:', previewProspects.length);
     setProspects(previewProspects);
   }, [csvFileInfo]);
 
   // Configuration state
-  const [concurrency, setConcurrency] = useState([3]);
+  const [concurrency, setConcurrency] = useState([2]);
   const [retryAttempts, setRetryAttempts] = useState([2]);
+  const [websitePages, setWebsitePages] = useState([3]);
 
   // Email generation states
 
-  // SSE connection for real-time updates
-  // const userId = 'user123'; // In real app, get from auth context - removed as unused
-
   // Move loadProspects function definition here but don't call it on mount
   const startEnrichment = async () => {
-    console.log('🚀 BeginEnrichmentStep: startEnrichment function called');
-    console.log('🔍 Initial enrichmentConfig received:', enrichmentConfig);
-    console.log('🔍 enrichmentConfig type:', typeof enrichmentConfig);
-    console.log('🔍 enrichmentConfig.selectedModel:', enrichmentConfig?.selectedModel);
-    console.log('🔍 enrichmentConfig.selectedModel.id:', enrichmentConfig?.selectedModel?.id);
+    console.log('[Step 3] Starting enrichment process...');
 
     if (isStarted) {
-      console.log('⚠️ Enrichment already started, skipping...');
+      console.log('[Step 3] Enrichment already started, skipping...');
       return;
     }
 
@@ -283,71 +266,84 @@ export default function BeginEnrichmentStep({
     setError(null);
 
     try {
-      let finalCampaignId = campaignId;
+      // Try to get campaign ID from props first, then from stepData
+      let finalCampaignId = campaignId || stepData?.campaignData?.campaignId || stepData?.campaignData?.id;
+
+      console.log('[Step 3] Campaign ID sources:');
+      console.log('  • From props:', campaignId);
+      console.log('  • From stepData.campaignData.campaignId:', stepData?.campaignData?.campaignId);
+      console.log('  • From stepData.campaignData.id:', stepData?.campaignData?.id);
+      console.log('  • Final Campaign ID:', finalCampaignId);
 
       // Validate that we have either a campaign ID or CSV data
       if (!finalCampaignId && !csvFileInfo?.preview?.rows) {
         throw new Error('Either campaign ID or valid CSV data is required to start enrichment');
       }
 
-      console.log('🚀 Starting enrichment with:', {
-        campaignId: finalCampaignId || 'will be required',
-        prospectCount: prospects.length > 0 ? prospects.length : prospectCount,
-        hasCSV: !!csvFileInfo,
-        enrichmentConfig,
-      });
-
-      // Get LLM model directly from enrichmentConfig with detailed validation
-      console.log('🔍 Validating LLM model selection...');
+      console.log('[Step 3] Configuring enrichment job:');
+      console.log('  • Campaign ID:', finalCampaignId || 'will be created');
+      console.log('  • Prospect Count:', prospects.length > 0 ? prospects.length : prospectCount);
+      console.log('  • CSV Data:', csvFileInfo ? 'Available' : 'Missing');
+      console.log('  • AI Model:', enrichmentConfig?.selectedModel?.name || 'Not specified');
       if (!enrichmentConfig) {
-        console.error('❌ No enrichmentConfig provided');
+        console.log('[Step 3] Error: No enrichment configuration provided');
         throw new Error('No enrichment configuration provided. Please go back to Step 2 and select an AI model.');
       }
 
       if (!enrichmentConfig.selectedModel) {
-        console.error('❌ No selectedModel in enrichmentConfig:', enrichmentConfig);
+        console.log('[Step 3] Error: No AI model selected in configuration');
         throw new Error('No LLM model selected. Please go back to Step 2 and select an AI model.');
       }
 
       if (!enrichmentConfig.selectedModel.id) {
-        console.error('❌ No LLM model ID found in enrichmentConfig.selectedModel:', enrichmentConfig.selectedModel);
+        console.log('[Step 3] Error: No AI model ID found in configuration');
         throw new Error('No LLM model selected. Please go back to Step 2 and select an AI model.');
       }
 
       const selectedLLMModel = enrichmentConfig.selectedModel.id;
-      const selectedAiProvider = selectedLLMModel.startsWith('openrouter-') ? 'openrouter' : 'gemini';
 
-      console.log('🤖 Using LLM configuration:', {
-        selectedLLMModel,
-        selectedAiProvider,
-        source: 'Step 2 enrichmentConfig'
+      console.log('[Step 3] AI Model configured:', selectedLLMModel);
+
+      // Determine AI provider from the selected model
+      const aiProvider = selectedLLMModel.startsWith('gemini-') ? 'gemini' : 'openrouter';
+      console.log('[Step 3] AI Provider detected:', aiProvider);
+
+      // Get services from previous step data (enrichment services)
+      const enabledServices = stepData?.campaignData?.enrichmentServices?.filter((service: any) => service.enabled) || [];
+      const serviceNames = enabledServices.map((service: any) => {
+        switch (service.id) {
+          case 'company-data': return 'Company';
+          case 'linkedin-profile': return 'LinkedIn';
+          case 'website-technology': return 'TechStack';
+          default: return service.name;
+        }
       });
 
+      // Always include Analysis as the final step
+      if (!serviceNames.includes('Analysis')) {
+        serviceNames.push('Analysis');
+      }
+
+      console.log('[Step 3] Services from Step 2:', serviceNames);
+
       const jobConfig: JobConfig = {
-        workflowSessionId: workflowSessionId || `workflow-${Date.now()}`,
         configuration: {
-          aiProvider: 'openrouter', // Default to openrouter
-          concurrency: concurrency[0] || 3,
-          retryAttempts: retryAttempts[0] || 2,
-          batchSize: 10,
-          services: ['LinkedIn', 'Company', 'TechStack', 'Analysis'],
+          aiProvider: aiProvider,
+          llmModelId: selectedLLMModel,
+          concurrency: concurrency[0] || 2, // Use slider value, default 2
+          retryAttempts: retryAttempts[0] || 2, // Use slider value, default 2
+          websitePages: websitePages[0] || 3, // Use slider value, default 3
+          services: serviceNames,
         }
       };
 
-      // Add AI provider and model if available
-      if (enrichmentConfig?.selectedModel?.id) {
-        jobConfig.configuration.llmModelId = enrichmentConfig.selectedModel.id;
-      }
-
       // Add CSV data if available
       if (csvFileInfo) {
-        console.log('📊 Adding CSV data to enrichment job config');
+        console.log('[Step 3] Processing CSV data for enrichment...');
         const isLocalFallback = csvFileInfo.uploadId?.includes('fallback');
 
         if (isLocalFallback && csvFileInfo.preview?.rows) {
-          console.log('📄 Using local CSV data for enrichment');
-          console.log('📄 CSV Headers:', csvFileInfo.preview.headers);
-          console.log('📄 CSV Sample row:', csvFileInfo.preview.rows[0]);
+          console.log('[Step 3] Using local CSV data with', csvFileInfo.preview.rows.length, 'rows');
 
           // Transform CSV data to match Prospect interface
           const csvData: Prospect[] = csvFileInfo.preview.rows.map((row: CSVPreviewRow) => {
@@ -355,7 +351,7 @@ export default function BeginEnrichmentStep({
             const email = row.email || '';
 
             if (!name || !email) {
-              console.warn('⚠️ Row missing required name or email:', row);
+              console.log('[Step 3] Warning: Row missing required name or email:', row);
             }
 
             const prospect: Prospect = {
@@ -377,33 +373,87 @@ export default function BeginEnrichmentStep({
             return prospect;
           });
 
-          console.log('📄 Final CSV data sample:', csvData[0]);
+          console.log('[Step 3] CSV data processed successfully');
           jobConfig.csvData = csvData;
-          jobConfig.fileName = csvFileInfo.fileName;
+          jobConfig.filename = csvFileInfo.fileName;
         } else if (!isLocalFallback) {
           jobConfig.fileId = csvFileInfo.uploadId;
-          jobConfig.fileName = csvFileInfo.fileName;
+          jobConfig.filename = csvFileInfo.fileName;
         } else {
           throw new Error('CSV preview data is missing. Please re-upload your CSV file.');
         }
       }
 
-      // Add campaign ID if available
-      if (finalCampaignId) {
-        jobConfig.configuration.campaignId = finalCampaignId;
+      // Check if we have CSV data from stepData instead
+      if (!jobConfig.csvData && stepData?.csvData?.preview?.rows && stepData?.csvData?.preview?.headers) {
+        console.log('[Step 3] Processing CSV data from stepData...');
+        const { rows, headers } = stepData.csvData.preview;
+
+        console.log('[Step 3] CSV Headers:', headers);
+        console.log('[Step 3] CSV Rows:', rows.length);
+
+        // Transform array-based CSV data to object-based format that backend expects
+        const csvData: Prospect[] = rows.map((row: string[], index: number) => {
+          // Create object from headers and row values
+          const rowObj: Record<string, string> = {};
+          headers.forEach((header: string, headerIndex: number) => {
+            if (row[headerIndex]) {
+              rowObj[header] = row[headerIndex];
+            }
+          });
+
+          console.log('[Step 3] Row object created:', rowObj);
+
+          // Create prospect object with proper field mapping
+          const prospect: Prospect = {
+            name: rowObj['First Name'] && rowObj['Last Name'] ?
+              `${rowObj['First Name']} ${rowObj['Last Name']}`.trim() :
+              (rowObj['name'] || rowObj['Name'] || `Prospect ${index + 1}`),
+            email: rowObj['Emails'] || rowObj['Email'] || rowObj['email'] || '',
+            ...(rowObj['Company'] && { company: rowObj['Company'] }),
+            ...(rowObj['Title'] && { position: rowObj['Title'] }),
+            ...(rowObj['LinkedIn URL'] && { linkedinUrl: rowObj['LinkedIn URL'] }),
+            ...(rowObj['Phone'] && { phone: rowObj['Phone'] }),
+            ...(rowObj['Location'] && { location: rowObj['Location'] }),
+            // Add all other fields as additional data
+            ...Object.entries(rowObj).reduce((acc, [key, value]) => {
+              // Skip already mapped fields
+              if (!['First Name', 'Last Name', 'Emails', 'Email', 'Company', 'Title', 'LinkedIn URL', 'Phone', 'Location', 'name', 'Name', 'email'].includes(key) && value) {
+                acc[key] = value;
+              }
+              return acc;
+            }, {} as Record<string, any>)
+          };
+
+          return prospect;
+        });
+
+        console.log('[Step 3] Transformed CSV data from stepData:', csvData);
+        jobConfig.csvData = csvData;
+        jobConfig.filename = stepData.csvData.filename || 'prospects.csv';
       }
 
-      console.log('🚀 Starting enrichment job with config:', {
+      // Add campaign ID if available
+      if (finalCampaignId) {
+        jobConfig.campaignId = finalCampaignId;
+      }
+
+      // Validate that we have CSV data
+      if (!jobConfig.csvData || jobConfig.csvData.length === 0) {
+        throw new Error('No CSV data available for enrichment. Please ensure prospects were uploaded in Step 1.');
+      }
+
+      console.log('[Step 3] Creating enrichment job...');
+      console.log('[Step 3] Final JobConfig being sent to API:', {
         ...jobConfig,
-        csvData: jobConfig.csvData ? `${jobConfig.csvData.length} rows` : 'none',
+        csvData: jobConfig.csvData ? `${jobConfig.csvData.length} rows` : 'none'
       });
 
       // Create the enrichment job
       const jobResponse = await ProspectEnrichmentService.createEnrichmentJob(jobConfig);
       const job = jobResponse.data;
 
-      console.log('✅ Created enrichment job:', job.id);
-      console.log('✅ Batch ID from enrichment job:', job.batchId);
+      console.log('[Step 3] Enrichment job created:', job.id);
 
       // Store the batch ID for prospect querying
       if (job.batchId) {
@@ -677,103 +727,191 @@ Jane Smith,jane@company.com,Company Inc,CTO
 
   const setupSSEConnection = (jobId: string) => {
     try {
-      eventSourceRef.current = ProspectEnrichmentService.createEnrichmentJobSSE(
-        jobId,
+      console.log(`📡 [Step 3] Setting up SSE connection for user: ${userId}, job: ${jobId}`);
+
+      // Use the user-specific SSE connection for more reliable updates
+      eventSourceRef.current = ProspectEnrichmentService.createSSEConnection(
+        userId,
         event => {
           try {
             const data = JSON.parse(event.data);
-            console.log('📡 SSE Event received:', data);
+            console.log('📡 [Step 3] SSE event received:', data.type, data);
 
             switch (data.type) {
-              case 'job_status':
-                // Update job status from backend
-                if (data.payload) {
-                  setJobStatus(prev => ({
-                    ...prev,
-                    ...data.payload,
-                    metrics: data.payload.metrics ||
-                      prev?.metrics || {
-                      averageProcessingTime: 0,
-                      successRate: 0,
-                      enrichmentQuality: 0,
-                      costPerProspect: 0.12,
-                      totalCost: 0,
-                    },
-                  }));
+              case 'job-progress':
+                // Handle job progress updates (batch completion)
+                console.log('[Step 3] Job progress update:', data.status);
 
-                  // Update prospects from job
-                  if (data.payload.prospects) {
-                    setProspects(data.payload.prospects);
+                if (data.status === 'completed' || data.status === 'completed_with_errors' || data.status === 'failed') {
+                  // Job completed - prepare data for Step 4
+                  const jobResult = {
+                    id: data.jobId,
+                    status: data.status,
+                    totalProspects: data.totalProspects,
+                    completedProspects: data.completedProspects,
+                    failedProspects: data.failedProspects,
+                    prospects: data.prospects || prospects,
+                    progress: Math.min(100, data.progress || 100),
+                    message: data.status === 'completed' ? 'Enrichment completed successfully' :
+                      data.status === 'failed' ? 'Enrichment failed' :
+                        'Enrichment completed with some errors'
+                  };
+
+                  setJobStatus(prev => {
+                    if (!prev) return null;
+                    return {
+                      ...prev,
+                      id: data.jobId || prev.id,
+                      status: data.status as any,
+                      totalProspects: data.totalProspects,
+                      processedProspects: data.completedProspects + data.failedProspects,
+                      completedProspects: data.completedProspects,
+                      failedProspects: data.failedProspects,
+                      progress: Math.min(100, data.progress || 100),
+                      metrics: prev.metrics || {
+                        averageProcessingTime: 0,
+                        successRate: data.totalProspects > 0 ? (data.completedProspects / data.totalProspects * 100) : 0,
+                        enrichmentQuality: 0,
+                        costPerProspect: 0.12,
+                        totalCost: data.totalProspects * 0.12,
+                      }
+                    };
+                  });
+
+                  // Update prospects list
+                  if (data.prospects) {
+                    setProspects(data.prospects);
+                  }
+
+                  // Prepare complete data package for Step 4
+                  const completeStepData = {
+                    enrichmentResults: jobResult,
+                    enrichmentSettings: {
+                      concurrency: concurrency[0],
+                      retryAttempts: retryAttempts[0],
+                      websitePages: websitePages[0],
+                      selectedModel: enrichmentConfig?.selectedModel
+                    },
+                    ...stepData
+                  };
+
+                  console.log(`[Step 3] Enrichment ${data.status} - proceeding to Step 4`);
+                  console.log(`  • Total: ${data.totalProspects}, Completed: ${data.completedProspects}, Failed: ${data.failedProspects}`);
+
+                  if (data.status === 'failed') {
+                    setError(`Enrichment failed: ${jobResult.message}`);
+                    onError?.(jobResult.message);
+                  } else {
+                    onStepComplete?.(completeStepData);
                   }
                 }
                 break;
 
-              case 'prospect_update':
-                // Update specific prospect
-                if (data.payload) {
-                  setProspects(prev =>
-                    prev.map(p =>
-                      p.id.toString() === data.payload.id.toString()
-                        ? { ...p, ...data.payload }
-                        : p
-                    )
-                  );
-                }
-                break;
+              case 'prospect-enrichment':
+                // Handle individual prospect updates
+                console.log(`[Step 3] Prospect update: ${data.prospectId} - ${data.status}`);
 
-              case 'job_complete':
-                // Job completed successfully
-                console.log('🎉 Enrichment job completed successfully!');
-                if (data.payload) {
-                  setJobStatus(data.payload);
-                  onStepComplete?.(data.payload);
-                }
-                break;
-
-              case 'job_complete_with_errors':
-                // Job completed but with some failures
-                console.log('⚠️ Enrichment job completed with errors');
-                if (data.payload) {
-                  setJobStatus(data.payload);
-                  setError(
-                    `Enrichment completed with issues: ${data.payload.message}`
-                  );
-                  // Still call onStepComplete but with warning context
-                  onStepComplete?.({
-                    ...data.payload,
-                    hasErrors: true,
-                    errorMessage: data.payload.message,
-                  });
-                }
-                break;
-
-              case 'job_failed':
-                // Job failed completely
-                console.error('❌ Enrichment job failed');
-                if (data.payload) {
-                  setJobStatus(data.payload);
-                  setError(`Enrichment failed: ${data.payload.message}`);
-                  onError?.(data.payload.message);
-                }
-                break;
-
-              case 'error':
-                // Handle errors
-                console.error(
-                  '❌ Enrichment job error:',
-                  data.payload?.message
+                // Update specific prospect in the list
+                setProspects(prev =>
+                  prev.map(p => {
+                    if (p.id.toString() === data.prospectId || `csv-${p.id - 1}` === data.prospectId) {
+                      return {
+                        ...p,
+                        status: data.isDuplicate ? 'skipped' :
+                          data.status === 'duplicate_found' ? 'skipped' :
+                            data.status === 'completed' ? 'completed' :
+                              data.status === 'error' ? 'failed' : p.status,
+                        progress: data.progress || p.progress,
+                        enrichedData: data.enrichmentData || p.enrichedData,
+                        errors: data.error ? [data.error] : p.errors,
+                        completedAt: data.status === 'completed' ? new Date().toISOString() : p.completedAt
+                      } as ProspectData;
+                    }
+                    return p;
+                  })
                 );
-                setError(data.payload?.message || 'Enrichment job error');
+
+                // Update job status counters
+                setJobStatus(prev => {
+                  if (!prev) return prev;
+
+                  const updatedStatus = { ...prev };
+
+                  if (data.status === 'completed' || data.status === 'duplicate_skipped') {
+                    updatedStatus.completedProspects = (prev.completedProspects || 0) + 1;
+                  } else if (data.status === 'error') {
+                    updatedStatus.failedProspects = (prev.failedProspects || 0) + 1;
+                  }
+
+                  const processed = (updatedStatus.completedProspects || 0) + (updatedStatus.failedProspects || 0);
+                  // Cap progress at 100% to fix the 150% issue
+                  updatedStatus.progress = Math.min(100, prev.totalProspects > 0 ? Math.round((processed / prev.totalProspects) * 100) : 0);
+
+                  // TEMPORARY FIX: Auto-transition to Step 4 when progress >= 100%
+                  if (updatedStatus.progress >= 100 && processed >= prev.totalProspects) {
+                    console.log('[Step 3] Progress reached 100%, auto-transitioning to Step 4');
+
+                    const completeStepData = {
+                      enrichmentResults: {
+                        id: prev.id,
+                        status: 'completed',
+                        totalProspects: prev.totalProspects,
+                        completedProspects: updatedStatus.completedProspects || 0,
+                        failedProspects: updatedStatus.failedProspects || 0,
+                        prospects: prospects,
+                        progress: 100,
+                        message: 'Enrichment completed successfully'
+                      },
+                      enrichmentSettings: {
+                        concurrency: concurrency[0],
+                        retryAttempts: retryAttempts[0],
+                        websitePages: websitePages[0],
+                        selectedModel: enrichmentConfig?.selectedModel
+                      },
+                      ...stepData
+                    };
+
+                    setTimeout(() => {
+                      onStepComplete?.(completeStepData);
+                    }, 1000); // Small delay to ensure UI updates
+                  }
+
+                  return updatedStatus;
+                });
+                break;
+
+              case 'batch-progress':
+                // Handle batch progress updates
+                console.log('[Step 3] Batch progress:', data.progress);
+                setJobStatus(prev => ({
+                  ...prev,
+                  progress: Math.min(100, data.progress || 0),
+                  processedProspects: data.processed,
+                  totalProspects: data.total,
+                  failedProspects: data.failed,
+                  status: data.status
+                } as EnrichmentJobStatus));
+                break;
+
+              case 'connected':
+                console.log('[Step 3] SSE connection established successfully');
+                break;
+
+              case 'heartbeat':
+                // Ignore heartbeat messages
+                break;
+
+              default:
+                console.log('[Step 3] Unknown SSE event type:', data.type);
                 break;
             }
           } catch (parseError) {
-            console.error('Error parsing SSE data:', parseError);
+            console.error('Error parsing SSE data:', parseError, event.data);
           }
         },
         error => {
           console.error('SSE connection error:', error);
-          setError('Lost connection to server. Reconnecting...');
-          // Try to reconnect after a delay
+          // Don't show error immediately, try to reconnect silently
           setTimeout(() => {
             if (jobStatus?.id) {
               setupSSEConnection(jobStatus.id);
@@ -781,6 +919,126 @@ Jane Smith,jane@company.com,Company Inc,CTO
           }, 3000);
         }
       );
+
+      // Add a polling fallback to check job status periodically
+      const pollInterval = setInterval(async () => {
+        if (!jobStatus?.id) return;
+
+        try {
+          // Check if all prospects are completed by polling the prospects endpoint
+          const response = await fetch(`/api/prospects?campaignId=${campaignId || stepData?.campaignData?.campaignId}&limit=100`);
+          if (response.ok) {
+            const data = await response.json();
+            const allProspects = data.prospects || [];
+
+            if (allProspects.length > 0) {
+              const enrichedCount = allProspects.filter((p: any) => p.status === 'ENRICHED' || p.status === 'COMPLETED').length;
+              const failedCount = allProspects.filter((p: any) => p.status === 'FAILED').length;
+              const totalCount = allProspects.length;
+
+              // Check if all prospects are done (enriched or failed)
+              if (enrichedCount + failedCount >= totalCount && totalCount > 0) {
+                console.log('[Step 3] Polling detected completion:', { enrichedCount, failedCount, totalCount });
+
+                // Clear the polling interval
+                clearInterval(pollInterval);
+
+                // Prepare completion data
+                const jobResult = {
+                  id: jobStatus.id,
+                  status: failedCount === 0 ? 'completed' : 'completed_with_errors',
+                  totalProspects: totalCount,
+                  completedProspects: enrichedCount,
+                  failedProspects: failedCount,
+                  prospects: allProspects,
+                  progress: 100,
+                  message: failedCount === 0 ? 'Enrichment completed successfully' : 'Enrichment completed with some errors'
+                };
+
+                setJobStatus(prev => {
+                  if (!prev) return null;
+                  return {
+                    ...prev,
+                    status: jobResult.status as any,
+                    totalProspects: totalCount,
+                    processedProspects: enrichedCount + failedCount,
+                    completedProspects: enrichedCount,
+                    failedProspects: failedCount,
+                    progress: 100,
+                    metrics: prev.metrics || {
+                      averageProcessingTime: 0,
+                      successRate: totalCount > 0 ? (enrichedCount / totalCount * 100) : 0,
+                      enrichmentQuality: 0,
+                      costPerProspect: 0.12,
+                      totalCost: totalCount * 0.12,
+                    }
+                  };
+                });
+
+                // Update prospects list
+                setProspects(allProspects.map((p: any) => ({
+                  id: p.id,
+                  name: p.name,
+                  email: p.email,
+                  company: p.company,
+                  position: p.position,
+                  status: p.status === 'ENRICHED' ? 'completed' : p.status === 'FAILED' ? 'failed' : 'pending',
+                  progress: p.status === 'ENRICHED' || p.status === 'FAILED' ? 100 : 0,
+                  enrichedData: p.enrichment ? {
+                    linkedinSummary: p.enrichment.linkedinSummary,
+                    companySummary: p.enrichment.companySummary,
+                    techStack: p.enrichment.techStackData,
+                    prospectAnalysisSummary: p.enrichment.prospectAnalysisSummary
+                  } : undefined,
+                  errors: [],
+                  retryCount: 0,
+                  completedAt: p.updatedAt
+                })));
+
+                // Prepare complete data package for Step 4
+                const completeStepData = {
+                  enrichmentResults: jobResult,
+                  enrichmentSettings: {
+                    concurrency: concurrency[0],
+                    retryAttempts: retryAttempts[0],
+                    websitePages: websitePages[0],
+                    selectedModel: enrichmentConfig?.selectedModel
+                  },
+                  ...stepData
+                };
+
+                console.log(`[Step 3] Polling-based completion - proceeding to Step 4`);
+
+                // Show success message and update UI
+                setError(null);
+                setIsLoading(false);
+
+                // Auto-proceed to Step 4 after a brief delay to show completion
+                setTimeout(() => {
+                  onStepComplete?.(completeStepData);
+                }, 1500);
+              }
+            }
+          }
+        } catch (error) {
+          console.error('[Step 3] Polling error:', error);
+        }
+      }, 5000); // Poll every 5 seconds
+
+      // Store the cleanup function for polling
+      const cleanupPolling = () => {
+        clearInterval(pollInterval);
+      };
+
+      // Store cleanup function for later use
+      if (eventSourceRef.current) {
+        const originalClose = eventSourceRef.current.close;
+        eventSourceRef.current.close = () => {
+          originalClose.call(eventSourceRef.current);
+          cleanupPolling();
+        };
+      }
+
     } catch (err) {
       console.error('Failed to setup SSE connection:', err);
       setError('Failed to establish real-time connection');
@@ -1372,7 +1630,7 @@ Jane Smith,jane@company.com,Company Inc,CTO
 
           <div className='space-y-2'>
             <Label htmlFor='retry-attempts'>
-              Retry Attempts: {retryAttempts[0]}
+              LLM API Retry Limit: {retryAttempts[0]}
             </Label>
             <Slider
               id='retry-attempts'
@@ -1385,8 +1643,27 @@ Jane Smith,jane@company.com,Company Inc,CTO
               disabled={isStarted}
             />
             <p className='text-sm text-muted-foreground'>
-              Number of times to retry failed enrichment attempts before marking
+              Number of times to retry failed LLM API calls before marking
               as failed.
+            </p>
+          </div>
+
+          <div className='space-y-2'>
+            <Label htmlFor='website-pages'>
+              Website Pages to Scrape: {websitePages[0]}
+            </Label>
+            <Slider
+              id='website-pages'
+              min={1}
+              max={10}
+              step={1}
+              value={websitePages}
+              onValueChange={setWebsitePages}
+              className='w-full'
+              disabled={isStarted}
+            />
+            <p className='text-sm text-muted-foreground'>
+              Maximum number of pages to scrape from each company website.
             </p>
           </div>
         </div>
@@ -1404,83 +1681,95 @@ Jane Smith,jane@company.com,Company Inc,CTO
     </div>
   );
 
-  const [showEnrichmentSettings, setShowEnrichmentSettings] = useState(false);
-
   // Render the initial view before enrichment starts
   const renderInitialView = () => (
-    <Card className="w-full">
-      <CardHeader>
-        <CardTitle>Begin Enrichment</CardTitle>
-        <CardDescription>
-          Start the enrichment process for {prospectCount} prospects
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button
-            onClick={startEnrichment}
-            disabled={disabled || isLoading}
-            className="flex items-center gap-2"
-          >
-            {isLoading ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Play className="h-4 w-4" />
-            )}
-            Start Enrichment
-          </Button>
-          <Dialog open={showEnrichmentSettings} onOpenChange={setShowEnrichmentSettings}>
-            <DialogTrigger asChild>
-              <Button variant="outline" size="icon">
-                <Settings2 className="h-4 w-4" />
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Enrichment Settings</DialogTitle>
-                <DialogDescription>
-                  Configure the enrichment process settings
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <Label>Parallel Processing (1-5)</Label>
-                  <Slider
-                    value={concurrency}
-                    onValueChange={setConcurrency}
-                    max={5}
-                    min={1}
-                    step={1}
-                  />
-                  <p className="text-sm text-muted-foreground">
-                    Current: {concurrency} parallel processes
-                  </p>
-                </div>
-                <div className="space-y-2">
-                  <Label>Retry Attempts (0-3)</Label>
-                  <Slider
-                    value={retryAttempts}
-                    onValueChange={setRetryAttempts}
-                    max={3}
-                    min={0}
-                    step={1}
-                  />
-                  <p className="text-sm text-muted-foreground">
-                    Current: {retryAttempts} retries
-                  </p>
-                </div>
-              </div>
-            </DialogContent>
-          </Dialog>
-        </div>
-        {error && (
-          <Alert variant="destructive" className="mt-4">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
-      </CardContent>
-    </Card>
+    <div className='max-w-6xl mx-auto space-y-6'>
+      {/* Page Title */}
+      <div className='text-center space-y-2'>
+        <h2 className='text-2xl font-bold text-gray-900'>Prospect Enrichment</h2>
+        <p className='text-gray-600'>Configure and start the enrichment process for {prospectCount} prospects</p>
+      </div>
+
+      {/* Enrichment Settings Section */}
+      <Card className="w-full">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Settings2 className="h-5 w-5" />
+            Enrichment Settings
+          </CardTitle>
+          <CardDescription>
+            Configure how the enrichment process will run
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="space-y-2">
+              <Label>Parallel Processing (1-5)</Label>
+              <Slider
+                value={concurrency}
+                onValueChange={setConcurrency}
+                max={5}
+                min={1}
+                step={1}
+              />
+              <p className="text-sm text-muted-foreground">
+                Current: {concurrency[0]} parallel processes
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label>LLM API Retry Limit (0-3)</Label>
+              <Slider
+                value={retryAttempts}
+                onValueChange={setRetryAttempts}
+                max={3}
+                min={0}
+                step={1}
+              />
+              <p className="text-sm text-muted-foreground">
+                Current: {retryAttempts[0]} retries
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label>Website Pages to Scrape (1-10)</Label>
+              <Slider
+                value={websitePages}
+                onValueChange={setWebsitePages}
+                max={10}
+                min={1}
+                step={1}
+              />
+              <p className="text-sm text-muted-foreground">
+                Current: {websitePages[0]} pages
+              </p>
+            </div>
+          </div>
+
+          {/* Start Enrichment Button - Bottom Right */}
+          <div className="flex justify-end pt-4">
+            <Button
+              onClick={startEnrichment}
+              disabled={disabled || isLoading}
+              className="flex items-center gap-2"
+              size="lg"
+            >
+              {isLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Play className="h-4 w-4" />
+              )}
+              Start Enrichment
+            </Button>
+          </div>
+
+          {error && (
+            <Alert variant="destructive" className="mt-4">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   );
 
   // Render the progress view after enrichment starts
@@ -1547,12 +1836,11 @@ Jane Smith,jane@company.com,Company Inc,CTO
             try {
               const existingProspects = await ProspectEnrichmentService.getProspects(
                 campaignId,
-                undefined,
-                workflowSessionId
+                undefined
               );
               if (existingProspects.length > 0) {
                 setProspects(existingProspects);
-                console.log(`✅ [BeginEnrichment] Loaded ${existingProspects.length} existing prospects`);
+                console.log('[Step 3] Loaded', existingProspects.length, 'existing prospects');
               }
             } catch (err) {
               console.warn('Could not load existing prospects:', err);

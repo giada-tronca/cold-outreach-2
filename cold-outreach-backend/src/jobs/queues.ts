@@ -60,6 +60,26 @@ export interface ProspectEnrichmentJobData {
     firecrawl?: boolean;
     builtwith?: boolean;
   };
+  // Configuration for enrichment settings
+  configuration?: {
+    pagesToScrape?: number;
+    websitePages?: number;
+    retryAttempts?: number;
+    concurrency?: number;
+    [key: string]: any;
+  };
+  // CSV data for prospect creation during processing
+  csvData?: {
+    name?: string;
+    email?: string;
+    company?: string;
+    position?: string;
+    linkedinUrl?: string;
+    campaignId: number;
+    batchId: number;
+    csvRowIndex: number;
+    additionalData?: Record<string, any>;
+  };
 }
 
 export interface EmailGenerationJobData {
@@ -70,8 +90,6 @@ export interface EmailGenerationJobData {
   llmModelId?: string;
   templateId?: string;
   customPrompt?: string;
-  workflowSessionId?: string;
-  batchId?: string;
 }
 
 export interface BatchEnrichmentJobData {

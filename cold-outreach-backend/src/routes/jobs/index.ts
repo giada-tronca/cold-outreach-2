@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express'
 import { JobController } from '@/controllers/jobController'
-import { createSSEHandler } from '@/services/sseService'
+import { createSSEHandler, SSEService } from '@/services/sseService'
 import {
     validateJobIdParam,
     validateUserIdParam,
@@ -16,6 +16,60 @@ import {
 import { handleValidationErrors } from '@/middleware/validation'
 
 const router = Router()
+
+/**
+ * Specific routes must come before parameterized routes
+ */
+
+/**
+ * Worker Health Check
+ * GET /api/jobs/health
+ */
+router.get('/health', JobController.healthCheck)
+
+/**
+ * Queue Statistics
+ * GET /api/jobs/stats
+ */
+router.get('/stats', JobController.getQueueStats)
+
+/**
+ * SSE Statistics and Debugging
+ * GET /api/jobs/sse-stats
+ */
+router.get('/sse-stats', (req: Request, res: Response) => {
+    try {
+        const sseService = SSEService.getInstance()
+        const stats = sseService.getStats()
+
+        res.json({
+            success: true,
+            data: {
+                ...stats,
+                timestamp: new Date().toISOString()
+            }
+        })
+    } catch (error) {
+        console.error('Error getting SSE stats:', error)
+        res.status(500).json({
+            success: false,
+            message: 'Failed to get SSE statistics',
+            error: error instanceof Error ? error.message : String(error)
+        })
+    }
+})
+
+/**
+ * Job Cleanup (specific routes)
+ */
+
+// Clean completed jobs
+// POST /api/jobs/clean/completed
+router.post('/clean/completed', JobController.cleanCompletedJobs)
+
+// Clean failed jobs
+// POST /api/jobs/clean/failed
+router.post('/clean/failedJobs', JobController.cleanFailedJobs)
 
 /**
  * Real-time Updates (Server-Sent Events)
@@ -42,19 +96,7 @@ router.get(
 )
 
 /**
- * Queue Statistics
- * GET /api/jobs/stats
- */
-router.get('/stats', JobController.getQueueStats)
-
-/**
- * Worker Health Check
- * GET /api/jobs/health
- */
-router.get('/health', JobController.healthCheck)
-
-/**
- * Job Management
+ * Job Management (parameterized routes come after specific ones)
  */
 
 // Get specific job details
@@ -123,16 +165,8 @@ router.post(
 )
 
 /**
- * Job Cleanup
+ * Job Cleanup - moved to top to avoid route conflicts
  */
-
-// Clean completed jobs
-// POST /api/jobs/clean/completed
-router.post('/clean/completed', JobController.cleanCompletedJobs)
-
-// Clean failed jobs
-// POST /api/jobs/clean/failed
-router.post('/clean/failedJobs', JobController.cleanFailedJobs)
 
 /**
  * Batch Processing

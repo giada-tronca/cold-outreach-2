@@ -44,18 +44,16 @@ import type {
 import { apiClient } from '@/services/api';
 
 interface EmailGenerationStepProps {
-  workflowSessionId?: string;
   prospectCount?: number;
   campaignId?: number;
   emailGenerationJobId?: string;
-  enrichmentData?: any; // Add enrichment data to extract LLM selection
+  enrichmentData?: any; // Contains AI model selection from Step 3
   onStepComplete?: (data: any) => void;
   onError?: (error: string) => void;
   disabled?: boolean;
 }
 
 export default function EmailGenerationStep({
-  workflowSessionId,
   prospectCount = 0,
   campaignId,
   emailGenerationJobId,
@@ -69,8 +67,8 @@ export default function EmailGenerationStep({
   );
   const [prospects, setProspects] = useState<EmailGenerationStatus[]>([]);
   const [isStarted, setIsStarted] = useState(false);
-  const [, setIsCompleted] = useState(false);
-  const [, setIsLoading] = useState(false);
+  const [isCompleted, setIsCompleted] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedTab, setSelectedTab] = useState<
     'overview' | 'prospects' | 'errors' | 'settings'
@@ -88,63 +86,21 @@ export default function EmailGenerationStep({
   // SSE connection for real-time updates
   const eventSourceRef = useRef<EventSource | null>(null);
 
-  // Function to get LLM model selection from workflow session (similar to BeginEnrichmentStep)
-  const getLLMModelSelection = async (): Promise<{
+  // Use consistent userId for SSE connections
+  // const userId = 'default-user'; // TODO: Get from auth context
+
+  // Function to get LLM model selection from stepData
+  const getLLMModelSelection = (): {
     aiProvider: 'gemini' | 'openrouter';
     llmModelId?: string;
-  }> => {
-    console.log('🔍 [EmailGenerationStep] Getting LLM model selection...');
+  } => {
+    console.log('🔍 [EmailGenerationStep] Getting LLM model selection from stepData...');
+    console.log('🔍 [EmailGenerationStep] Available enrichmentData:', enrichmentData);
 
-    // Method 1: Try to get from workflow session configuration (most reliable)
-    if (workflowSessionId && workflowSessionId !== 'local-session') {
-      try {
-        console.log(
-          '🔍 [EmailGenerationStep] Attempting to get LLM model from workflow session configuration...'
-        );
-        const response = await apiClient.get(
-          `/api/workflow/sessions/${workflowSessionId}`
-        );
-        const data = await response.json();
-
-        console.log(
-          '🔍 [EmailGenerationStep] Workflow session API response:',
-          data
-        );
-
-        if (
-          data.success &&
-          data.data?.session?.configurationData?.campaignSettings?.selectedModel?.id
-        ) {
-          const llmModelId = data.data.session.configurationData.campaignSettings.selectedModel.id;
-          console.log(
-            '✅ [EmailGenerationStep] Found LLM model from workflow session:',
-            { llmModelId }
-          );
-
-          // Convert LLM model ID to aiProvider
-          if (llmModelId === 'gemini-2.0-flash') {
-            return { aiProvider: 'gemini', llmModelId: llmModelId };
-          } else if (llmModelId.startsWith('openrouter-')) {
-            return { aiProvider: 'openrouter', llmModelId: llmModelId };
-          } else {
-            return { aiProvider: 'openrouter', llmModelId: llmModelId };
-          }
-        }
-      } catch (error) {
-        console.warn(
-          '⚠️ [EmailGenerationStep] Failed to get LLM model from workflow session:',
-          error
-        );
-      }
-    }
-
-    // Method 2: Try to get from enrichment data (fallback)
-    if (enrichmentData?.data?.selectedModel?.id) {
-      const llmModelId = enrichmentData.data.selectedModel.id;
-      console.log(
-        '✅ [EmailGenerationStep] Found LLM model from enrichment data:',
-        llmModelId
-      );
+    // Method 1: Get from enrichmentSettings.selectedModel (main path)
+    if (enrichmentData?.enrichmentSettings?.selectedModel?.id) {
+      const llmModelId = enrichmentData.enrichmentSettings.selectedModel.id;
+      console.log('✅ [EmailGenerationStep] Found LLM model from enrichmentSettings:', llmModelId);
 
       if (llmModelId === 'gemini-2.0-flash') {
         return { aiProvider: 'gemini', llmModelId };
@@ -153,35 +109,32 @@ export default function EmailGenerationStep({
       }
     }
 
-    // Method 3: Try global function (last resort)
-    if (typeof window !== 'undefined' && (window as any).__campaignStepData) {
-      try {
-        const campaignData = (window as any).__campaignStepData();
-        if (campaignData?.selectedModel?.id) {
-          const llmModelId = campaignData.selectedModel.id;
-          console.log(
-            '✅ [EmailGenerationStep] Found LLM model from global function:',
-            { llmModelId }
-          );
+    // Method 2: Get from enrichment data (Step 3 data)
+    if (enrichmentData?.selectedModel?.id) {
+      const llmModelId = enrichmentData.selectedModel.id;
+      console.log('✅ [EmailGenerationStep] Found LLM model from enrichment data:', llmModelId);
 
-          if (llmModelId === 'gemini-2.0-flash') {
-            return { aiProvider: 'gemini', llmModelId };
-          } else {
-            return { aiProvider: 'openrouter', llmModelId };
-          }
-        }
-      } catch (error) {
-        console.warn(
-          '⚠️ [EmailGenerationStep] Failed to get LLM model from global function:',
-          error
-        );
+      if (llmModelId === 'gemini-2.0-flash') {
+        return { aiProvider: 'gemini', llmModelId };
+      } else {
+        return { aiProvider: 'openrouter', llmModelId };
+      }
+    }
+
+    // Method 3: Try to get from enrichmentData.data structure
+    if (enrichmentData?.data?.selectedModel?.id) {
+      const llmModelId = enrichmentData.data.selectedModel.id;
+      console.log('✅ [EmailGenerationStep] Found LLM model from enrichment data.data:', llmModelId);
+
+      if (llmModelId === 'gemini-2.0-flash') {
+        return { aiProvider: 'gemini', llmModelId };
+      } else {
+        return { aiProvider: 'openrouter', llmModelId };
       }
     }
 
     // Default fallback with explicit model
-    console.log(
-      '⚠️ [EmailGenerationStep] No LLM model selection found, using default OpenRouter with o1-mini'
-    );
+    console.log('⚠️ [EmailGenerationStep] No LLM model selection found, using default OpenRouter with o1-mini');
     return { aiProvider: 'openrouter', llmModelId: 'openrouter-o1-mini' };
   };
 
@@ -230,9 +183,9 @@ export default function EmailGenerationStep({
       return;
     }
 
-    // Get LLM model selection using the new robust method
+    // Get LLM model selection from stepData
     const { aiProvider: selectedAiProvider, llmModelId: selectedLLMModelId } =
-      await getLLMModelSelection();
+      getLLMModelSelection();
 
     console.log('🔍 [EmailGenerationStep] LLM model selection result:', {
       selectedAiProvider,
@@ -252,10 +205,9 @@ export default function EmailGenerationStep({
         selectedLLMModelId,
       });
 
-      // Create email generation jobs - Always include llmModelId
+      // Create email generation jobs - Remove workflowSessionId
       const config = {
         campaignId,
-        workflowSessionId: `workflow-${Date.now()}`,
         configuration: {
           parallelism: emailGenerationParallelism[0] || 2,
           aiProvider: selectedAiProvider,

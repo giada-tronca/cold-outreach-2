@@ -1,0 +1,12 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Blue background with rounded corners -->
+  <rect width="32" height="32" rx="6" fill="#3b82f6"/>
+  
+  <!-- Zap icon in white -->
+  <path d="M18.667 10.667L13.333 18.667h4.889L16.889 25.333L22.222 17.333h-4.889L18.667 10.667z" 
+        fill="white" 
+        stroke="white" 
+        stroke-width="1.5" 
+        stroke-linecap="round" 
+        stroke-linejoin="round"/>
+</svg> 

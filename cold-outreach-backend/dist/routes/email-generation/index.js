@@ -219,7 +219,7 @@ router.post('/jobs', (0, errorHandler_1.asyncHandler)(async (req, res) => {
                 const jobData = {
                     prospectId: prospect.id,
                     campaignId: parseInt(campaignId),
-                    userId: 'user123', // Fixed: Use correct user ID for SSE
+                    userId: 'default-user', // Use consistent userId for SSE
                     aiProvider: validAiProvider,
                     llmModelId: llmModelId, // Add specific LLM model ID
                     workflowSessionId: finalWorkflowSessionId,

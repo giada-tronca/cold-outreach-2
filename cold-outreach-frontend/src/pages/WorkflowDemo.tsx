@@ -230,7 +230,7 @@ export default function WorkflowDemo() {
                 <Progress value={100} className='h-2' />
 
                 <div className='flex items-center justify-between'>
-                  <span className='text-sm'>Company data enrichment</span>
+                  <span className='text-sm'>Company website enrichment</span>
                   <Badge variant='secondary'>In Progress</Badge>
                 </div>
                 <Progress value={67} className='h-2' />

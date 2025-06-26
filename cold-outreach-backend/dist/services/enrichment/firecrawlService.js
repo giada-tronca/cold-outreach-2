@@ -7,6 +7,7 @@ exports.FirecrawlService = void 0;
 const axios_1 = __importDefault(require("axios"));
 const apiConfigurationService_1 = require("./apiConfigurationService");
 const errors_1 = require("@/utils/errors");
+const emailHelpers_1 = require("@/utils/emailHelpers");
 /**
  * Firecrawl API Service for V1 API
  * Handles website content scraping and crawling according to official documentation
@@ -50,37 +51,15 @@ class FirecrawlService {
         throw lastError;
     }
     /**
-     * Extract company website URL from email domain
+     * Extract company website URL from email
      * This is the primary method to get company website URL
      */
     static extractCompanyWebsiteFromEmail(email) {
-        try {
-            if (!email || !email.includes('@')) {
-                return null;
-            }
-            const emailDomain = email.split('@')[1]?.toLowerCase();
-            if (!emailDomain) {
-                return null;
-            }
-            // Skip common free email providers
-            const freeEmailProviders = [
-                'gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com',
-                'icloud.com', 'live.com', 'aol.com', 'protonmail.com',
-                'mail.com', 'yandex.com', 'zoho.com', 'mailinator.com',
-                'tempmail.org', '10minutemail.com'
-            ];
-            if (freeEmailProviders.includes(emailDomain)) {
-                return null;
-            }
-            // Use the email domain as the company website
-            const websiteUrl = `https://www.${emailDomain}`;
+        const websiteUrl = (0, emailHelpers_1.extractCompanyWebsiteFromEmail)(email);
+        if (websiteUrl) {
             console.log(`🔍 [Firecrawl]: Extracted company website from email domain: ${websiteUrl}`);
-            return websiteUrl;
         }
-        catch (error) {
-            console.error(`❌ [Firecrawl]: Failed to extract website from email ${email}:`, error);
-            return null;
-        }
+        return websiteUrl;
     }
     /**
      * Scrape website content using V1 API
@@ -348,12 +327,12 @@ class FirecrawlService {
      * Crawl website and generate AI company summary using database prompt
      * This method combines crawling multiple pages with AI analysis
      */
-    static async crawlAndGenerateCompanySummary(url, aiProvider = 'openrouter') {
+    static async crawlAndGenerateCompanySummary(url, aiProvider = 'openrouter', llmModelId, pagesToScrape = 3) {
         try {
             console.log(`🔍 [Firecrawl]: Starting comprehensive crawl and summary for: ${url}`);
-            // Start crawl job with optimized settings
+            // Start crawl job with user-specified page limit
             const { jobId } = await this.startCrawlJob(url, {
-                maxPages: 10,
+                maxPages: Math.min(pagesToScrape, 10), // Respect user setting but cap at 10
                 maxDepth: 2,
                 allowBackwardLinks: false,
                 allowExternalLinks: false,
@@ -487,12 +466,13 @@ class FirecrawlService {
                             role: 'user',
                             content: prompt
                         }
-                    ],
-                    max_completion_tokens: 8000
+                    ]
                 }, {
                     headers: {
                         'Authorization': `Bearer ${apiKey}`,
-                        'Content-Type': 'application/json'
+                        'Content-Type': 'application/json',
+                        'HTTP-Referer': process.env.SITE_URL || 'http://localhost:3001',
+                        'X-Title': 'Cold Outreach AI'
                     },
                     timeout: 120000
                 });
@@ -609,6 +589,42 @@ class FirecrawlService {
             }
         }
         return items.slice(0, 5); // Limit to 5 items
+    }
+    /**
+     * Simple URL scraping method for general use
+     */
+    static async scrapeUrl(url) {
+        try {
+            console.log(`🔍 [Firecrawl]: Scraping URL: ${url}`);
+            const axiosInstance = await this.createAxiosInstance();
+            const scrapePayload = {
+                url: url,
+                formats: ['markdown'],
+                onlyMainContent: true,
+                excludeTags: ['script', 'style', 'nav', 'footer'],
+                timeout: 30000,
+                waitFor: 0,
+                mobile: false,
+            };
+            const response = await this.retryRequest(async () => {
+                return await axiosInstance.post('/v1/scrape', scrapePayload);
+            });
+            if (!response.data?.success) {
+                throw new Error(`Firecrawl scraping failed: ${response.data?.error || 'Unknown error'}`);
+            }
+            const scrapedData = response.data.data;
+            if (!scrapedData?.markdown) {
+                throw new Error('No content returned from Firecrawl');
+            }
+            return {
+                content: scrapedData.markdown,
+                metadata: scrapedData.metadata
+            };
+        }
+        catch (error) {
+            console.error(`❌ [Firecrawl]: Failed to scrape URL ${url}:`, error);
+            return null;
+        }
     }
 }
 exports.FirecrawlService = FirecrawlService;

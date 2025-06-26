@@ -21,6 +21,7 @@ const proxycurlService_1 = require("./proxycurlService");
 const firecrawlService_1 = require("./firecrawlService");
 const builtwithService_1 = require("./builtwithService");
 const errors_1 = require("@/utils/errors");
+const emailHelpers_1 = require("@/utils/emailHelpers");
 /**
  * Main Enrichment Service
  * Orchestrates all enrichment APIs and manages database updates
@@ -298,10 +299,7 @@ class EnrichmentService {
         }
         // Try to extract from prospect email domain
         if (prospect.email) {
-            const emailDomain = prospect.email.split('@')[1];
-            if (emailDomain && !['gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com'].includes(emailDomain)) {
-                return emailDomain;
-            }
+            return (0, emailHelpers_1.extractDomainFromEmail)(prospect.email);
         }
         return null;
     }

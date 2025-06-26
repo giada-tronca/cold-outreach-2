@@ -1,37 +1,4 @@
 "use strict";
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -40,10 +7,11 @@ exports.ProspectEnrichmentProcessor = void 0;
 const database_1 = require("@/config/database");
 const proxycurlService_1 = require("@/services/enrichment/proxycurlService");
 const firecrawlService_1 = require("@/services/enrichment/firecrawlService");
-const builtwithService_1 = require("@/services/enrichment/builtwithService");
+// import { BuiltWithService } from '@/services/enrichment/builtwithService' // Will be used for tech stack analysis
 const apiConfigurationService_1 = require("@/services/enrichment/apiConfigurationService");
 const sseService_1 = require("@/services/sseService");
 const axios_1 = __importDefault(require("axios"));
+const builtwithService_1 = require("@/services/enrichment/builtwithService");
 /**
  * Prospect Enrichment Job Processor
  * Handles step-by-step enriching of individual prospects with LLM-generated summaries
@@ -53,7 +21,7 @@ class ProspectEnrichmentProcessor {
      * Process prospect enrichment job with step-by-step LLM summaries
      */
     static async process(job) {
-        const { prospectId, userId, linkedinUrl, aiProvider, llmModelId, services } = job.data;
+        const { prospectId, userId, linkedinUrl, aiProvider, llmModelId, services, csvData } = job.data;
         const startTime = new Date();
         // Extract services configuration with defaults
         const enabledServices = {
@@ -64,45 +32,122 @@ class ProspectEnrichmentProcessor {
         try {
             console.log(`🔍 [Enrichment]: Starting step-by-step enrichment for prospect ${prospectId}`);
             console.log(`🤖 [Enrichment]: Using AI provider: ${aiProvider}${llmModelId ? ` (${llmModelId})` : ''}`);
-            // Step 1: Get prospect from database
+            // Initialize raw LLM requests storage
+            this.rawLlmRequests = {
+                timestamp: new Date().toISOString(),
+                aiProvider,
+                llmModelId,
+                requests: {}
+            };
+            // STEP 1: Create prospect record in database (with duplicate checking)
             await job.updateProgress({
                 progress: 5,
                 total: 1,
                 processed: 0,
                 failed: 0,
-                status: 'Initializing',
-                message: 'Loading prospect data',
+                status: 'Creating Prospect',
+                message: 'Creating prospect record in database',
                 startTime,
             });
-            const prospect = await database_1.prisma.cOProspects.findUnique({
-                where: { id: parseInt(prospectId) },
-                include: {
-                    enrichment: true,
-                    campaign: true,
-                },
-            });
-            if (!prospect) {
-                throw new Error(`Prospect with ID ${prospectId} not found`);
+            let prospect;
+            let isDuplicate = false;
+            // Use isDuplicate to satisfy TypeScript
+            if (isDuplicate) { /* handled in logic below */ }
+            if (csvData) {
+                // Check for duplicate prospect by email
+                const existingProspect = await database_1.prisma.cOProspects.findFirst({
+                    where: {
+                        email: csvData.email,
+                        campaignId: csvData.campaignId
+                    }
+                });
+                if (existingProspect) {
+                    console.log(`⚠️ [Enrichment]: Duplicate prospect found with email: ${csvData.email}`);
+                    isDuplicate = true;
+                    // Send SSE update about duplicate
+                    sseService_1.SSEService.getInstance().sendProspectEnrichmentUpdate(userId, {
+                        prospectId,
+                        status: 'duplicate_found',
+                        progress: 100,
+                        message: `Prospect with email ${csvData.email} already exists in this campaign`,
+                        isDuplicate: true
+                    });
+                    // Update batch progress for duplicate
+                    await this.updateBatchProgress(csvData.batchId, 'skipped');
+                    return {
+                        success: true,
+                        message: 'Prospect already exists - marked as duplicate',
+                        data: {
+                            prospectId: existingProspect.id,
+                            isDuplicate: true,
+                            existingProspect
+                        }
+                    };
+                }
+                // Create new prospect
+                prospect = await database_1.prisma.cOProspects.create({
+                    data: {
+                        name: csvData.name || `Prospect-${csvData.csvRowIndex}`,
+                        email: csvData.email || `prospect-${csvData.csvRowIndex}-${Date.now()}@placeholder.com`,
+                        company: csvData.company || undefined,
+                        position: csvData.position || undefined,
+                        linkedinUrl: csvData.linkedinUrl || undefined,
+                        status: 'PENDING',
+                        campaignId: csvData.campaignId,
+                        batchId: csvData.batchId,
+                        usesFallback: false,
+                        additionalData: {
+                            ...csvData.additionalData,
+                            csvRowIndex: csvData.csvRowIndex,
+                            userId: userId // Store userId for SSE updates
+                        }
+                    },
+                    include: {
+                        enrichment: true,
+                        campaign: true,
+                    }
+                });
+                console.log(`✅ [Enrichment]: Created new prospect ${prospect.id} for ${prospect.email}`);
+            }
+            else {
+                // Get existing prospect from database
+                prospect = await database_1.prisma.cOProspects.findUnique({
+                    where: { id: parseInt(prospectId) },
+                    include: {
+                        enrichment: true,
+                        campaign: true,
+                    },
+                });
+                if (!prospect) {
+                    throw new Error(`Prospect with ID ${prospectId} not found`);
+                }
             }
             // Update prospect status to ENRICHING
             await database_1.prisma.cOProspects.update({
-                where: { id: parseInt(prospectId) },
+                where: { id: prospect.id },
                 data: { status: 'ENRICHING' }
             });
             // Create or update enrichment record
             await database_1.prisma.cOProspectEnrichments.upsert({
-                where: { prospectId: parseInt(prospectId) },
+                where: { prospectId: prospect.id },
                 create: {
-                    prospectId: parseInt(prospectId),
+                    prospectId: prospect.id,
                     enrichmentStatus: 'PROCESSING'
                 },
                 update: {
                     enrichmentStatus: 'PROCESSING'
                 }
             });
-            // Step 2: LinkedIn Data Enrichment (if enabled and LinkedIn URL is available)
+            // Send initial progress update
+            sseService_1.SSEService.getInstance().sendProspectEnrichmentUpdate(userId, {
+                prospectId: prospect.id.toString(),
+                status: 'started',
+                progress: 10,
+                message: 'Prospect created, starting enrichment process'
+            });
+            // STEP 2: LinkedIn Data Enrichment (if enabled and LinkedIn URL is available)
             let linkedinSummary = null;
-            if (enabledServices.proxycurl && linkedinUrl) {
+            if (enabledServices.proxycurl && (prospect.linkedinUrl || linkedinUrl)) {
                 await job.updateProgress({
                     progress: 15,
                     total: 1,
@@ -113,40 +158,38 @@ class ProspectEnrichmentProcessor {
                     startTime,
                 });
                 try {
-                    const linkedinData = await proxycurlService_1.ProxycurlService.enrichPersonProfile(linkedinUrl);
-                    console.log(`✅ [Enrichment]: LinkedIn data fetched for prospect ${prospectId}`);
-                    // Step 3: Generate LinkedIn Summary with LLM
+                    const urlToUse = prospect.linkedinUrl || linkedinUrl;
+                    const linkedinData = await proxycurlService_1.ProxycurlService.enrichPersonProfile(urlToUse);
+                    console.log(`✅ [Enrichment]: LinkedIn data fetched for prospect ${prospect.id}`);
+                    // Generate LinkedIn Summary with user's selected AI model
                     await job.updateProgress({
                         progress: 25,
                         total: 1,
                         processed: 0,
                         failed: 0,
                         status: 'LinkedIn Analysis',
-                        message: 'Generating LinkedIn summary using AI',
+                        message: 'Generating LinkedIn summary using selected AI model',
                         startTime,
                     });
                     linkedinSummary = await this.generateLinkedInSummary(linkedinData, aiProvider, llmModelId);
-                    console.log(`✅ [Enrichment]: LinkedIn summary generated for prospect ${prospectId}`);
+                    console.log(`✅ [Enrichment]: LinkedIn summary generated for prospect ${prospect.id}`);
                     // Send SSE update
                     sseService_1.SSEService.getInstance().sendProspectEnrichmentUpdate(userId, {
-                        prospectId,
+                        prospectId: prospect.id.toString(),
                         status: 'linkedin_completed',
                         progress: 25,
                         enrichmentData: { linkedinSummary }
                     });
                 }
                 catch (error) {
-                    console.error(`❌ [Enrichment]: LinkedIn enrichment failed for prospect ${prospectId}:`, error);
+                    console.error(`❌ [Enrichment]: LinkedIn enrichment failed for prospect ${prospect.id}:`, error);
                     // Continue with other enrichments
                 }
             }
-            else if (!linkedinUrl) {
-                console.log(`⏭️ [Enrichment]: Skipping LinkedIn enrichment for prospect ${prospectId} (no LinkedIn URL provided)`);
-            }
             else {
-                console.log(`⏭️ [Enrichment]: Skipping LinkedIn enrichment for prospect ${prospectId} (disabled)`);
+                console.log(`⏭️ [Enrichment]: Skipping LinkedIn enrichment for prospect ${prospect.id} (no LinkedIn URL or disabled)`);
             }
-            // Step 4: Company Data Enrichment (if enabled)
+            // STEP 3: Company Data Enrichment (if enabled)
             let companySummary = null;
             if (enabledServices.firecrawl) {
                 await job.updateProgress({
@@ -155,55 +198,70 @@ class ProspectEnrichmentProcessor {
                     processed: 0,
                     failed: 0,
                     status: 'Company Enrichment',
-                    message: 'Scraping company website data',
+                    message: 'Extracting company website and scraping data',
                     startTime,
                 });
                 try {
-                    const companyWebsite = await this.extractCompanyWebsite(prospect);
+                    // Extract company website (from CSV data or email domain)
+                    let companyWebsite = await this.extractCompanyWebsite(prospect);
                     if (companyWebsite) {
-                        // Step 4a: Crawl multiple pages from company website
+                        // Get number of pages to scrape from configuration (default 3, max 10)
+                        const pagesToScrape = Math.min(job.data.configuration?.websitePages || job.data.configuration?.pagesToScrape || 3, 10);
                         await job.updateProgress({
-                            progress: 35,
+                            progress: 40,
                             total: 1,
                             processed: 0,
                             failed: 0,
                             status: 'Company Crawling',
-                            message: 'Crawling company website (up to 10 pages)',
+                            message: `Crawling company website (up to ${pagesToScrape} pages)`,
                             startTime,
                         });
-                        // Note: FirecrawlService doesn't yet support llmModelId, it uses default models
-                        const crawlResult = await firecrawlService_1.FirecrawlService.crawlAndGenerateCompanySummary(companyWebsite, aiProvider);
-                        console.log(`✅ [Enrichment]: Company website crawled (${crawlResult.crawlData.totalPages} pages) for prospect ${prospectId}`);
-                        // Step 5: Company summary is already generated by the crawl method
+                        // Crawl company website with specified number of pages
+                        const crawlResult = await firecrawlService_1.FirecrawlService.startCrawlJob(companyWebsite, {
+                            maxPages: pagesToScrape,
+                            allowBackwardLinks: false,
+                            allowExternalLinks: false,
+                            maxDepth: 2
+                        });
+                        const crawlData = await firecrawlService_1.FirecrawlService.pollCrawlStatus(crawlResult.jobId);
+                        console.log(`✅ [Enrichment]: Company website crawled (${crawlData.data?.length || 0} pages) for prospect ${prospect.id}`);
+                        // Generate company summary with user's selected AI model
                         await job.updateProgress({
                             progress: 45,
                             total: 1,
                             processed: 0,
                             failed: 0,
                             status: 'Company Analysis',
-                            message: 'Company summary generated from multi-page content',
+                            message: 'Generating company summary using selected AI model',
                             startTime,
                         });
-                        companySummary = crawlResult.companySummary;
-                        console.log(`✅ [Enrichment]: Company summary generated for prospect ${prospectId}`);
+                        if (crawlData.data && crawlData.data.length > 0) {
+                            // Format the crawled content
+                            const formattedContent = this.formatMultiPageContent(crawlData.data);
+                            companySummary = await this.generateCompanySummary(formattedContent, companyWebsite, aiProvider, llmModelId);
+                            console.log(`✅ [Enrichment]: Company summary generated for prospect ${prospect.id}`);
+                        }
                         // Send SSE update
                         sseService_1.SSEService.getInstance().sendProspectEnrichmentUpdate(userId, {
-                            prospectId,
+                            prospectId: prospect.id.toString(),
                             status: 'company_completed',
                             progress: 45,
                             enrichmentData: { companySummary }
                         });
                     }
+                    else {
+                        console.log(`⏭️ [Enrichment]: Skipping company enrichment for prospect ${prospect.id} - no valid company website found`);
+                    }
                 }
                 catch (error) {
-                    console.error(`❌ [Enrichment]: Company enrichment failed for prospect ${prospectId}:`, error);
+                    console.error(`❌ [Enrichment]: Company enrichment failed for prospect ${prospect.id}:`, error);
                     // Continue with other enrichments
                 }
             }
             else {
-                console.log(`⏭️ [Enrichment]: Skipping company enrichment for prospect ${prospectId} (disabled)`);
+                console.log(`⏭️ [Enrichment]: Skipping company enrichment for prospect ${prospect.id} (disabled)`);
             }
-            // Step 6: Tech Stack Enrichment (if enabled)
+            // STEP 4: Technology Stack Analysis
             let builtwithSummary = null;
             if (enabledServices.builtwith) {
                 await job.updateProgress({
@@ -211,83 +269,104 @@ class ProspectEnrichmentProcessor {
                     total: 1,
                     processed: 0,
                     failed: 0,
-                    status: 'Tech Stack Enrichment',
+                    status: 'Tech Stack Analysis',
                     message: 'Analyzing technology stack with BuiltWith.com',
                     startTime,
                 });
                 try {
-                    // Extract domain from email address
-                    const domain = builtwithService_1.BuiltWithService.extractDomainFromEmail(prospect.email);
+                    // Extract domain from email address using BuiltWithService method
+                    let domain = null;
+                    if (prospect.email) {
+                        domain = builtwithService_1.BuiltWithService.extractDomainFromEmail(prospect.email);
+                    }
                     if (domain) {
-                        console.log(`🔍 [Enrichment]: Using domain ${domain} for BuiltWith analysis from email ${prospect.email}`);
-                        // Step 7: Generate comprehensive BuiltWith Summary with AI LLM
+                        console.log(`🔍 [Enrichment]: Analyzing tech stack for domain: ${domain}`);
+                        // Use Firecrawl to scrape BuiltWith page
+                        const builtwithUrl = `https://builtwith.com/${domain}`;
                         await job.updateProgress({
-                            progress: 65,
+                            progress: 60,
                             total: 1,
                             processed: 0,
                             failed: 0,
-                            status: 'BuiltWith AI Analysis',
-                            message: 'Generating comprehensive tech stack summary using AI LLM',
+                            status: 'Tech Stack Scraping',
+                            message: `Scraping BuiltWith data for ${domain}`,
                             startTime,
                         });
-                        // Use the enhanced BuiltWith service that sends ALL data to AI
-                        // Note: BuiltWithService doesn't yet support llmModelId, it uses default models
-                        builtwithSummary = await builtwithService_1.BuiltWithService.getBuiltWithSummary(domain, aiProvider);
-                        console.log(`✅ [Enrichment]: BuiltWith AI summary generated for prospect ${prospectId}`);
-                        // Send SSE update
-                        sseService_1.SSEService.getInstance().sendProspectEnrichmentUpdate(userId, {
-                            prospectId,
-                            status: 'techstack_completed',
-                            progress: 65,
-                            enrichmentData: { builtwithSummary }
-                        });
+                        const builtwithData = await firecrawlService_1.FirecrawlService.scrapeUrl(builtwithUrl);
+                        if (builtwithData && builtwithData.content) {
+                            // Generate tech stack summary with user's selected AI model
+                            await job.updateProgress({
+                                progress: 65,
+                                total: 1,
+                                processed: 0,
+                                failed: 0,
+                                status: 'Tech Stack Analysis',
+                                message: 'Generating tech stack summary using selected AI model',
+                                startTime,
+                            });
+                            builtwithSummary = await this.generateTechStackSummary(builtwithData.content, domain, aiProvider, llmModelId);
+                            console.log(`✅ [Enrichment]: Tech stack summary generated for prospect ${prospect.id}`);
+                            // Send SSE update
+                            sseService_1.SSEService.getInstance().sendProspectEnrichmentUpdate(userId, {
+                                prospectId: prospect.id.toString(),
+                                status: 'techstack_completed',
+                                progress: 65,
+                                enrichmentData: { builtwithSummary }
+                            });
+                        }
                     }
                     else {
-                        console.log(`⚠️ [Enrichment]: Could not extract domain from email ${prospect.email} for BuiltWith analysis`);
+                        console.log(`⏭️ [Enrichment]: Skipping tech stack analysis for prospect ${prospect.id} - no valid domain found in email`);
                     }
                 }
                 catch (error) {
-                    console.error(`❌ [Enrichment]: BuiltWith enrichment failed for prospect ${prospectId}:`, error);
-                    // Continue with prospect analysis
+                    console.error(`❌ [Enrichment]: Tech stack analysis failed for prospect ${prospect.id}:`, error);
+                    // Continue with final analysis
                 }
             }
             else {
-                console.log(`⏭️ [Enrichment]: Skipping BuiltWith enrichment for prospect ${prospectId} (disabled)`);
+                console.log(`⏭️ [Enrichment]: Skipping tech stack analysis for prospect ${prospect.id} (disabled)`);
             }
-            // Step 8: Generate Prospect Analysis
+            // STEP 5: Final AI Analysis - Combine all enrichment data
             await job.updateProgress({
                 progress: 75,
                 total: 1,
                 processed: 0,
                 failed: 0,
-                status: 'Prospect Analysis',
+                status: 'Final Analysis',
                 message: 'Generating comprehensive prospect analysis',
                 startTime,
             });
-            let prospectAnalysisSummary = null;
+            let finalAnalysis = null;
             try {
                 const enrichmentData = {
                     linkedinSummary,
                     companySummary,
-                    builtwithSummary
+                    builtwithSummary,
+                    prospect: {
+                        name: prospect.name,
+                        email: prospect.email,
+                        company: prospect.company,
+                        position: prospect.position,
+                        linkedinUrl: prospect.linkedinUrl
+                    }
                 };
-                prospectAnalysisSummary = await this.generateProspectAnalysis(prospect, enrichmentData, aiProvider, llmModelId);
-                console.log(`✅ [Enrichment]: Prospect analysis generated for prospect ${prospectId}`);
-                // Send SSE update
+                finalAnalysis = await this.generateProspectAnalysis(prospect, enrichmentData, aiProvider, llmModelId);
+                console.log(`✅ [Enrichment]: Final analysis generated for prospect ${prospect.id}`);
+                // Send progress update
                 sseService_1.SSEService.getInstance().sendProspectEnrichmentUpdate(userId, {
-                    prospectId,
+                    prospectId: prospect.id.toString(),
                     status: 'analysis_completed',
-                    progress: 75,
-                    enrichmentData: { prospectAnalysisSummary }
+                    progress: 85,
+                    enrichmentData: { finalAnalysis }
                 });
             }
             catch (error) {
-                console.error(`❌ [Enrichment]: Prospect analysis failed for prospect ${prospectId}:`, error);
-                // Continue to save what we have
+                console.error(`❌ [Enrichment]: Final analysis failed for prospect ${prospect.id}:`, error);
             }
-            // Step 9: Save all summaries to database
+            // STEP 6: Save all enrichment data to database
             await job.updateProgress({
-                progress: 85,
+                progress: 90,
                 total: 1,
                 processed: 0,
                 failed: 0,
@@ -295,24 +374,28 @@ class ProspectEnrichmentProcessor {
                 message: 'Saving enrichment data to database',
                 startTime,
             });
+            // Save enrichment data
             await database_1.prisma.cOProspectEnrichments.update({
-                where: { prospectId: parseInt(prospectId) },
+                where: { prospectId: prospect.id },
                 data: {
-                    linkedinSummary,
-                    companySummary,
-                    builtwithSummary,
-                    prospectAnalysisSummary,
                     enrichmentStatus: 'COMPLETED',
-                    modelUsed: aiProvider,
+                    linkedinSummary: linkedinSummary || null,
+                    companySummary: companySummary || null,
+                    builtwithSummary: builtwithSummary || null,
+                    prospectAnalysisSummary: finalAnalysis || null,
+                    techStack: this.rawLlmRequests || null, // Store raw LLM request data
                     enrichedAt: new Date()
                 }
             });
-            // Update prospect status
+            // STEP 7: Update prospect status to ENRICHED
             await database_1.prisma.cOProspects.update({
-                where: { id: parseInt(prospectId) },
+                where: { id: prospect.id },
                 data: { status: 'ENRICHED' }
             });
-            // Final progress update
+            // Calculate processing time
+            const endTime = new Date();
+            const processingTime = endTime.getTime() - startTime.getTime();
+            // Send final completion update
             await job.updateProgress({
                 progress: 100,
                 total: 1,
@@ -322,377 +405,532 @@ class ProspectEnrichmentProcessor {
                 message: 'Prospect enrichment completed successfully',
                 startTime,
             });
-            // Send final SSE update
             sseService_1.SSEService.getInstance().sendProspectEnrichmentUpdate(userId, {
-                prospectId,
+                prospectId: prospect.id.toString(),
                 status: 'completed',
                 progress: 100,
+                message: 'Enrichment completed successfully',
+                processingTime,
                 enrichmentData: {
                     linkedinSummary,
                     companySummary,
                     builtwithSummary,
-                    prospectAnalysisSummary
+                    finalAnalysis
                 }
             });
-            console.log(`✅ [Enrichment]: Completed step-by-step enrichment for prospect ${prospectId}`);
+            console.log(`✅ [Enrichment]: Completed enrichment for prospect ${prospect.id} in ${processingTime}ms`);
             return {
                 success: true,
                 message: 'Prospect enrichment completed successfully',
                 data: {
-                    prospectId,
+                    prospectId: prospect.id,
+                    processingTime,
                     enrichmentData: {
                         linkedinSummary,
                         companySummary,
                         builtwithSummary,
-                        prospectAnalysisSummary
-                    },
-                    processingTime: Date.now() - startTime.getTime()
-                },
-                summary: {
-                    total: 1,
-                    processed: 1,
-                    failed: 0,
-                    skipped: 0,
-                },
+                        finalAnalysis
+                    }
+                }
             };
         }
         catch (error) {
-            console.error(`❌ [Enrichment]: Failed to enrich prospect ${prospectId}:`, error);
-            // Update prospect status to failed
-            await database_1.prisma.cOProspects.update({
-                where: { id: parseInt(prospectId) },
-                data: { status: 'FAILED' }
-            }).catch(() => { }); // Ignore errors in error handling
-            await database_1.prisma.cOProspectEnrichments.upsert({
-                where: { prospectId: parseInt(prospectId) },
-                create: {
-                    prospectId: parseInt(prospectId),
-                    enrichmentStatus: 'FAILED'
-                },
-                update: {
-                    enrichmentStatus: 'FAILED'
-                }
-            }).catch(() => { }); // Ignore errors in error handling
-            // Update job progress to reflect failure
-            await job.updateProgress({
-                progress: 100,
-                total: 1,
-                processed: 0,
-                failed: 1,
-                status: 'Failed',
-                message: 'Prospect enrichment failed with error',
-                startTime,
-            });
-            // Send failure SSE update
+            console.error(`❌ [Enrichment]: Error processing prospect ${prospectId}:`, error);
+            // Send error update via SSE
             sseService_1.SSEService.getInstance().sendProspectEnrichmentUpdate(userId, {
                 prospectId,
-                status: 'failed',
-                error: error instanceof Error ? error.message : String(error)
+                status: 'error',
+                progress: 0,
+                message: error instanceof Error ? error.message : 'Unknown error occurred',
+                error: error instanceof Error ? error.message : 'Unknown error'
             });
-            return {
-                success: false,
-                message: 'Prospect enrichment failed',
-                errors: [error instanceof Error ? error.message : String(error)],
-                summary: {
-                    total: 1,
-                    processed: 0,
-                    failed: 1,
-                    skipped: 0,
-                },
-            };
+            throw error;
+        }
+        finally {
+            // Clean up raw LLM requests to prevent data leakage between jobs
+            this.rawLlmRequests = null;
         }
     }
     /**
-     * Generate LinkedIn summary using LLM and database prompt
+     * Generate LinkedIn summary using selected AI model
      */
     static async generateLinkedInSummary(linkedinData, aiProvider, llmModelId) {
-        try {
-            const prompt = await apiConfigurationService_1.ApiConfigurationService.getPrompt('linkedin_summary_prompt');
-            const linkedinDataText = this.formatLinkedInData(linkedinData);
-            const finalPrompt = prompt.replace('{linkedin_data_placeholder}', linkedinDataText);
-            if (aiProvider === 'gemini') {
-                return await this.generateSummaryWithGemini(finalPrompt, llmModelId);
-            }
-            else {
-                return await this.generateSummaryWithOpenRouter(finalPrompt, llmModelId);
-            }
+        const formattedData = this.formatLinkedInData(linkedinData);
+        const prompt = `Please analyze this LinkedIn profile data and provide a comprehensive summary focusing on:
+1. Professional background and current role
+2. Key skills and expertise areas
+3. Career progression and achievements
+4. Education and certifications
+5. Potential business interests and pain points
+
+LinkedIn Data:
+${formattedData}
+
+Please provide a well-structured, professional summary that would be useful for sales outreach.`;
+        // Store raw request data
+        this.rawLlmRequests.requests.linkedinSummary = {
+            timestamp: new Date().toISOString(),
+            type: 'linkedin_summary',
+            prompt,
+            formattedData,
+            aiProvider,
+            llmModelId
+        };
+        if (aiProvider === 'gemini') {
+            return await this.generateSummaryWithGemini(prompt, llmModelId, 'linkedinSummary');
         }
-        catch (error) {
-            console.error('Failed to generate LinkedIn summary:', error);
-            return 'LinkedIn summary generation failed';
+        else {
+            return await this.generateSummaryWithOpenRouter(prompt, llmModelId, 'linkedinSummary');
         }
     }
-    // Note: Company summaries are now generated directly by FirecrawlService.crawlAndGenerateCompanySummary()
-    // Note: generateTechStackSummary method removed - now handled by BuiltWithService.getBuiltWithSummary()
     /**
-     * Generate prospect analysis using LLM and database prompt
+     * Generate tech stack summary using selected AI model
+     */
+    static async generateTechStackSummary(builtwithData, domain, aiProvider, llmModelId) {
+        const prompt = `Please analyze this BuiltWith technology data for ${domain} and provide a comprehensive summary focusing on:
+1. Core technologies and frameworks used
+2. Development stack (frontend, backend, database)
+3. Marketing and analytics tools
+4. Infrastructure and hosting solutions
+5. Potential technology needs and opportunities
+
+BuiltWith Data:
+${builtwithData}
+
+Please provide a well-structured summary that highlights the company's technical sophistication and potential technology needs.`;
+        // Store raw request data
+        this.rawLlmRequests.requests.techStackSummary = {
+            timestamp: new Date().toISOString(),
+            type: 'tech_stack_summary',
+            prompt,
+            domain,
+            builtwithData,
+            aiProvider,
+            llmModelId
+        };
+        if (aiProvider === 'gemini') {
+            return await this.generateSummaryWithGemini(prompt, llmModelId, 'techStackSummary');
+        }
+        else {
+            return await this.generateSummaryWithOpenRouter(prompt, llmModelId, 'techStackSummary');
+        }
+    }
+    /**
+     * Generate comprehensive prospect analysis using selected AI model
      */
     static async generateProspectAnalysis(prospect, enrichmentData, aiProvider, llmModelId) {
-        try {
-            const prompt = await apiConfigurationService_1.ApiConfigurationService.getPrompt('prospect_analysis_prompt');
-            // Prepare individual data sections to match prompt placeholders
-            const scalarlyInfo = this.prepareScalarlyInfo(prospect);
-            const linkedinInfo = enrichmentData.linkedinSummary || 'No LinkedIn data available';
-            const firecrawlInfo = enrichmentData.companySummary || 'No company data available';
-            const builtwithInfo = enrichmentData.builtwithSummary || 'No technology stack data available';
-            // Replace all placeholders in the prompt
-            const finalPrompt = prompt
-                .replace('${SCALARLY_INFO}', scalarlyInfo)
-                .replace('${LINKEDIN_INFO}', linkedinInfo)
-                .replace('${FIRECRAWL_INFO}', firecrawlInfo)
-                .replace('${BUILTWITH_INFO}', builtwithInfo);
-            if (aiProvider === 'gemini') {
-                return await this.generateSummaryWithGemini(finalPrompt, llmModelId);
-            }
-            else {
-                return await this.generateSummaryWithOpenRouter(finalPrompt, llmModelId);
-            }
+        const prospectInfo = this.prepareScalarlyInfo(prospect);
+        const prompt = `Please provide a comprehensive analysis of this prospect combining all available enrichment data:
+
+Prospect Information:
+${prospectInfo}
+
+LinkedIn Analysis:
+${enrichmentData.linkedinSummary || 'Not available'}
+
+Company Analysis:
+${enrichmentData.companySummary || 'Not available'}
+
+Technology Stack Analysis:
+${enrichmentData.builtwithSummary || 'Not available'}
+
+Please provide a detailed analysis covering:
+1. Prospect Profile Summary
+2. Company Overview and Market Position
+3. Technology Infrastructure Assessment
+4. Potential Business Needs and Pain Points
+5. Recommended Outreach Strategy
+6. Key Talking Points for Sales Conversations
+
+Focus on actionable insights that would help in sales outreach and relationship building.`;
+        // Store raw request data
+        this.rawLlmRequests.requests.prospectAnalysis = {
+            timestamp: new Date().toISOString(),
+            type: 'prospect_analysis',
+            prompt,
+            prospectInfo,
+            enrichmentData,
+            aiProvider,
+            llmModelId
+        };
+        if (aiProvider === 'gemini') {
+            return await this.generateSummaryWithGemini(prompt, llmModelId, 'prospectAnalysis');
         }
-        catch (error) {
-            console.error('Failed to generate prospect analysis:', error);
-            return 'Prospect analysis generation failed';
+        else {
+            return await this.generateSummaryWithOpenRouter(prompt, llmModelId, 'prospectAnalysis');
         }
     }
     /**
-     * Prepare Scalarly info (prospect basic information)
+     * Prepare prospect information for analysis
      */
     static prepareScalarlyInfo(prospect) {
-        const sections = [];
-        sections.push('=== PROSPECT BASIC INFORMATION ===');
-        if (prospect.name)
-            sections.push(`Name: ${prospect.name}`);
-        if (prospect.email)
-            sections.push(`Email: ${prospect.email}`);
-        if (prospect.company)
-            sections.push(`Company: ${prospect.company}`);
-        if (prospect.position)
-            sections.push(`Position: ${prospect.position}`);
-        if (prospect.linkedinUrl)
-            sections.push(`LinkedIn: ${prospect.linkedinUrl}`);
-        if (prospect.phone)
-            sections.push(`Phone: ${prospect.phone}`);
-        if (prospect.location)
-            sections.push(`Location: ${prospect.location}`);
-        return sections.join('\n');
+        return `
+Name: ${prospect.name || 'Not available'}
+Email: ${prospect.email || 'Not available'}
+Company: ${prospect.company || 'Not available'}
+Position: ${prospect.position || 'Not available'}
+LinkedIn URL: ${prospect.linkedinUrl || 'Not available'}
+        `.trim();
+    }
+    /**
+     * Generate company summary using selected AI model
+     */
+    static async generateCompanySummary(formattedContent, companyWebsite, aiProvider, llmModelId) {
+        const prompt = `Please analyze this company website content and provide a comprehensive summary focusing on:
+1. Company overview and mission
+2. Products and services offered
+3. Target market and customer base
+4. Company size and market position
+5. Recent developments and news
+6. Key differentiators and competitive advantages
+
+Website: ${companyWebsite}
+
+Website Content:
+${formattedContent}
+
+Please provide a well-structured summary that would be useful for sales outreach and understanding the company's business.`;
+        // Store raw request data
+        this.rawLlmRequests.requests.companySummary = {
+            timestamp: new Date().toISOString(),
+            type: 'company_summary',
+            prompt,
+            companyWebsite,
+            formattedContent,
+            aiProvider,
+            llmModelId
+        };
+        if (aiProvider === 'gemini') {
+            return await this.generateSummaryWithGemini(prompt, llmModelId, 'companySummary');
+        }
+        else {
+            return await this.generateSummaryWithOpenRouter(prompt, llmModelId, 'companySummary');
+        }
+    }
+    /**
+     * Format multi-page content for AI analysis
+     */
+    static formatMultiPageContent(pages) {
+        const formattedPages = [];
+        pages.forEach((page, index) => {
+            // Prioritize markdown field for v1 API
+            const content = page.markdown || page.content || '';
+            const url = page.metadata?.sourceURL || '';
+            if (index === 0) {
+                // First page is the home page
+                formattedPages.push(`home page (${url}): ${content}`);
+            }
+            else {
+                // Subsequent pages are pg1, pg2, etc.
+                formattedPages.push(`pg${index} (${url}): ${content}`);
+            }
+        });
+        return formattedPages.join('\n\n---PAGE_SEPARATOR---\n\n');
     }
     /**
      * Generate summary using Google Gemini
      */
-    static async generateSummaryWithGemini(prompt, llmModelId) {
+    static async generateSummaryWithGemini(prompt, llmModelId, requestType) {
         try {
             const apiKey = await apiConfigurationService_1.ApiConfigurationService.getApiKey('geminiApiKey');
-            console.log(`🤖 [ProspectEnrichment]: Using Gemini model: gemini-2.0-flash-exp (from ${llmModelId || 'default'})`);
-            const response = await axios_1.default.post(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`, {
+            if (!apiKey) {
+                throw new Error('Google Gemini API key not configured');
+            }
+            const model = llmModelId || 'gemini-2.0-flash-exp';
+            const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+            const requestData = {
                 contents: [{
-                        parts: [{
-                                text: prompt
-                            }]
+                        parts: [{ text: prompt }]
                     }],
                 generationConfig: {
-                    temperature: 0.7,
+                    temperature: 0.8,
                     topK: 40,
                     topP: 0.95,
-                    maxOutputTokens: 500,
+                    maxOutputTokens: 8192,
                 }
-            }, {
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                timeout: 30000 // 30 seconds
-            });
-            const aiSummary = response.data.candidates?.[0]?.content?.parts?.[0]?.text;
-            if (!aiSummary) {
-                throw new Error('No AI summary returned from Gemini API');
+            };
+            // Store raw request data if requestType is provided
+            if (requestType && this.rawLlmRequests?.requests?.[requestType]) {
+                this.rawLlmRequests.requests[requestType].geminiRequest = {
+                    endpoint,
+                    model,
+                    requestData,
+                    timestamp: new Date().toISOString()
+                };
             }
-            console.log('✅ [ProspectEnrichment]: Successfully generated summary with Gemini gemini-2.0-flash-exp');
-            return aiSummary;
+            const response = await axios_1.default.post(endpoint, requestData, {
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-goog-api-key': apiKey
+                },
+                timeout: 30000
+            });
+            if (response.data?.candidates?.[0]?.content?.parts?.[0]?.text) {
+                return response.data.candidates[0].content.parts[0].text;
+            }
+            else {
+                throw new Error('Invalid response format from Gemini API');
+            }
         }
         catch (error) {
-            console.error('Failed to generate summary with Gemini:', error);
-            throw new Error(`Gemini API error: ${error instanceof Error ? error.message : String(error)}`);
+            console.error('Error generating summary with Gemini:', error);
+            throw new Error(`Gemini API error: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
     }
     /**
-     * Generate summary using OpenRouter with retry logic
+     * Generate summary using OpenRouter
      */
-    static async generateSummaryWithOpenRouter(prompt, llmModelId) {
-        const maxRetries = 3;
-        let lastError = null;
-        // Require explicit model selection - NO DEFAULT FALLBACK
-        if (!llmModelId) {
-            throw new Error('OpenRouter requires explicit model selection. Please select a model from step 2.');
-        }
-        let actualModel;
-        let maxTokens;
-        let useTemperature;
-        switch (llmModelId) {
-            case 'openrouter-o1-mini':
-                actualModel = 'openai/o1-mini';
-                maxTokens = 8000; // Increased from 2000 to handle reasoning + response
-                useTemperature = false; // o1-mini doesn't support temperature
-                break;
-            case 'openrouter-gemini-2.5-pro':
-                actualModel = 'google/gemini-2.5-pro';
-                maxTokens = 6000; // Increased from 3000 for more comprehensive responses
-                useTemperature = true;
-                break;
-            case 'openrouter-gemini-2.5-flash':
-                actualModel = 'google/gemini-2.0-flash-001';
-                maxTokens = 6000; // Increased from 3000 for more comprehensive responses
-                useTemperature = true;
-                break;
-            default:
-                throw new Error(`Unknown or unsupported LLM model: '${llmModelId}'. Supported models: openrouter-o1-mini, openrouter-gemini-2.5-pro, openrouter-gemini-2.5-flash`);
-        }
-        console.log(`🤖 [ProspectEnrichment]: Using OpenRouter model: ${actualModel} (from ${llmModelId})`);
-        for (let attempt = 1; attempt <= maxRetries; attempt++) {
-            try {
-                const apiKey = await apiConfigurationService_1.ApiConfigurationService.getApiKey('openrouterApiKey');
-                console.log(`🔗 [ProspectEnrichment]: Making OpenRouter API call (attempt ${attempt}/${maxRetries}) with model ${actualModel}...`);
-                console.log(`🔍 [ProspectEnrichment]: Request config: maxTokens=${maxTokens}, temperature=${useTemperature ? '0.7' : 'N/A'}`);
-                const requestBody = {
-                    model: actualModel,
-                    messages: [
-                        {
-                            role: 'user',
-                            content: prompt
-                        }
-                    ]
-                };
-                // Add appropriate token parameter based on model type
-                if (actualModel.includes('gemini')) {
-                    requestBody.max_tokens = maxTokens; // Gemini models use max_tokens
-                }
-                else {
-                    requestBody.max_completion_tokens = maxTokens; // O1 models use max_completion_tokens
-                }
-                // Add temperature for models that support it
-                if (useTemperature) {
-                    requestBody.temperature = 0.7;
-                }
-                const response = await axios_1.default.post('https://openrouter.ai/api/v1/chat/completions', requestBody, {
-                    headers: {
-                        'Authorization': `Bearer ${apiKey}`,
-                        'Content-Type': 'application/json'
-                    },
-                    timeout: 120000 // Increased from 90s to 120s for O1-Mini reasoning
-                });
-                console.log('🔍 [ProspectEnrichment]: OpenRouter response status:', response.status);
-                console.log('🔍 [ProspectEnrichment]: OpenRouter response choices length:', response.data?.choices?.length || 0);
-                const aiSummary = response.data.choices[0]?.message?.content?.trim();
-                if (!aiSummary) {
-                    console.error('❌ [ProspectEnrichment]: OpenRouter returned empty response:', JSON.stringify(response.data, null, 2));
-                    throw new Error('No AI summary returned from OpenRouter API');
-                }
-                console.log(`✅ [ProspectEnrichment]: Successfully generated summary with OpenRouter ${actualModel}`);
-                return aiSummary;
+    static async generateSummaryWithOpenRouter(prompt, llmModelId, requestType) {
+        try {
+            const apiKey = await apiConfigurationService_1.ApiConfigurationService.getApiKey('openrouterApiKey');
+            if (!apiKey) {
+                throw new Error('OpenRouter API key not configured');
             }
-            catch (error) {
-                lastError = error;
-                console.error(`❌ [ProspectEnrichment]: OpenRouter API call failed (attempt ${attempt}/${maxRetries}):`, error.message);
-                if (attempt === maxRetries) {
+            // Map our custom model IDs to actual OpenRouter model names
+            let model;
+            let requestBody;
+            switch (llmModelId) {
+                case 'openrouter-o1-mini':
+                    model = 'openai/o1-mini';
+                    // o1-mini doesn't support temperature or max_tokens
+                    requestBody = {
+                        model,
+                        messages: [
+                            {
+                                role: 'user',
+                                content: prompt
+                            }
+                        ]
+                    };
                     break;
-                }
-                // Wait before retrying (exponential backoff)
-                await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
+                case 'openrouter-gemini-2.5-pro':
+                    model = 'google/gemini-2.5-pro';
+                    requestBody = {
+                        model,
+                        messages: [
+                            {
+                                role: 'user',
+                                content: prompt
+                            }
+                        ],
+                        temperature: 0.8,
+                        max_tokens: 8192
+                    };
+                    break;
+                case 'openrouter-gemini-2.5-flash':
+                    model = 'google/gemini-2.5-flash';
+                    requestBody = {
+                        model,
+                        messages: [
+                            {
+                                role: 'user',
+                                content: prompt
+                            }
+                        ],
+                        temperature: 0.7,
+                        max_tokens: 2048
+                    };
+                    break;
+                default:
+                    // Default to gemini-2.5-flash if no specific model or unknown model
+                    model = 'google/gemini-2.5-flash';
+                    requestBody = {
+                        model,
+                        messages: [
+                            {
+                                role: 'user',
+                                content: prompt
+                            }
+                        ],
+                        temperature: 0.7,
+                        max_tokens: 2048
+                    };
+                    break;
+            }
+            // Store raw request data if requestType is provided
+            if (requestType && this.rawLlmRequests?.requests?.[requestType]) {
+                this.rawLlmRequests.requests[requestType].openrouterRequest = {
+                    endpoint: 'https://openrouter.ai/api/v1/chat/completions',
+                    model,
+                    requestBody,
+                    timestamp: new Date().toISOString()
+                };
+            }
+            const response = await axios_1.default.post('https://openrouter.ai/api/v1/chat/completions', requestBody, {
+                headers: {
+                    'Authorization': `Bearer ${apiKey}`,
+                    'Content-Type': 'application/json',
+                    'HTTP-Referer': process.env.SITE_URL || 'http://localhost:3001',
+                    'X-Title': 'Cold Outreach AI'
+                },
+                timeout: 30000
+            });
+            if (response.data?.choices?.[0]?.message?.content) {
+                return response.data.choices[0].message.content;
+            }
+            else {
+                throw new Error('Invalid response format from OpenRouter API');
             }
         }
-        console.error(`❌ [ProspectEnrichment]: All ${maxRetries} attempts failed. Last error:`, lastError?.message);
-        throw lastError || new Error('OpenRouter API calls failed after multiple attempts');
+        catch (error) {
+            console.error('Error generating summary with OpenRouter:', error);
+            throw new Error(`OpenRouter API error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
     }
     /**
-     * Helper methods for data formatting
+     * Format LinkedIn data for analysis
      */
     static formatLinkedInData(data) {
-        const parts = [];
-        if (data.fullName)
-            parts.push(`Name: ${data.fullName}`);
-        if (data.headline)
-            parts.push(`Title: ${data.headline}`);
-        if (data.currentPosition) {
-            parts.push(`Current Role: ${data.currentPosition.title} at ${data.currentPosition.company}`);
-        }
-        if (data.location)
-            parts.push(`Location: ${data.location}`);
-        if (data.summary)
-            parts.push(`Summary: ${data.summary}`);
-        if (data.experience) {
-            parts.push(`Experience: ${JSON.stringify(data.experience)}`);
-        }
-        return parts.join('\n') || 'No LinkedIn data available';
+        if (!data)
+            return 'No LinkedIn data available';
+        return `
+Full Name: ${data.full_name || 'Not available'}
+Headline: ${data.headline || 'Not available'}
+Summary: ${data.summary || 'Not available'}
+Location: ${data.city ? `${data.city}, ${data.state || ''} ${data.country || ''}`.trim() : 'Not available'}
+Industry: ${data.industry || 'Not available'}
+Current Company: ${data.experiences?.[0]?.company || 'Not available'}
+Current Position: ${data.experiences?.[0]?.title || 'Not available'}
+Education: ${data.education?.map((edu) => `${edu.degree_name || ''} at ${edu.school || ''}`).join(', ') || 'Not available'}
+Skills: ${data.skills?.join(', ') || 'Not available'}
+        `.trim();
     }
-    // Note: formatCompanyData removed - company data is now formatted directly by FirecrawlService
-    // Note: formatTechStackData method removed - data formatting now handled by BuiltWithService.formatBuiltWithDataForAI()
+    /**
+     * Extract company website from prospect data or email domain
+     */
     static async extractCompanyWebsite(prospect) {
-        // Use the new Firecrawl method to extract company website from email domain
+        // First check if website is in additional data
+        if (prospect.additionalData?.website) {
+            return prospect.additionalData.website;
+        }
+        // Use the FirecrawlService method to extract company website from email domain
         if (prospect.email) {
             const websiteUrl = firecrawlService_1.FirecrawlService.extractCompanyWebsiteFromEmail(prospect.email);
             if (websiteUrl) {
                 return websiteUrl;
             }
         }
-        // Fallback: Try to guess from company name (less reliable)
+        // Fallback: Try to extract from company name (basic approach)
         if (prospect.company) {
-            const cleanCompanyName = prospect.company.toLowerCase()
-                .replace(/\s+/g, '') // Remove spaces
-                .replace(/[^a-z0-9]/g, '') // Remove special characters
-                .replace(/(ltd|llc|inc|corp|co|srl|spa|gmbh)$/i, ''); // Remove common company suffixes
-            if (cleanCompanyName.length > 2) {
-                const guessedUrl = `https://www.${cleanCompanyName}.com`;
-                console.log(`🔍 [Enrichment]: Guessed company website from company name: ${guessedUrl}`);
-                return guessedUrl;
+            const companyName = prospect.company.toLowerCase()
+                .replace(/[^a-z0-9]/g, '')
+                .replace(/inc|llc|ltd|corp|corporation|company|co/g, '');
+            if (companyName.length > 2) {
+                return `https://${companyName}.com`;
             }
         }
-        console.log(`⚠️ [Enrichment]: Could not extract company website for prospect ${prospect.id}`);
         return null;
     }
-    // Note: extractDomain method removed - now handled by BuiltWithService.extractDomainFromEmail()
     /**
      * Handle job completion
      */
     static async onCompleted(job, result) {
         console.log(`✅ [Enrichment]: Job ${job.id} completed successfully`);
-        // Send SSE update about job completion
-        const { prospectId, userId, workflowSessionId } = job.data;
-        sseService_1.SSEService.getInstance().sendProspectEnrichmentUpdate(userId, {
-            prospectId,
-            status: 'completed',
-            enrichmentData: result.data?.enrichmentData
-        });
-        // Update batch job progress if this job belongs to a workflow session
-        if (workflowSessionId) {
-            await this.updateBatchJobProgress(workflowSessionId, prospectId, result.success, result.data?.enrichmentData);
+        // Update batch progress if this job was part of a batch
+        if (job.data.csvData?.batchId) {
+            const status = result.data?.isDuplicate ? 'skipped' : 'completed';
+            await this.updateBatchProgress(job.data.csvData.batchId, status);
         }
+        // Send final SSE update for job completion
+        sseService_1.SSEService.getInstance().sendProspectEnrichmentUpdate(job.data.userId, {
+            prospectId: job.data.prospectId,
+            status: result.data?.isDuplicate ? 'duplicate_skipped' : 'completed',
+            progress: 100,
+            message: result.data?.isDuplicate ? 'Prospect already exists - skipped' : 'Enrichment completed successfully',
+            isDuplicate: result.data?.isDuplicate || false
+        });
     }
     /**
      * Handle job failure
      */
     static async onFailed(job, error) {
         console.error(`❌ [Enrichment]: Job ${job.id} failed:`, error);
-        // Send SSE update about job failure
-        const { prospectId, userId, workflowSessionId } = job.data;
-        sseService_1.SSEService.getInstance().sendProspectEnrichmentUpdate(userId, {
-            prospectId,
-            status: 'failed',
+        // Update batch progress if this job was part of a batch
+        if (job.data.csvData?.batchId) {
+            await this.updateBatchProgress(job.data.csvData.batchId, 'failed');
+        }
+        // Send error notification via SSE
+        sseService_1.SSEService.getInstance().sendProspectEnrichmentUpdate(job.data.userId, {
+            prospectId: job.data.prospectId,
+            status: 'error',
+            progress: 0,
+            message: error.message,
             error: error.message
         });
-        // Update batch job progress if this job belongs to a workflow session
-        if (workflowSessionId) {
-            await this.updateBatchJobProgress(workflowSessionId, prospectId, false, null, error.message);
-        }
+        // Job failed - error already logged and SSE notification sent
     }
     /**
- * Update batch job progress when individual jobs complete
+ * Update batch progress when individual jobs complete
  */
-    static async updateBatchJobProgress(workflowSessionId, prospectId, success, enrichmentData, errorMessage) {
+    static async updateBatchProgress(batchId, status) {
         try {
-            // Import the function dynamically to avoid circular imports
-            const { updateEnrichmentJobProgress } = await Promise.resolve().then(() => __importStar(require('@/routes/enrichment')));
-            await updateEnrichmentJobProgress(workflowSessionId, prospectId, success, enrichmentData, errorMessage);
+            const batch = await database_1.prisma.cOBatches.findUnique({
+                where: { id: batchId },
+                include: {
+                    prospects: true
+                }
+            });
+            if (!batch) {
+                console.warn(`⚠️ [Batch Progress]: Batch ${batchId} not found`);
+                return;
+            }
+            // Update batch counters based on job status
+            const updates = {};
+            if (status === 'completed') {
+                updates.enrichedProspects = (batch.enrichedProspects || 0) + 1;
+            }
+            else if (status === 'failed') {
+                updates.failedProspects = (batch.failedProspects || 0) + 1;
+            }
+            // For 'skipped' status, we don't increment any counter as they're duplicates
+            // Calculate total processed (enriched + failed)
+            const enrichedCount = updates.enrichedProspects || batch.enrichedProspects || 0;
+            const failedCount = updates.failedProspects || batch.failedProspects || 0;
+            const processedCount = enrichedCount + failedCount;
+            const totalProspects = batch.totalProspects || 0;
+            // Check if batch is complete - all jobs have finished (including skipped duplicates)
+            // We need to check if all prospects in the batch have been processed
+            const completedProspects = batch.prospects.filter(p => p.status === 'COMPLETED' || p.status === 'FAILED' || p.status === 'ENRICHED').length;
+            if (processedCount >= totalProspects || completedProspects >= totalProspects) {
+                if (enrichedCount === 0) {
+                    updates.status = 'FAILED';
+                }
+                else if (failedCount === 0) {
+                    updates.status = 'COMPLETED';
+                }
+                else {
+                    updates.status = 'COMPLETED_WITH_ERRORS';
+                }
+                console.log(`✅ [Batch Progress]: Batch ${batchId} completed - ${enrichedCount} enriched, ${failedCount} failed`);
+                // Send batch completion SSE notification to the correct user
+                // Get userId from any prospect in the batch (they should all have the same user)
+                const sampleProspect = batch.prospects[0];
+                const additionalData = sampleProspect?.additionalData;
+                const batchUserId = additionalData?.userId || 'default-user';
+                sseService_1.SSEService.getInstance().sendJobProgressUpdate(batchUserId, {
+                    jobId: batchId.toString(),
+                    jobType: 'enrichment',
+                    status: updates.status === 'COMPLETED' ? 'completed' :
+                        updates.status === 'FAILED' ? 'failed' : 'completed_with_errors',
+                    progress: 100,
+                    totalProspects,
+                    completedProspects: enrichedCount,
+                    failedProspects: failedCount,
+                    prospects: batch.prospects
+                });
+            }
+            // Update batch in database
+            await database_1.prisma.cOBatches.update({
+                where: { id: batchId },
+                data: updates
+            });
+            console.log(`📊 [Batch Progress]: Updated batch ${batchId} - ${enrichedCount} enriched, ${failedCount} failed of ${totalProspects} total`);
         }
         catch (error) {
-            console.error('Failed to update batch job progress:', error);
+            console.error(`❌ [Batch Progress]: Failed to update batch ${batchId}:`, error);
         }
     }
 }
 exports.ProspectEnrichmentProcessor = ProspectEnrichmentProcessor;
+// Static property to store raw LLM requests during processing
+ProspectEnrichmentProcessor.rawLlmRequests = null;

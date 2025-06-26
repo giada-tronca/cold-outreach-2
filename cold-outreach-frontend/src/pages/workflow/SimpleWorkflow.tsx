@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   ChevronRight,
   ChevronLeft,
@@ -23,6 +23,7 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 import { Slider } from '@/components/ui/slider';
 import FileUpload from '@/components/forms/FileUpload';
 import { apiClient, handleApiResponse } from '@/services/api';
@@ -41,30 +42,16 @@ interface WorkflowStep {
 
 // Removed unused UploadProgress interface
 
-interface WorkflowSession {
-  id: string;
-  status: string;
-  currentStep: number;
-  configuration: any;
-  progress: {
-    current: number;
-    total: number;
-    percentage: number;
-  };
-  metadata: any;
-  createdAt: string;
-  updatedAt: string;
-}
+// Removed WorkflowSession interface - using local state management only
 
 export default function SimpleWorkflow() {
   const [currentStep, setCurrentStep] = useState(1);
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
 
-  // Enhanced workflow management
-  const [workflowSession, setWorkflowSession] =
-    useState<WorkflowSession | null>(null);
+  // Simplified workflow management - no server session for step 1
   const [workflowData, setWorkflowData] = useState<{
     csvData?: any;
+    batchName?: string;
     campaignData?: any;
     enrichmentData?: any;
     enrichmentResults?: any;
@@ -76,6 +63,9 @@ export default function SimpleWorkflow() {
   const [isPaused] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Step 1 specific state
+  const [batchName, setBatchName] = useState<string>('');
+
   // Email generation states
   const [showEmailGenerationSettings, setShowEmailGenerationSettings] =
     useState(false);
@@ -84,6 +74,9 @@ export default function SimpleWorkflow() {
   >([2]);
   const [isEmailGenerationStarting, setIsEmailGenerationStarting] =
     useState(false);
+
+  // Workflow session will only be created when needed in step 3
+  // Removed workflow session for local-only processing in step 1
 
   // Updated to 4 steps (combined step 2 and 3)
   const steps: WorkflowStep[] = [
@@ -121,47 +114,8 @@ export default function SimpleWorkflow() {
     },
   ];
 
-  const initializeWorkflow = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const response = await apiClient.post('/api/workflow/sessions', {
-        type: 'PROSPECT_ENRICHMENT',
-        configuration: {
-          steps: [
-            'UPLOAD_CSV',
-            'CAMPAIGN_SETTINGS',
-            'BEGIN_ENRICHMENT',
-            'EMAIL_GENERATION',
-          ],
-          settings: {
-            allowPause: true,
-            autoSave: true,
-            timeout: 3600000, // 1 hour
-          },
-        },
-      });
-
-      const data = await handleApiResponse(response);
-      if (data.success) {
-        setWorkflowSession(data.data);
-        setCurrentStep(data.data.progress.current + 1); // Convert to 1-based indexing
-      } else {
-        throw new Error(data.message || 'Failed to initialize workflow');
-      }
-    } catch (error) {
-      // Continue without workflow session for local development
-      console.log('🔄 Workflow running in local mode');
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  // Initialize workflow session when component mounts
-  useEffect(() => {
-    initializeWorkflow();
-  }, [initializeWorkflow]);
+  // Remove automatic workflow initialization - only create when needed in step 3
+  // useEffect removed
 
   const handleStepComplete = async (stepData: any) => {
     setIsLoading(true);
@@ -173,6 +127,7 @@ export default function SimpleWorkflow() {
 
       if (currentStep === 1) {
         updatedData.csvData = stepData;
+        updatedData.batchName = stepData.batchName;
 
         // Validate that we have valid prospect count
         if (!stepData.preview?.totalRows || stepData.preview.totalRows <= 0) {
@@ -182,7 +137,7 @@ export default function SimpleWorkflow() {
         }
 
         updatedData.prospectCount = stepData.preview.totalRows;
-        console.log('✅ Step 1 Complete - CSV Data:', stepData);
+        console.log('✅ Step 1 Complete - CSV Data with Batch Name:', stepData);
       } else if (currentStep === 2) {
         // Store campaign settings data
         updatedData.campaignData = stepData;
@@ -370,50 +325,56 @@ export default function SimpleWorkflow() {
       let actualProspectCount = 0;
       if (result.preview && result.preview.totalRows) {
         actualProspectCount = result.preview.totalRows;
-        console.log(
-          `📊 Found ${actualProspectCount} prospects in uploaded file`
-        );
+        console.log(`📊 Local CSV processing found ${actualProspectCount} prospects`);
       } else {
-        // If no preview, this means the upload failed - should not reach here after our fixes
-        const errorMsg = 'Upload completed but no prospect data was processed';
-        console.error('📊 No preview data found in upload result');
+        const errorMsg = 'CSV processing completed but no prospect data was found';
+        console.error('📊 No preview data found in processing result');
         throw new Error(errorMsg);
       }
 
       const stepData = {
-        uploadId: result.uploadId,
-        filename: result.filename,
+        // Generate local ID for step data tracking (no server upload)
+        localId: `local_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        filename: result.filename || 'uploaded-file.csv',
+        fileSize: result.fileSize || 0,
+        processedAt: new Date().toISOString(),
         preview: {
           totalRows: actualProspectCount,
-          validRows: actualProspectCount,
-          invalidRows: 0,
-          headers: result.preview?.headers || [
-            'First Name',
-            'Last Name',
-            'Email',
-            'Company',
-          ],
-          rows: result.preview?.rows || [], // ✅ Preserve the actual CSV data rows
+          validRows: result.preview.validRows || actualProspectCount,
+          invalidRows: result.preview.invalidRows || 0,
+          headers: result.preview.headers || [],
+          rows: result.preview.rows || [],
         },
+        // Store the raw file data for later upload in step 3
+        rawFileData: result.rawFileData || null,
       };
 
-      console.log(
-        `✅ Upload completed with ${stepData.preview.totalRows} prospects - ready for manual advance`
-      );
+      console.log(`✅ Local CSV processing completed with ${stepData.preview.totalRows} prospects - ready for next step`);
 
-      // Store the upload data but don't auto-advance
+      // Store the processed data locally and reset batch name for new upload
       setWorkflowData(prev => ({
         ...prev,
         csvData: stepData,
         prospectCount: stepData.preview.totalRows,
       }));
 
-      // Do NOT call handleStepComplete - let user manually advance
+      // Auto-fill batch name with timestamp format: Batch_DD-MMM-YY-HH:MM:SS
+      const now = new Date();
+      const day = now.getDate().toString().padStart(2, '0');
+      const month = now.toLocaleString('en', { month: 'short' });
+      const year = now.getFullYear().toString().slice(-2);
+      const hours = now.getHours().toString().padStart(2, '0');
+      const minutes = now.getMinutes().toString().padStart(2, '0');
+      const seconds = now.getSeconds().toString().padStart(2, '0');
+
+      const autoGeneratedBatchName = `Batch_${day}-${month}-${year}-${hours}:${minutes}:${seconds}`;
+      setBatchName(autoGeneratedBatchName);
+
     } catch (error) {
       const errorMessage =
         error instanceof Error
           ? error.message
-          : 'Failed to process upload result';
+          : 'Failed to process CSV file locally';
       setError(errorMessage);
     }
   }, []);
@@ -422,7 +383,31 @@ export default function SimpleWorkflow() {
     if (currentStep < steps.length) {
       // If moving from Step 1, complete the step with CSV data
       if (currentStep === 1 && workflowData.csvData) {
-        handleStepComplete(workflowData.csvData);
+        // Validate batch name
+        if (!batchName.trim()) {
+          setError('Please enter a batch name before proceeding to the next step');
+          return;
+        }
+
+        const step1Data = {
+          ...workflowData.csvData,
+          batchName: batchName.trim(),
+        };
+
+        console.log('🔄 Moving from Step 1 to Step 2');
+        console.log('📋 Data being passed to Step 2:', {
+          csvData: step1Data,
+          batchName: batchName.trim(),
+          prospectCount: workflowData.prospectCount,
+          filename: workflowData.csvData.filename,
+          headers: workflowData.csvData.preview.headers,
+          totalRows: workflowData.csvData.preview.totalRows,
+          validRows: workflowData.csvData.preview.validRows,
+          currentStep: 1,
+          nextStep: 2,
+          completedSteps: completedSteps
+        });
+        handleStepComplete(step1Data);
       }
       // If moving from Step 2, check campaign step readiness directly
       else if (currentStep === 2) {
@@ -534,8 +519,10 @@ export default function SimpleWorkflow() {
       <div className='space-y-8'>
         {/* Single Campaign Settings Section - includes AI model and enrichment services */}
         <CampaignSettingsStep
-          workflowSessionId={workflowSession?.id || 'local-session'}
+          workflowSessionId={'local-session'}
           prospectCount={workflowData.prospectCount}
+          csvData={workflowData.csvData}
+          batchName={workflowData.batchName || undefined}
           onError={handleStepError}
           disabled={isLoading || isPaused}
         />
@@ -544,12 +531,14 @@ export default function SimpleWorkflow() {
   };
 
   const renderStepContent = () => {
-    console.log(
-      '🔍 Current step:',
-      currentStep,
-      'Completed steps:',
-      completedSteps
-    );
+    // Only log step changes, not on every render
+    const stepKey = `${currentStep}-${completedSteps.join(',')}`;
+    const lastStepKey = React.useRef<string>('');
+
+    if (lastStepKey.current !== stepKey) {
+      console.log('🔍 Step changed:', { currentStep, completedSteps });
+      lastStepKey.current = stepKey;
+    }
 
     try {
       switch (currentStep) {
@@ -564,61 +553,126 @@ export default function SimpleWorkflow() {
                 disabled={isLoading}
               />
 
+              {/* Batch Name Input - Show after CSV upload */}
+              {workflowData.csvData && (
+                <Card>
+                  <CardContent className='p-6'>
+                    <div className='space-y-4'>
+                      <div>
+                        <Label htmlFor='batch-name' className='text-sm font-medium text-gray-700'>
+                          Batch Name *
+                        </Label>
+                        <Input
+                          id='batch-name'
+                          type='text'
+                          placeholder='Enter a name for this batch (e.g., "Q1 2024 Prospects")'
+                          value={batchName}
+                          onChange={(e) => setBatchName(e.target.value)}
+                          className='mt-1'
+                          disabled={isLoading}
+                        />
+                        <p className='text-xs text-gray-500 mt-1'>
+                          This name will help you identify this batch of prospects in your campaign.
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
               {/* Show CSV Preview after upload */}
               {workflowData.csvData && (
-                <div className='mt-6 p-6 bg-gray-50 rounded-lg'>
-                  <div className='flex items-center gap-2 mb-4'>
+                <div className='mt-6 space-y-6'>
+                  <div className='flex items-center gap-2'>
                     <CheckCircle className='h-5 w-5 text-green-500' />
                     <h3 className='text-lg font-semibold text-gray-900'>
                       CSV Upload Complete
                     </h3>
                   </div>
 
-                  <div className='grid grid-cols-1 md:grid-cols-3 gap-4 mb-4'>
-                    <div className='bg-white p-4 rounded-lg border'>
-                      <div className='text-2xl font-bold text-blue-600'>
-                        {workflowData.csvData.preview.totalRows}
-                      </div>
-                      <div className='text-sm text-gray-600'>
-                        Total Prospects
-                      </div>
-                    </div>
-                    <div className='bg-white p-4 rounded-lg border'>
-                      <div className='text-2xl font-bold text-green-600'>
-                        {workflowData.csvData.preview.validRows}
-                      </div>
-                      <div className='text-sm text-gray-600'>Valid Records</div>
-                    </div>
-                    <div className='bg-white p-4 rounded-lg border'>
-                      <div className='text-2xl font-bold text-gray-600'>
-                        {workflowData.csvData.filename}
-                      </div>
-                      <div className='text-sm text-gray-600'>File Name</div>
-                    </div>
+                  {/* Stats Cards */}
+                  <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
+                    <Card>
+                      <CardContent className='p-4'>
+                        <div className='text-2xl font-bold text-blue-600'>
+                          {workflowData.csvData.preview.totalRows}
+                        </div>
+                        <div className='text-sm text-gray-600'>
+                          Total Prospects
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardContent className='p-4'>
+                        <div className='text-2xl font-bold text-green-600'>
+                          {workflowData.csvData.preview.validRows}
+                        </div>
+                        <div className='text-sm text-gray-600'>Valid Records</div>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardContent className='p-4'>
+                        <div className='text-2xl font-bold text-gray-600 truncate'>
+                          {workflowData.csvData.filename}
+                        </div>
+                        <div className='text-sm text-gray-600'>File Name</div>
+                      </CardContent>
+                    </Card>
                   </div>
 
-                  {/* Headers Preview */}
-                  <div className='bg-white p-4 rounded-lg border'>
-                    <h4 className='font-medium text-gray-900 mb-2'>
-                      Detected Columns:
-                    </h4>
-                    <div className='flex flex-wrap gap-2'>
-                      {workflowData.csvData.preview.headers.map(
-                        (header: string, index: number) => (
-                          <span
-                            key={index}
-                            className='px-2 py-1 bg-blue-100 text-blue-800 text-sm rounded'
-                          >
-                            {header}
-                          </span>
-                        )
+                  {/* CSV Data Preview Table */}
+                  <Card>
+                    <CardContent className='p-6'>
+                      <h4 className='font-medium text-gray-900 mb-4'>
+                        Data Preview (First 5 Rows)
+                      </h4>
+                      <div className='overflow-x-auto border rounded-lg'>
+                        <table className='min-w-full divide-y divide-gray-200'>
+                          <thead className='bg-gray-50'>
+                            <tr>
+                              {workflowData.csvData.preview.headers.map(
+                                (header: string, index: number) => (
+                                  <th
+                                    key={index}
+                                    className='px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap'
+                                  >
+                                    {header}
+                                  </th>
+                                )
+                              )}
+                            </tr>
+                          </thead>
+                          <tbody className='bg-white divide-y divide-gray-200'>
+                            {workflowData.csvData.preview.rows.map(
+                              (row: string[], rowIndex: number) => (
+                                <tr key={rowIndex} className='hover:bg-gray-50'>
+                                  {row.map((cell: string, cellIndex: number) => (
+                                    <td
+                                      key={cellIndex}
+                                      className='px-4 py-3 text-sm text-gray-900 whitespace-nowrap max-w-xs truncate'
+                                      title={cell} // Show full content on hover
+                                    >
+                                      {cell || '-'}
+                                    </td>
+                                  ))}
+                                </tr>
+                              )
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                      {workflowData.csvData.preview.totalRows > 5 && (
+                        <p className='text-xs text-gray-500 mt-3'>
+                          Showing 5 of {workflowData.csvData.preview.totalRows} total rows
+                        </p>
                       )}
-                    </div>
-                  </div>
+                    </CardContent>
+                  </Card>
 
-                  <div className='mt-4 p-3 bg-blue-50 rounded-lg'>
-                    <p className='text-sm text-blue-800'>
-                      ✅ Your CSV file has been successfully processed. Click
+                  {/* Success Message */}
+                  <div className='p-4 bg-green-50 rounded-lg border border-green-200'>
+                    <p className='text-sm text-green-800'>
+                      ✅ Your CSV file has been successfully processed. Enter a batch name above and click
                       "Next" to continue with campaign configuration.
                     </p>
                   </div>
@@ -639,36 +693,33 @@ export default function SimpleWorkflow() {
             ...workflowData.campaignData
           };
 
-          console.log('🔍 [SimpleWorkflow] Rendering step 3 with data:', {
-            workflowSessionId: workflowSession?.id || 'local-session',
-            prospectCount: workflowData.prospectCount || 0,
-            campaignId: workflowData.campaignData?.campaignId,
-            csvFileInfo: workflowData.csvData,
-            enrichmentConfig: enrichmentConfig,
-            campaignData: workflowData.campaignData,
-          });
+          console.log('[SimpleWorkflow] Rendering Step 3 with data:');
+          console.log('  • Prospect Count:', workflowData.prospectCount || 0);
+          console.log('  • Campaign ID:', workflowData.campaignData?.campaignId);
+          console.log('  • CSV Data:', workflowData.csvData ? 'Available' : 'Missing');
+          console.log('  • AI Model:', enrichmentConfig?.selectedModel?.name || 'Not specified');
 
           return (
             <BeginEnrichmentStep
-              workflowSessionId={workflowSession?.id || 'local-session'}
               prospectCount={workflowData.prospectCount || 0}
               campaignId={workflowData.campaignData?.campaignId}
               csvFileInfo={workflowData.csvData}
               enrichmentConfig={enrichmentConfig}
+              stepData={workflowData}
               onStepComplete={handleStepComplete}
               onError={handleStepError}
               disabled={isLoading}
             />
           );
         case 4:
-          console.log('🔍 Rendering step 4 - Email Generation');
-          console.log('🔍 Current workflow data in step 4:', workflowData);
+          console.log('[SimpleWorkflow] Rendering Step 4 - Email Generation');
+          console.log('[SimpleWorkflow] Workflow data available:', !!workflowData);
+          console.log('[SimpleWorkflow] Enrichment data structure:', workflowData.enrichmentData);
 
           // If email generation has started, show the EmailGenerationStep component
           if (workflowData.emailGenerationJobId) {
             return (
               <EmailGenerationStep
-                workflowSessionId={workflowSession?.id || 'local-session'}
                 prospectCount={workflowData.prospectCount || 0}
                 campaignId={workflowData.campaignData?.campaignId}
                 emailGenerationJobId={workflowData.emailGenerationJobId}
@@ -890,7 +941,8 @@ export default function SimpleWorkflow() {
               disabled={
                 currentStep === steps.length ||
                 isLoading ||
-                (currentStep === 1 && !workflowData.csvData)
+                (currentStep === 1 && !workflowData.csvData) ||
+                (currentStep === 3 && !workflowData.enrichmentResults)
               }
               className='flex items-center'
             >

@@ -29,7 +29,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Plus,
   Search,
-  Upload,
   Eye,
   Trash2,
   RefreshCw,
@@ -359,10 +358,6 @@ export default function Prospects() {
           <Button variant='outline' onClick={() => loadProspects()}>
             <RefreshCw className='h-4 w-4 mr-2' />
             Refresh
-          </Button>
-          <Button variant='outline'>
-            <Upload className='h-4 w-4 mr-2' />
-            Import
           </Button>
           <Button onClick={() => setIsAddProspectOpen(true)}>
             <Plus className='h-4 w-4 mr-2' />
@@ -1197,7 +1192,7 @@ export default function Prospects() {
                                       try {
                                         if (
                                           typeof selectedEnrichment.techStack ===
-                                            'object' &&
+                                          'object' &&
                                           selectedEnrichment.techStack !== null
                                         ) {
                                           const techStackEntries =
@@ -1408,15 +1403,14 @@ export default function Prospects() {
                                     </span>
                                   </div>
                                   <Badge
-                                    className={`px-2 py-1 text-xs font-medium ${
-                                      generatedEmail.generationStatus ===
+                                    className={`px-2 py-1 text-xs font-medium ${generatedEmail.generationStatus ===
                                       'COMPLETED'
-                                        ? 'bg-green-100 text-green-800'
-                                        : generatedEmail.generationStatus ===
-                                            'FAILED'
-                                          ? 'bg-red-100 text-red-800'
-                                          : 'bg-yellow-100 text-yellow-800'
-                                    }`}
+                                      ? 'bg-green-100 text-green-800'
+                                      : generatedEmail.generationStatus ===
+                                        'FAILED'
+                                        ? 'bg-red-100 text-red-800'
+                                        : 'bg-yellow-100 text-yellow-800'
+                                      }`}
                                   >
                                     {generatedEmail.generationStatus}
                                   </Badge>

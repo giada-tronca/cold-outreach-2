@@ -454,12 +454,13 @@ export class ProspectEnricher {
                             role: 'user',
                             content: finalPrompt
                         }
-                    ],
-                    max_completion_tokens: 8000 // Increased from 2000 to handle O1-Mini reasoning + response
+                    ]
                 }, {
                     headers: {
                         'Authorization': `Bearer ${apiKey}`,
-                        'Content-Type': 'application/json'
+                        'Content-Type': 'application/json',
+                        'HTTP-Referer': process.env.SITE_URL || 'http://localhost:3001',
+                        'X-Title': 'Cold Outreach AI'
                     },
                     timeout: 120000 // Increased from 90s to 120s for O1-Mini reasoning
                 })
@@ -1038,13 +1039,13 @@ export class ProspectEnricher {
                             role: 'user',
                             content: prompt
                         }
-                    ],
-                    max_completion_tokens: 2500 // Increased for tech stack analysis + reasoning
-                    // Note: temperature is not supported by o1-mini model
+                    ]
                 }, {
                     headers: {
                         'Authorization': `Bearer ${apiKey}`,
-                        'Content-Type': 'application/json'
+                        'Content-Type': 'application/json',
+                        'HTTP-Referer': process.env.SITE_URL || 'http://localhost:3001',
+                        'X-Title': 'Cold Outreach AI'
                     },
                     timeout: 90000 // 90 seconds - o1-mini needs more time for reasoning
                 })
@@ -1472,8 +1473,7 @@ export class ProspectEnricher {
                         messages: [{
                             role: 'user',
                             content: prompt
-                        }],
-                        max_tokens: 3000,
+                        }]
                     };
                     break;
 
@@ -1488,13 +1488,13 @@ export class ProspectEnricher {
                             content: prompt
                         }],
                         max_tokens: 3000,
-                        temperature: 0.7,
+                        temperature: 0.7
                     };
                     break;
 
                 case 'openrouter-gemini-2.5-flash':
-                    modelId = 'google/gemini-2.0-flash-001';
-                    modelName = 'gemini-2.0-flash-001';
+                    modelId = 'google/gemini-2.5-flash';
+                    modelName = 'gemini-2.5-flash';
                     // Gemini models support temperature
                     requestBody = {
                         model: modelId,
@@ -1503,7 +1503,7 @@ export class ProspectEnricher {
                             content: prompt
                         }],
                         max_tokens: 3000,
-                        temperature: 0.7,
+                        temperature: 0.7
                     };
                     break;
 
@@ -1516,8 +1516,7 @@ export class ProspectEnricher {
                         messages: [{
                             role: 'user',
                             content: prompt
-                        }],
-                        max_tokens: 3000,
+                        }]
                     };
                     break;
             }
@@ -1528,8 +1527,7 @@ export class ProspectEnricher {
                 messages: [{
                     role: 'user',
                     content: prompt
-                }],
-                max_tokens: 3000,
+                }]
             };
         }
 
@@ -1544,7 +1542,9 @@ export class ProspectEnricher {
                     {
                         headers: {
                             'Authorization': `Bearer ${apiKey}`,
-                            'Content-Type': 'application/json'
+                            'Content-Type': 'application/json',
+                            'HTTP-Referer': process.env.SITE_URL || 'http://localhost:3001',
+                            'X-Title': 'Cold Outreach AI'
                         },
                         timeout: 120000 // 120 seconds - prospect analysis is the most complex task
                     }

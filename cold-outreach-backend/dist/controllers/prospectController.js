@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.associateProspectsWithCampaign = exports.deleteProspect = exports.updateProspect = exports.createProspect = exports.getGeneratedEmailByProspectId = exports.getProspectById = exports.getAllProspects = exports.ProspectController = void 0;
+exports.associateProspectsWithCampaign = exports.getProspectStats = exports.deleteProspect = exports.updateProspect = exports.createProspect = exports.getGeneratedEmailByProspectId = exports.getProspectById = exports.getAllProspects = exports.ProspectController = void 0;
 const apiResponse_1 = require("../utils/apiResponse");
 const database_1 = require("../config/database");
 // interface ProspectData {
@@ -346,6 +346,138 @@ class ProspectController {
             apiResponse_1.ApiResponseBuilder.error(res, 'Failed to fetch generated email');
         }
     }
+    async deleteProspect(req, res) {
+        try {
+            const { id } = req.params;
+            if (!id) {
+                apiResponse_1.ApiResponseBuilder.badRequest(res, 'Prospect ID is required');
+                return;
+            }
+            const prospectId = parseInt(id);
+            if (isNaN(prospectId)) {
+                apiResponse_1.ApiResponseBuilder.badRequest(res, 'Invalid prospect ID');
+                return;
+            }
+            // Check if prospect exists
+            const existingProspect = await database_1.prisma.cOProspects.findUnique({
+                where: { id: prospectId },
+            });
+            if (!existingProspect) {
+                apiResponse_1.ApiResponseBuilder.notFound(res, 'Prospect not found');
+                return;
+            }
+            // Delete related records first to avoid foreign key constraint issues
+            await database_1.prisma.$transaction(async (tx) => {
+                // Delete enrichment record if exists
+                await tx.cOProspectEnrichments.deleteMany({
+                    where: { prospectId: prospectId },
+                });
+                // Delete generated email record if exists
+                await tx.cOGeneratedEmails.deleteMany({
+                    where: { prospectId: prospectId },
+                });
+                // Finally delete the prospect
+                await tx.cOProspects.delete({
+                    where: { id: prospectId },
+                });
+            });
+            apiResponse_1.ApiResponseBuilder.success(res, { deletedProspectId: prospectId }, 'Prospect deleted successfully');
+        }
+        catch (error) {
+            logger.error('Error deleting prospect:', error);
+            apiResponse_1.ApiResponseBuilder.error(res, 'Failed to delete prospect');
+        }
+    }
+    async getProspectStats(req, res) {
+        try {
+            console.log('📊 Getting prospect statistics...');
+            // Get current date and last month date
+            const now = new Date();
+            const lastMonth = new Date();
+            lastMonth.setMonth(now.getMonth() - 1);
+            // Get total prospects
+            const totalProspects = await database_1.prisma.cOProspects.count();
+            // Get prospects enriched (status = ENRICHED or EMAIL_GENERATED or COMPLETED)
+            const enrichedProspects = await database_1.prisma.cOProspects.count({
+                where: {
+                    status: {
+                        in: ['ENRICHED', 'EMAIL_GENERATED', 'COMPLETED']
+                    }
+                }
+            });
+            // Get prospects with emails generated (status = EMAIL_GENERATED or COMPLETED)
+            const emailsGenerated = await database_1.prisma.cOProspects.count({
+                where: {
+                    status: {
+                        in: ['EMAIL_GENERATED', 'COMPLETED']
+                    }
+                }
+            });
+            // Get last month statistics for comparison
+            const totalProspectsLastMonth = await database_1.prisma.cOProspects.count({
+                where: {
+                    createdAt: {
+                        gte: lastMonth,
+                        lt: now
+                    }
+                }
+            });
+            const enrichedProspectsLastMonth = await database_1.prisma.cOProspects.count({
+                where: {
+                    status: {
+                        in: ['ENRICHED', 'EMAIL_GENERATED', 'COMPLETED']
+                    },
+                    createdAt: {
+                        gte: lastMonth,
+                        lt: now
+                    }
+                }
+            });
+            const emailsGeneratedLastMonth = await database_1.prisma.cOProspects.count({
+                where: {
+                    status: {
+                        in: ['EMAIL_GENERATED', 'COMPLETED']
+                    },
+                    createdAt: {
+                        gte: lastMonth,
+                        lt: now
+                    }
+                }
+            });
+            // Calculate percentage changes
+            const totalProspectsChange = totalProspectsLastMonth > 0
+                ? ((totalProspects - totalProspectsLastMonth) / totalProspectsLastMonth) * 100
+                : 0;
+            const enrichedProspectsChange = enrichedProspectsLastMonth > 0
+                ? ((enrichedProspects - enrichedProspectsLastMonth) / enrichedProspectsLastMonth) * 100
+                : 0;
+            const emailsGeneratedChange = emailsGeneratedLastMonth > 0
+                ? ((emailsGenerated - emailsGeneratedLastMonth) / emailsGeneratedLastMonth) * 100
+                : 0;
+            const stats = {
+                totalProspects,
+                enrichedProspects,
+                emailsGenerated,
+                changes: {
+                    totalProspects: Math.round(totalProspectsChange * 100) / 100,
+                    enrichedProspects: Math.round(enrichedProspectsChange * 100) / 100,
+                    emailsGenerated: Math.round(emailsGeneratedChange * 100) / 100,
+                }
+            };
+            console.log('📊 Prospect stats:', stats);
+            apiResponse_1.ApiResponseBuilder.success(res, stats, 'Prospect statistics retrieved successfully');
+        }
+        catch (error) {
+            logger.error('Error getting prospect statistics:', error);
+            apiResponse_1.ApiResponseBuilder.error(res, 'Failed to get prospect statistics');
+        }
+    }
+    async createProspect(req, res) {
+        apiResponse_1.ApiResponseBuilder.error(res, 'Create prospect functionality is temporarily disabled', 501);
+    }
+    async updateProspect(req, res) {
+        apiResponse_1.ApiResponseBuilder.error(res, 'Update prospect functionality is temporarily disabled', 501);
+    }
 }
 exports.ProspectController = ProspectController;
 // Export controller functions for use in routes
@@ -353,60 +485,10 @@ const controller = new ProspectController();
 exports.getAllProspects = controller.getProspects.bind(controller);
 exports.getProspectById = controller.getProspectById.bind(controller);
 exports.getGeneratedEmailByProspectId = controller.getGeneratedEmailByProspectId.bind(controller);
-// Placeholder functions for disabled functionality
-const createProspect = async (req, res) => {
-    apiResponse_1.ApiResponseBuilder.error(res, 'Create prospect functionality is temporarily disabled', 501);
-};
-exports.createProspect = createProspect;
-const updateProspect = async (req, res) => {
-    apiResponse_1.ApiResponseBuilder.error(res, 'Update prospect functionality is temporarily disabled', 501);
-};
-exports.updateProspect = updateProspect;
-const deleteProspect = async (req, res) => {
-    try {
-        const { id } = req.params;
-        if (!id) {
-            apiResponse_1.ApiResponseBuilder.badRequest(res, 'Prospect ID is required');
-            return;
-        }
-        const prospectId = parseInt(id);
-        if (isNaN(prospectId)) {
-            apiResponse_1.ApiResponseBuilder.badRequest(res, 'Invalid prospect ID');
-            return;
-        }
-        logger.info(`Attempting to delete prospect ${prospectId}`);
-        // Check if prospect exists
-        const existingProspect = await database_1.prisma.prospect.findUnique({
-            where: { id: prospectId },
-        });
-        if (!existingProspect) {
-            apiResponse_1.ApiResponseBuilder.notFound(res, 'Prospect not found');
-            return;
-        }
-        // Delete prospect and all associated data using transaction
-        await database_1.prisma.$transaction(async (tx) => {
-            // Delete generated email if exists
-            await tx.generatedEmail.deleteMany({
-                where: { prospectId },
-            });
-            // Delete enrichment data if exists
-            await tx.prospectEnrichment.deleteMany({
-                where: { prospectId },
-            });
-            // Delete the prospect
-            await tx.prospect.delete({
-                where: { id: prospectId },
-            });
-        });
-        logger.info(`Successfully deleted prospect ${prospectId}`);
-        apiResponse_1.ApiResponseBuilder.success(res, { id: prospectId }, 'Prospect deleted successfully');
-    }
-    catch (error) {
-        logger.error('Error deleting prospect:', error);
-        apiResponse_1.ApiResponseBuilder.error(res, 'Failed to delete prospect');
-    }
-};
-exports.deleteProspect = deleteProspect;
+exports.createProspect = controller.createProspect.bind(controller);
+exports.updateProspect = controller.updateProspect.bind(controller);
+exports.deleteProspect = controller.deleteProspect.bind(controller);
+exports.getProspectStats = controller.getProspectStats.bind(controller);
 /**
  * Associate prospects with a campaign
  * This is used when a campaign is created after prospects are uploaded

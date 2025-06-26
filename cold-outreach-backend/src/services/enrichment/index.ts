@@ -4,6 +4,7 @@ import { ProxycurlService, EnrichedPersonData, EnrichedCompanyData } from './pro
 import { FirecrawlService, CompanyWebsiteData } from './firecrawlService'
 import { BuiltWithService, TechStackData } from './builtwithService'
 import { DatabaseError } from '@/utils/errors'
+import { extractDomainFromEmail } from '@/utils/emailHelpers'
 
 export interface EnrichmentResult {
     prospectId: number
@@ -373,10 +374,7 @@ export class EnrichmentService {
 
         // Try to extract from prospect email domain
         if (prospect.email) {
-            const emailDomain = prospect.email.split('@')[1]
-            if (emailDomain && !['gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com'].includes(emailDomain)) {
-                return emailDomain
-            }
+            return extractDomainFromEmail(prospect.email)
         }
 
         return null

@@ -12,7 +12,8 @@ import {
     getGeneratedEmailByProspectId,
     createProspect,
     updateProspect,
-    deleteProspect
+    deleteProspect,
+    getProspectStats
 } from '../../controllers/prospectController'
 
 const router = Router()
@@ -131,8 +132,9 @@ router.post('/bulk', validate([
     }
 });
 
-// Basic prospect routes
+// Main prospect CRUD routes
 router.get('/', getAllProspects)
+router.get('/stats', getProspectStats)
 router.get('/:id', getProspectById)
 router.get('/:prospectId/generated-email', getGeneratedEmailByProspectId)
 router.post('/', createProspect)

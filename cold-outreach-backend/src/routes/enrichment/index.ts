@@ -1,21 +1,18 @@
 import { Router, Request, Response } from 'express'
-
 import { prisma } from '@/config/database'
 import { ApiResponseBuilder } from '@/utils/apiResponse'
-import { asyncHandler } from '@/middleware/asyncHandler'
+import { asyncHandler } from '@/middleware'
 import { BadRequestError, NotFoundError } from '@/utils/errors'
-import { Prisma, COProspects, COBatches } from '@prisma/client'
 import { prospectEnrichmentQueue, ProspectEnrichmentJobData } from '@/jobs/queues'
 import { extractProspectFromRow } from '../../utils/csvHelpers'
 import { v4 as uuidv4 } from 'uuid'
-
 
 const router = Router()
 
 // In-memory job storage (replace with Redis/database in production)
 interface EnrichmentJob {
     id: string
-    workflowSessionId: string
+    workflowSessionId?: string
     status: 'pending' | 'running' | 'paused' | 'completed' | 'completed_with_errors' | 'failed' | 'cancelled'
     totalProspects: number
     processedProspects: number
@@ -308,346 +305,132 @@ export async function updateEnrichmentJobProgress(workflowSessionId: string, pro
  * Create enrichment jobs using proper BullMQ background job system
  */
 router.post('/jobs', asyncHandler(async (req: Request, res: Response) => {
-    const { workflowSessionId, configuration, campaignId, prospectIds, csvData } = req.body;
+    const { configuration, campaignId, csvData } = req.body;
 
-    if (!workflowSessionId || !configuration) {
-        throw new BadRequestError('Missing required fields: workflowSessionId and configuration');
+    if (!configuration) {
+        throw new BadRequestError('Missing required field: configuration');
     }
 
     if (!campaignId) {
         throw new BadRequestError('Campaign ID is required');
     }
 
-    let dbProspects: COProspects[];
-    let batch: COBatches | null = null;
+    if (!csvData || !Array.isArray(csvData) || csvData.length === 0) {
+        throw new BadRequestError('CSV data is required for enrichment');
+    }
 
-    // STEP 1: Create batch FIRST when starting enrichment
-    console.log('📋 [Enrichment]: Creating batch for enrichment session FIRST');
+    // STEP 1: Create batch FIRST (no prospect creation at this stage)
+    console.log('📋 [Enrichment]: Creating batch for enrichment session');
     const batchName = `Enrichment Batch - ${new Date().toISOString()}`;
 
-    batch = await prisma.cOBatches.create({
+    const batch = await prisma.cOBatches.create({
         data: {
             name: batchName,
             campaign: {
                 connect: { id: parseInt(campaignId) }
             },
             status: 'PROCESSING',
-            totalProspects: 0 // Will be updated after prospect processing
+            totalProspects: csvData.length // Set total from CSV data
         }
     });
     console.log('✅ [Enrichment]: Created batch', batch.id);
 
-    // Store warnings for mixed scenarios (some created, some skipped)
-    let processingWarnings: string[] = [];
-
-    // STEP 2: Handle CSV processing if CSV data is provided
-    if (csvData && Array.isArray(csvData) && csvData.length > 0) {
-        console.log(`📊 [Enrichment]: Processing CSV data with ${csvData.length} rows`);
-
-        // Create prospects from CSV data
-        const prospectsToCreate = csvData.map((row: Record<string, any>, index: number) => {
-            console.log(`🔍 [CSV Debug]: Processing row ${index}:`, row);
-            const prospectData = extractProspectFromRow(row);
-            console.log(`🔍 [CSV Debug]: Extracted prospect data for row ${index}:`, prospectData);
-
-            // Ensure required fields have default values
-            const createData: Prisma.COProspectsUncheckedCreateInput = {
-                name: prospectData.name || `Prospect-${index}`, // Provide default name since it's required
-                email: prospectData.email || `prospect-${index}-${Date.now()}@placeholder.com`, // Default email to prevent type error
-                company: prospectData.company || undefined,
-                position: prospectData.position || undefined,
-                linkedinUrl: prospectData.linkedinUrl || undefined,
-                status: 'PENDING' as const,
-                campaignId: parseInt(campaignId),
-                batchId: batch.id,
-                createdAt: new Date(),
-                updatedAt: new Date(),
-                usesFallback: false,
-                additionalData: {
-                    ...prospectData.additionalData,
-                    csvRowIndex: index,
-                    uploadSession: workflowSessionId
-                }
-            };
-
-            console.log(`🔍 [CSV Debug]: Final create data for row ${index}:`, {
-                name: createData.name,
-                email: createData.email,
-                company: createData.company,
-                position: createData.position,
-                linkedinUrl: createData.linkedinUrl
-            });
-
-            return createData;
-        });
-
-        // Create prospects with proper typing and error handling
-        console.log(`👥 [Enrichment]: Creating ${prospectsToCreate.length} prospects`);
-
-        let prospectsCreated = 0;
-        let prospectsSkipped = 0;
-        const skippedReasons: string[] = [];
-
-        // Use transaction to ensure data consistency
-        await prisma.$transaction(async (prismaClient: Prisma.TransactionClient) => {
-            for (const prospectData of prospectsToCreate) {
-                try {
-                    // Check for duplicates
-                    if (prospectData.email) {
-                        const existingProspect = await prismaClient.cOProspects.findFirst({
-                            where: {
-                                email: prospectData.email,
-                                campaignId: parseInt(campaignId),
-                            },
-                        });
-
-                        if (existingProspect) {
-                            console.log(`⚠️ [Enrichment]: Skipping duplicate email: ${prospectData.email}`);
-                            prospectsSkipped++;
-                            skippedReasons.push(`Duplicate email: ${prospectData.email}`);
-                            continue;
-                        }
-                    }
-
-                    await prismaClient.cOProspects.create({
-                        data: prospectData,
-                    });
-                    prospectsCreated++;
-                } catch (error) {
-                    console.error(`❌ [Enrichment]: Error creating prospect:`, error);
-                    prospectsSkipped++;
-                    skippedReasons.push(`Creation error for ${prospectData.email || 'unknown email'}: ${error instanceof Error ? error.message : 'Unknown error'}`);
-                }
-            }
-
-            // Update batch with actual prospect count
-            await prismaClient.cOBatches.update({
-                where: { id: batch.id },
-                data: { totalProspects: prospectsCreated }
-            });
-        });
-
-        console.log(`✅ [Enrichment]: CSV processing completed - ${prospectsCreated} created, ${prospectsSkipped} skipped`);
-
-        // Get the newly created prospects for enrichment
-        dbProspects = await prisma.cOProspects.findMany({
-            where: {
-                batchId: batch.id
-            }
-        });
-        console.log(`🔍 [Enrichment]: Found ${dbProspects.length} newly created prospects for enrichment`);
-
-        // Enhanced error handling for cases where no prospects were created
-        if (dbProspects.length === 0 && prospectsSkipped > 0) {
-            const duplicateEmails = skippedReasons.filter(reason => reason.includes('Duplicate email')).length;
-            const errorReasons = skippedReasons.filter(reason => reason.includes('Creation error')).length;
-
-            let errorMessage = `No new prospects were created from your CSV file. `;
-
-            if (duplicateEmails > 0) {
-                errorMessage += `${duplicateEmails} prospect(s) were skipped because they already exist in this campaign. `;
-            }
-
-            if (errorReasons > 0) {
-                errorMessage += `${errorReasons} prospect(s) failed to create due to validation errors. `;
-            }
-
-            errorMessage += `\n\nDetails:\n${skippedReasons.slice(0, 5).join('\n')}`;
-
-            if (skippedReasons.length > 5) {
-                errorMessage += `\n... and ${skippedReasons.length - 5} more issues`;
-            }
-
-            errorMessage += `\n\nSolutions:\n`;
-            if (duplicateEmails > 0) {
-                errorMessage += `• Remove duplicate emails from your CSV file\n`;
-                errorMessage += `• Use a different campaign for these prospects\n`;
-                errorMessage += `• Or proceed with enriching existing prospects in this campaign\n`;
-            }
-            if (errorReasons > 0) {
-                errorMessage += `• Check your CSV file format and fix validation errors\n`;
-                errorMessage += `• Ensure all required fields are properly filled\n`;
-            }
-
-            throw new BadRequestError(errorMessage);
-        }
-
-        // Handle warnings for mixed scenarios (some created, some skipped)
-        if (prospectsCreated > 0 && prospectsSkipped > 0) {
-            const duplicateEmails = skippedReasons.filter(reason => reason.includes('Duplicate email')).length;
-            const errorReasons = skippedReasons.filter(reason => reason.includes('Creation error')).length;
-
-            let warningMessage = `Successfully created ${prospectsCreated} new prospects, but ${prospectsSkipped} were skipped:\n`;
-
-            if (duplicateEmails > 0) {
-                warningMessage += `• ${duplicateEmails} duplicates found (already exist in this campaign)\n`;
-            }
-            if (errorReasons > 0) {
-                warningMessage += `• ${errorReasons} failed validation\n`;
-            }
-
-            // Add first few specific reasons
-            if (skippedReasons.length > 0) {
-                warningMessage += `\nSkipped details:\n${skippedReasons.slice(0, 3).join('\n')}`;
-                if (skippedReasons.length > 3) {
-                    warningMessage += `\n... and ${skippedReasons.length - 3} more`;
-                }
-            }
-
-            processingWarnings.push(warningMessage);
-            console.log(`⚠️ [Enrichment]: ${warningMessage}`);
-        }
-    } else if (prospectIds && Array.isArray(prospectIds) && prospectIds.length > 0) {
-        // Get specific prospects by IDs
-        dbProspects = await prisma.cOProspects.findMany({
-            where: {
-                id: { in: prospectIds.map(id => parseInt(id)) }
-            }
-        });
-
-        if (dbProspects.length > 0) {
-            // Update batch with prospect count and assign prospects to batch
-            await prisma.$transaction([
-                prisma.cOProspects.updateMany({
-                    where: {
-                        id: { in: dbProspects.map((p: COProspects) => p.id) }
-                    },
-                    data: {
-                        batchId: batch.id
-                    }
-                }),
-                prisma.cOBatches.update({
-                    where: { id: batch.id },
-                    data: { totalProspects: dbProspects.length }
-                })
-            ]);
-            console.log(`✅ [Enrichment]: Assigned batch ${batch.id} to ${dbProspects.length} existing prospects`);
-        }
-    } else {
-        throw new BadRequestError('Either campaignId with csvData, or prospectIds is required');
-    }
-
-    // Enhanced error handling for empty prospect lists
-    if (dbProspects.length === 0) {
-        // Check if we have any prospects in this campaign at all
-        const existingProspects = await prisma.cOProspects.count({
-            where: { campaignId: parseInt(campaignId) }
-        });
-
-        let errorMessage = 'No prospects found to enrich. ';
-
-        if (existingProspects === 0) {
-            errorMessage += 'This campaign has no prospects yet. Please upload a CSV file with prospect data first.';
-        } else {
-            errorMessage += `This campaign has ${existingProspects} existing prospects, but none were selected for enrichment. `;
-            errorMessage += 'This usually happens when:\n';
-            errorMessage += '• All prospects in your CSV already exist in this campaign\n';
-            errorMessage += '• Your CSV file contains invalid or incomplete prospect data\n';
-            errorMessage += '• The prospects were filtered out due to validation errors\n\n';
-            errorMessage += 'Solutions:\n';
-            errorMessage += '• Upload a CSV with new, unique prospects\n';
-            errorMessage += '• Use the existing prospects in this campaign for enrichment\n';
-            errorMessage += '• Check your CSV file format and data quality';
-        }
-
-        throw new BadRequestError(errorMessage);
-    }
+    // STEP 2: Individual Job Creation - Create parallel jobs based on concurrency setting
+    console.log(`📊 [Enrichment]: Processing ${csvData.length} prospects from CSV data`);
 
     // Validate and prepare enrichment configuration
-    const concurrency = Math.max(1, Math.min(configuration.concurrency || 3, 10)); // Limit to 10 max
+    const concurrency = Math.max(1, Math.min(configuration.concurrency || 2, 10)); // Limit to 10 max
     const aiProvider = configuration.aiProvider || 'openrouter';
     const llmModelId = configuration.llmModelId;
+    const services = configuration.services || [];
 
-    console.log(`🚀 [Enrichment]: Creating ${concurrency} parallel enrichment jobs for ${dbProspects.length} prospects`);
+    console.log(`🚀 [Enrichment]: Creating ${concurrency} parallel enrichment jobs for ${csvData.length} prospects`);
+    console.log(`🤖 [Enrichment]: Using AI provider: ${aiProvider}${llmModelId ? ` (${llmModelId})` : ''}`);
+    console.log(`🔧 [Enrichment]: Services enabled: ${services.join(', ')}`);
 
-    // Create individual enrichment jobs based on concurrency
+    // Create individual enrichment jobs based on concurrency setting
     const batchId = `batch-${Date.now()}`;
-    const prospectsPerJob = Math.ceil(dbProspects.length / concurrency);
     const jobPromises = [];
 
-    for (let i = 0; i < dbProspects.length; i += prospectsPerJob) {
-        const jobProspects = dbProspects.slice(i, i + prospectsPerJob);
+    // Create jobs for each prospect from CSV data (no database creation yet)
+    for (let i = 0; i < csvData.length; i++) {
+        const prospectData = csvData[i];
 
-        // Create individual jobs for each prospect in this batch
-        for (const prospect of jobProspects) {
-            const typedProspect = prospect as COProspects;
+        // Extract prospect information from CSV row
+        const extractedProspect = extractProspectFromRow(prospectData);
 
-            // Check which services are requested
-            const services = configuration.services || [];
-            const requestedServices = Array.isArray(services) ? services : Object.keys(services).filter(key => services[key]);
+        // Determine what enrichment we can do for this prospect
+        const canEnrichLinkedIn = !!(extractedProspect.linkedinUrl && services.includes('LinkedIn'));
+        const canEnrichCompany = !!(extractedProspect.company && services.includes('Company'));
+        const canEnrichTechStack = !!(extractedProspect.company && services.includes('TechStack'));
 
-            // Determine what enrichment we can do for this prospect
-            const canEnrichLinkedIn = !!(typedProspect.linkedinUrl &&
-                (requestedServices.includes('LinkedIn') || requestedServices.includes('proxycurl')));
-
-            const canEnrichCompany = !!(typedProspect.company &&
-                (requestedServices.includes('Company') || requestedServices.includes('firecrawl')));
-
-            const canEnrichTechStack = !!(typedProspect.company &&
-                (requestedServices.includes('TechStack') || requestedServices.includes('builtwith')));
-
-            // Skip if we can't do any enrichment for this prospect
-            if (!canEnrichLinkedIn && !canEnrichCompany && !canEnrichTechStack) {
-                console.log(`⚠️ [Enrichment]: Skipping prospect ${typedProspect.id} - no enrichment possible with available data`);
-                continue;
+        // Create job data for this prospect
+        const jobData: ProspectEnrichmentJobData = {
+            prospectId: `csv-${i}`, // Temporary ID for CSV prospects
+            userId: 'default-user', // Use consistent userId for now - TODO: Get from auth context
+            linkedinUrl: extractedProspect.linkedinUrl || '',
+            aiProvider: aiProvider as 'gemini' | 'openrouter',
+            llmModelId,
+            enrichmentOptions: {
+                includeCompanyInfo: canEnrichCompany,
+                includePersonalInfo: canEnrichLinkedIn,
+                includeContactDetails: canEnrichLinkedIn,
+                includeSocialProfiles: canEnrichLinkedIn
+            },
+            services: {
+                proxycurl: canEnrichLinkedIn,
+                firecrawl: canEnrichCompany,
+                builtwith: canEnrichTechStack
+            },
+            configuration: {
+                websitePages: configuration.websitePages || 3,
+                retryAttempts: configuration.retryAttempts || 2,
+                concurrency: concurrency
+            },
+            // Include CSV data for prospect creation during processing
+            csvData: {
+                ...extractedProspect,
+                campaignId: parseInt(campaignId),
+                batchId: batch.id,
+                csvRowIndex: i
             }
+        };
 
-            // Skip if LinkedIn enrichment is needed but no URL is available (since linkedinUrl is required in the job data)
-            if (canEnrichLinkedIn && !typedProspect.linkedinUrl) {
-                console.log(`⚠️ [Enrichment]: Skipping prospect ${typedProspect.id} - LinkedIn enrichment requested but no LinkedIn URL available`);
-                continue;
-            }
-
-            const jobData: ProspectEnrichmentJobData = {
-                prospectId: typedProspect.id.toString(),
-                userId: 'system', // TODO: Get from auth context
-                linkedinUrl: typedProspect.linkedinUrl || '', // Provide empty string as fallback since it's required
-                aiProvider: aiProvider as 'gemini' | 'openrouter',
-                llmModelId,
-                workflowSessionId,
-                enrichmentOptions: {
-                    includeCompanyInfo: canEnrichCompany,
-                    includePersonalInfo: canEnrichLinkedIn,
-                    includeContactDetails: canEnrichLinkedIn,
-                    includeSocialProfiles: canEnrichLinkedIn
-                },
-                services: {
-                    proxycurl: canEnrichLinkedIn,
-                    firecrawl: canEnrichCompany,
-                    builtwith: canEnrichTechStack
-                }
-            };
-
-            jobPromises.push(
-                prospectEnrichmentQueue.add(
-                    `enrichment-${batchId}-${typedProspect.id}`,
-                    jobData,
-                    {
-                        attempts: 3,
-                        backoff: {
-                            type: 'exponential',
-                            delay: 5000
-                        }
+        // Add job to queue
+        jobPromises.push(
+            prospectEnrichmentQueue.add(
+                `enrichment-${batchId}-csv-${i}`,
+                jobData,
+                {
+                    attempts: configuration.retryAttempts || 2,
+                    backoff: {
+                        type: 'exponential',
+                        delay: 5000
                     }
-                )
-            );
+                }
+            )
+        );
+
+        // If we've created 'concurrency' number of jobs, wait a bit before creating more
+        // This ensures parallel processing according to user's setting
+        if ((i + 1) % concurrency === 0) {
+            console.log(`⚡ [Enrichment]: Created batch of ${concurrency} jobs (${i + 1}/${csvData.length})`);
         }
     }
 
     const createdJobs = await Promise.all(jobPromises);
-    console.log(`✅ [Enrichment]: Created ${createdJobs.length} individual enrichment jobs`);
+    console.log(`✅ [Enrichment]: Created ${createdJobs.length} individual enrichment jobs with ${concurrency} parallel processing`);
 
     // Create a batch tracking record
     const batchJob: EnrichmentJob = {
         id: batchId,
-        workflowSessionId,
         status: 'running',
-        totalProspects: dbProspects.length,
+        totalProspects: csvData.length,
         processedProspects: 0,
         completedProspects: 0,
         failedProspects: 0,
         currentBatch: 1,
-        totalBatches: Math.ceil(dbProspects.length / concurrency),
+        totalBatches: Math.ceil(csvData.length / concurrency),
         progress: 0,
         startedAt: new Date().toISOString(),
         processingRate: 0,
@@ -658,37 +441,27 @@ router.post('/jobs', asyncHandler(async (req: Request, res: Response) => {
             aiProvider,
             llmModelId
         },
-        prospects: dbProspects.map(prospect => ({
-            id: prospect.id.toString(),
-            name: prospect.name || '',
-            email: prospect.email || '',
-            company: prospect.company || '',
-            title: prospect.position || '',
-            status: 'pending',
-            progress: 0,
-            retryCount: 0
-        })),
+        prospects: csvData.map((row, index) => {
+            const extracted = extractProspectFromRow(row);
+            return {
+                id: `csv-${index}`,
+                name: extracted.name || `Prospect-${index}`,
+                email: extracted.email || '',
+                company: extracted.company || '',
+                title: extracted.position || '',
+                status: 'pending',
+                progress: 0,
+                retryCount: 0
+            };
+        }),
         errors: [],
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-        batchId: batch?.id?.toString()
+        batchId: batch.id.toString()
     };
-
-    // Add processing warnings to the job if any
-    if (processingWarnings && processingWarnings.length > 0) {
-        processingWarnings.forEach(warning => {
-            batchJob.errors.push({
-                id: `warning-${Date.now()}`,
-                message: warning,
-                severity: 'warning',
-                timestamp: new Date().toISOString()
-            });
-        });
-    }
 
     // Store the job tracking information
     enrichmentJobs.set(batchId, batchJob);
-    workflowToJobMapping.set(workflowSessionId, batchId);
 
     return ApiResponseBuilder.success(res, batchJob, 'Enrichment jobs created and queued successfully', 201);
 }))
@@ -1045,10 +818,10 @@ setInterval(() => {
 
 // Create enrichment batch
 router.post('/batches', asyncHandler(async (req: Request, res: Response) => {
-    const { workflowSessionId, configuration, campaignId } = req.body;
+    const { configuration, campaignId } = req.body;
 
-    if (!workflowSessionId || !configuration) {
-        throw new BadRequestError('Missing required fields: workflowSessionId and configuration');
+    if (!configuration) {
+        throw new BadRequestError('Missing required field: configuration');
     }
 
     if (!campaignId) {

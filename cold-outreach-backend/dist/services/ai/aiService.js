@@ -90,14 +90,13 @@ class AIService {
                 case 'openrouter-o1-mini':
                     modelId = 'openai/o1-mini';
                     modelName = 'o1-mini';
-                    // o1-mini uses all tokens for reasoning, need much higher limits
+                    // o1-mini doesn't support temperature or max_tokens
                     requestBody = {
                         model: modelId,
                         messages: [{
                                 role: 'user',
                                 content: prompt
-                            }],
-                        max_completion_tokens: Math.max(options.maxTokens * 3, 1000), // Increase significantly for reasoning
+                            }]
                     };
                     break;
                 case 'openrouter-gemini-2.5-pro':
@@ -110,13 +109,12 @@ class AIService {
                                 content: prompt
                             }],
                         max_tokens: options.maxTokens,
-                        temperature: Math.min(options.temperature, 1.0),
+                        temperature: options.temperature
                     };
                     break;
                 case 'openrouter-gemini-2.5-flash':
-                    // Use the correct Google Gemini 2.0 Flash model from official docs
-                    modelId = 'google/gemini-2.0-flash-001';
-                    modelName = 'gemini-2.0-flash-001';
+                    modelId = 'google/gemini-2.5-flash';
+                    modelName = 'gemini-2.5-flash';
                     requestBody = {
                         model: modelId,
                         messages: [{
@@ -124,7 +122,7 @@ class AIService {
                                 content: prompt
                             }],
                         max_tokens: options.maxTokens,
-                        temperature: Math.min(options.temperature, 1.0),
+                        temperature: options.temperature
                     };
                     break;
                 default:
@@ -137,7 +135,7 @@ class AIService {
                 headers: {
                     'Authorization': `Bearer ${apiKey}`,
                     'Content-Type': 'application/json',
-                    'HTTP-Referer': 'http://localhost:3001',
+                    'HTTP-Referer': process.env.SITE_URL || 'http://localhost:3001',
                     'X-Title': 'Cold Outreach AI'
                 },
                 timeout: options.timeout
@@ -146,28 +144,24 @@ class AIService {
             const content = response.data.choices?.[0]?.message?.content;
             const finishReason = response.data.choices?.[0]?.finish_reason;
             const reasoningTokens = response.data.usage?.completion_tokens_details?.reasoning_tokens;
-            // Special handling for O1 models that use reasoning tokens
-            if (modelId.includes('o1') && finishReason === 'length' && reasoningTokens > 0) {
-                console.warn(`⚠️ [AIService]: ${modelName} used ${reasoningTokens} reasoning tokens, may need higher limits`);
-                if (!content || content.trim().length === 0) {
-                    console.error(`❌ [AIService]: ${modelName} used all tokens for reasoning, no content generated:`, {
-                        finishReason,
-                        reasoningTokens,
-                        maxTokensRequested: requestBody.max_completion_tokens,
-                        totalTokensUsed: response.data.usage?.total_tokens
-                    });
-                    throw new Error(`OpenRouter ${modelName} ran out of tokens: ${reasoningTokens} reasoning tokens consumed all available tokens. The prompt may be too complex for the current token limit.`);
-                }
+            if (!content) {
+                throw new Error('No content returned from OpenRouter API');
             }
-            if (!content || content.trim().length === 0) {
-                console.error(`❌ [AIService]: OpenRouter ${modelName} returned empty response:`, JSON.stringify(response.data, null, 2));
-                throw new Error(`No content returned from OpenRouter ${modelName} API`);
+            console.log(`✅ [AIService]: Generated content with OpenRouter ${modelName}`);
+            console.log(`🔍 [AIService]: Finish reason: ${finishReason}`);
+            if (reasoningTokens) {
+                console.log(`🧠 [AIService]: Reasoning tokens used: ${reasoningTokens}`);
             }
-            console.log(`✅ [AIService]: OpenRouter ${modelName} generation successful (${content.length} chars)`);
             return {
                 content: content.trim(),
                 model: modelId,
-                tokensUsed: response.data.usage?.total_tokens
+                finishReason: finishReason || 'unknown',
+                usage: {
+                    promptTokens: response.data.usage?.prompt_tokens || 0,
+                    completionTokens: response.data.usage?.completion_tokens || 0,
+                    totalTokens: response.data.usage?.total_tokens || 0,
+                    reasoningTokens: reasoningTokens || 0
+                }
             };
         }
         catch (error) {

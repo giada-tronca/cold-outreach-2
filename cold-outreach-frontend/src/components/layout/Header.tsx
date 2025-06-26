@@ -8,20 +8,18 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
 import {
   Menu,
   PanelLeftClose,
   PanelLeftOpen,
   Search,
-  Bell,
   Settings,
   User,
   LogOut,
-  HelpCircle,
   Zap,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useNavigate } from 'react-router-dom';
 
 interface HeaderProps {
   onMenuClick: () => void;
@@ -36,6 +34,16 @@ export function Header({
   sidebarCollapsed,
   className,
 }: HeaderProps) {
+  const navigate = useNavigate();
+
+  const handleProfileClick = () => {
+    navigate('/profile');
+  };
+
+  const handleSettingsClick = () => {
+    navigate('/settings');
+  };
+
   return (
     <header
       className={cn(
@@ -100,31 +108,25 @@ export function Header({
           <span className='sr-only'>Search</span>
         </Button>
 
-        {/* Notifications */}
-        <Button variant='ghost' size='icon' className='relative'>
-          <Bell className='h-5 w-5' />
-          <Badge
-            variant='destructive'
-            className='absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 text-xs flex items-center justify-center'
-          >
-            3
-          </Badge>
-          <span className='sr-only'>Notifications</span>
-        </Button>
-
-        {/* Help */}
-        <Button variant='ghost' size='icon'>
-          <HelpCircle className='h-5 w-5' />
-          <span className='sr-only'>Help</span>
+        {/* Settings */}
+        <Button
+          variant='ghost'
+          size='icon'
+          className='cursor-pointer'
+          onClick={handleSettingsClick}
+        >
+          <Settings className='h-5 w-5' />
+          <span className='sr-only'>Settings</span>
         </Button>
 
         {/* User menu */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant='ghost' className='relative h-8 w-8 rounded-full'>
+            <Button variant='ghost' className='relative h-8 w-8 rounded-full cursor-pointer'>
               <Avatar className='h-8 w-8'>
-                <AvatarImage src='https://github.com/shadcn.png' alt='User' />
-                <AvatarFallback>JD</AvatarFallback>
+                <AvatarFallback>
+                  <User className='h-4 w-4' />
+                </AvatarFallback>
               </Avatar>
             </Button>
           </DropdownMenuTrigger>
@@ -138,16 +140,16 @@ export function Header({
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>
+            <DropdownMenuItem className='cursor-pointer' onClick={handleProfileClick}>
               <User className='mr-2 h-4 w-4' />
               <span>Profile</span>
             </DropdownMenuItem>
-            <DropdownMenuItem>
+            <DropdownMenuItem className='cursor-pointer' onClick={handleSettingsClick}>
               <Settings className='mr-2 h-4 w-4' />
               <span>Settings</span>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>
+            <DropdownMenuItem className='cursor-pointer'>
               <LogOut className='mr-2 h-4 w-4' />
               <span>Log out</span>
             </DropdownMenuItem>

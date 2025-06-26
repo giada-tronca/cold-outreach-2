@@ -63,7 +63,7 @@ export class EmailGenerationService {
    */
   static async createEmailGenerationJob(config: {
     campaignId: number;
-    workflowSessionId: string;
+    workflowSessionId?: string;
     configuration: {
       aiProvider: 'gemini' | 'openrouter';
       parallelism: number;

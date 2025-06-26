@@ -209,6 +209,22 @@ export class ProspectService {
     return handleApiResponse(response);
   }
 
+  static async getProspectStats(): Promise<
+    ApiResponse<{
+      totalProspects: number;
+      enrichedProspects: number;
+      emailsGenerated: number;
+      changes: {
+        totalProspects: number;
+        enrichedProspects: number;
+        emailsGenerated: number;
+      };
+    }>
+  > {
+    const response = await apiClient.get('/api/prospects/stats');
+    return handleApiResponse(response);
+  }
+
   // Enrichment Operations (Existing)
   static async startEnrichment(prospectId: number): Promise<ApiResponse<any>> {
     const response = await apiClient.post(

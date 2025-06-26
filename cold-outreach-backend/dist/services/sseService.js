@@ -168,7 +168,14 @@ class SSEService extends events_1.EventEmitter {
     sendProspectEnrichmentUpdate(userId, prospectData) {
         this.sendToUser(userId, 'prospect-enrichment', {
             type: 'prospect-enrichment',
-            ...prospectData,
+            prospectId: prospectData.prospectId,
+            status: prospectData.status,
+            progress: prospectData.progress,
+            enrichmentData: prospectData.enrichmentData,
+            error: prospectData.error,
+            message: prospectData.message,
+            isDuplicate: prospectData.isDuplicate,
+            processingTime: prospectData.processingTime,
             timestamp: new Date().toISOString(),
         });
     }

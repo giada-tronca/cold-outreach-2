@@ -14,7 +14,7 @@ class EmailGenerationProcessor {
      * Process email generation job
      */
     static async process(job) {
-        const { prospectId, campaignId, aiProvider, llmModelId, userId = 'user123', batchId } = job.data;
+        const { prospectId, campaignId, aiProvider, llmModelId, userId = 'default-user', batchId } = job.data;
         const startTime = new Date();
         const sseService = sseService_1.SSEService.getInstance();
         try {
@@ -98,7 +98,7 @@ class EmailGenerationProcessor {
                         modelUsed = 'google/gemini-2.5-pro';
                         break;
                     case 'openrouter-gemini-2.5-flash':
-                        modelUsed = 'google/gemini-2.0-flash-001';
+                        modelUsed = 'google/gemini-2.5-flash';
                         break;
                     default:
                         modelUsed = 'openai/o1-mini'; // Default fallback

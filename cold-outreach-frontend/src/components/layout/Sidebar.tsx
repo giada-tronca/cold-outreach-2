@@ -6,12 +6,11 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { cn } from '@/lib/utils';
+import { cn, formatNumber } from '@/lib/utils';
 import { Link, useLocation } from 'react-router-dom';
 import {
   Home,
   Users,
-  Mail,
   Upload,
   BarChart3,
   Settings,
@@ -19,11 +18,12 @@ import {
   Zap,
   X,
   ChevronDown,
-  Database,
-  Target,
   Workflow,
+  Plus,
+  Eye,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { ProspectService } from '@/services/prospectService';
 
 interface SidebarProps {
   open: boolean;
@@ -42,7 +42,7 @@ interface NavigationItem {
   children?: NavigationItem[];
 }
 
-const getNavigationItems = (currentPath: string): NavigationItem[] => [
+const getNavigationItems = (currentPath: string, prospectCount: number): NavigationItem[] => [
   {
     title: 'Dashboard',
     href: '/dashboard',
@@ -50,27 +50,23 @@ const getNavigationItems = (currentPath: string): NavigationItem[] => [
     active: currentPath === '/dashboard',
   },
   {
-    title: 'Campaigns',
-    href: '/campaigns',
-    icon: Target,
-    badge: '3',
-    active: currentPath.startsWith('/campaigns'),
+    title: 'Templates',
+    href: '/templates',
+    icon: FileText,
+    active: currentPath.startsWith('/templates'),
     children: [
-      { title: 'All Campaigns', href: '/campaigns', icon: FileText },
-      { title: 'Create Campaign', href: '/campaigns/new', icon: FileText },
-      { title: 'Templates', href: '/campaigns/templates', icon: FileText },
+      { title: 'View Templates', href: '/templates', icon: Eye },
+      { title: 'Create Template', href: '/templates/create', icon: Plus },
     ],
   },
   {
     title: 'Prospects',
     href: '/prospects',
     icon: Users,
-    badge: '1.2k',
+    badge: formatNumber(prospectCount),
     active: currentPath.startsWith('/prospects'),
     children: [
       { title: 'All Prospects', href: '/prospects', icon: Users },
-      { title: 'Import Prospects', href: '/prospects/import', icon: Upload },
-      { title: 'Enrichment', href: '/prospects/enrichment', icon: Database },
     ],
   },
   {
@@ -78,13 +74,6 @@ const getNavigationItems = (currentPath: string): NavigationItem[] => [
     href: '/workflow',
     icon: Workflow,
     active: currentPath === '/workflow',
-  },
-  {
-    title: 'Email Generation',
-    href: '/emails',
-    icon: Mail,
-    badge: 'New',
-    active: currentPath === '/emails',
   },
   {
     title: 'Analytics',
@@ -114,40 +103,56 @@ function NavigationLink({
   const Icon = item.icon;
 
   const linkContent = hasChildren ? (
-    <Button
-      variant={item.active ? 'secondary' : 'ghost'}
-      className={cn(
-        'w-full justify-start gap-3 h-10 px-3',
-        level > 0 && 'ml-6 h-8',
-        item.active && 'bg-secondary text-secondary-foreground',
-        collapsed && level === 0 && 'justify-center px-2'
-      )}
-      onClick={() => !collapsed && setExpanded(!expanded)}
-    >
-      <Icon className={cn('h-4 w-4 flex-shrink-0')} />
-      {!collapsed && (
-        <>
-          <span className='flex-1 text-left'>{item.title}</span>
-          {item.badge && (
-            <Badge variant='secondary' className='h-5 px-1.5 text-xs'>
-              {item.badge}
-            </Badge>
+    collapsed && level === 0 ? (
+      <Link to={item.href} className='block'>
+        <Button
+          variant={item.active ? 'secondary' : 'ghost'}
+          className={cn(
+            'w-full justify-start gap-3 h-10 px-3 cursor-pointer',
+            level > 0 && 'ml-6 h-8',
+            item.active && 'bg-secondary text-secondary-foreground',
+            collapsed && level === 0 && 'justify-center px-2'
           )}
-          <ChevronDown
-            className={cn(
-              'h-4 w-4 transition-transform',
-              expanded && 'rotate-180'
+        >
+          <Icon className={cn('h-4 w-4 flex-shrink-0')} />
+        </Button>
+      </Link>
+    ) : (
+      <Button
+        variant={item.active ? 'secondary' : 'ghost'}
+        className={cn(
+          'w-full justify-start gap-3 h-10 px-3 cursor-pointer',
+          level > 0 && 'ml-6 h-8',
+          item.active && 'bg-secondary text-secondary-foreground',
+          collapsed && level === 0 && 'justify-center px-2'
+        )}
+        onClick={() => !collapsed && setExpanded(!expanded)}
+      >
+        <Icon className={cn('h-4 w-4 flex-shrink-0')} />
+        {!collapsed && (
+          <>
+            <span className='flex-1 text-left'>{item.title}</span>
+            {item.badge && (
+              <Badge variant='secondary' className='h-5 px-1.5 text-xs'>
+                {item.badge}
+              </Badge>
             )}
-          />
-        </>
-      )}
-    </Button>
+            <ChevronDown
+              className={cn(
+                'h-4 w-4 transition-transform',
+                expanded && 'rotate-180'
+              )}
+            />
+          </>
+        )}
+      </Button>
+    )
   ) : (
     <Link to={item.href} className='block'>
       <Button
         variant={item.active ? 'secondary' : 'ghost'}
         className={cn(
-          'w-full justify-start gap-3 h-10 px-3',
+          'w-full justify-start gap-3 h-10 px-3 cursor-pointer',
           level > 0 && 'ml-6 h-8',
           item.active && 'bg-secondary text-secondary-foreground',
           collapsed && level === 0 && 'justify-center px-2'
@@ -213,7 +218,24 @@ export function Sidebar({
   className,
 }: SidebarProps) {
   const location = useLocation();
-  const navigationItems = getNavigationItems(location.pathname);
+  const [prospectCount, setProspectCount] = useState(0);
+
+  useEffect(() => {
+    const fetchProspectCount = async () => {
+      try {
+        const response = await ProspectService.getProspectStats();
+        if (response.success && response.data) {
+          setProspectCount(response.data.totalProspects);
+        }
+      } catch (error) {
+        console.error('Error fetching prospect count:', error);
+      }
+    };
+
+    fetchProspectCount();
+  }, []);
+
+  const navigationItems = getNavigationItems(location.pathname, prospectCount);
 
   return (
     <>
@@ -227,12 +249,12 @@ export function Sidebar({
         <div className='flex h-full flex-col'>
           {/* Mobile header */}
           <div className='flex h-16 items-center justify-between px-4 border-b'>
-            <div className='flex items-center gap-2'>
+            <Link to="/dashboard" className='flex items-center gap-2 cursor-pointer'>
               <div className='flex items-center justify-center w-8 h-8 bg-primary text-primary-foreground rounded-lg'>
                 <Zap className='h-4 w-4' />
               </div>
               <span className='font-semibold'>Cold Outreach AI</span>
-            </div>
+            </Link>
             <Button
               variant='ghost'
               size='icon'
@@ -261,14 +283,14 @@ export function Sidebar({
       >
         {/* Desktop header */}
         <div className='flex h-16 items-center px-4 border-b'>
-          <div className='flex items-center gap-2'>
+          <Link to="/dashboard" className='flex items-center gap-2 cursor-pointer'>
             <div className='flex items-center justify-center w-8 h-8 bg-primary text-primary-foreground rounded-lg'>
               <Zap className='h-4 w-4' />
             </div>
             {!collapsed && (
               <span className='font-semibold'>Cold Outreach AI</span>
             )}
-          </div>
+          </Link>
         </div>
 
         {/* Desktop navigation */}

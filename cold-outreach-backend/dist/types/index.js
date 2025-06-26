@@ -9,6 +9,7 @@ var ProspectStatus;
     ProspectStatus["ENRICHED"] = "ENRICHED";
     ProspectStatus["GENERATING"] = "GENERATING";
     ProspectStatus["COMPLETED"] = "COMPLETED";
+    ProspectStatus["EMAIL_GENERATED"] = "EMAIL_GENERATED";
     ProspectStatus["FAILED"] = "FAILED";
 })(ProspectStatus || (exports.ProspectStatus = ProspectStatus = {}));
 var EnrichmentStatus;

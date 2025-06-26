@@ -104,8 +104,9 @@ router.post('/bulk', (0, validation_1.validate)([
         }
     }
 });
-// Basic prospect routes
+// Main prospect CRUD routes
 router.get('/', prospectController_1.getAllProspects);
+router.get('/stats', prospectController_1.getProspectStats);
 router.get('/:id', prospectController_1.getProspectById);
 router.get('/:prospectId/generated-email', prospectController_1.getGeneratedEmailByProspectId);
 router.post('/', prospectController_1.createProspect);

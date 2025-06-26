@@ -84,7 +84,6 @@ interface Prospect {
 }
 
 interface EnrichmentJobConfig {
-  workflowSessionId?: string;
   campaignId?: number;
   csvData?: Prospect[];
   filename?: string;
@@ -92,7 +91,6 @@ interface EnrichmentJobConfig {
     aiProvider: 'gemini' | 'openrouter';
     concurrency: number;
     retryAttempts: number;
-    batchSize: number;
     services: string[];
   };
 }
@@ -267,7 +265,6 @@ export class ProspectEnrichmentService {
 
       // First create a batch to get batchId
       const batchResponse = await apiClient.post('/api/enrichment/batches', {
-        workflowSessionId: config.workflowSessionId,
         configuration: config.configuration,
         campaignId: config.campaignId,
         name: `Enrichment batch for campaign ${config.campaignId || 'unknown'}`,
@@ -285,7 +282,6 @@ export class ProspectEnrichmentService {
 
       // Create the enrichment job with CSV data (prospects will be created by backend)
       const jobResponse = await apiClient.post('/api/enrichment/jobs', {
-        workflowSessionId: config.workflowSessionId,
         campaignId: config.campaignId,
         csvData: config.csvData,
         filename: config.filename,

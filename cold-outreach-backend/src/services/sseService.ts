@@ -231,11 +231,21 @@ export class SSEService extends EventEmitter {
       progress?: number;
       enrichmentData?: any;
       error?: string;
+      message?: string;
+      isDuplicate?: boolean;
+      processingTime?: number;
     }
   ): void {
     this.sendToUser(userId, 'prospect-enrichment', {
       type: 'prospect-enrichment',
-      ...prospectData,
+      prospectId: prospectData.prospectId,
+      status: prospectData.status,
+      progress: prospectData.progress,
+      enrichmentData: prospectData.enrichmentData,
+      error: prospectData.error,
+      message: prospectData.message,
+      isDuplicate: prospectData.isDuplicate,
+      processingTime: prospectData.processingTime,
       timestamp: new Date().toISOString(),
     });
   }

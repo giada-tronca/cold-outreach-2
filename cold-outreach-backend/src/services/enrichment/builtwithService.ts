@@ -1,5 +1,6 @@
 import { FirecrawlService } from './firecrawlService'
 import { ApiConfigurationService } from './apiConfigurationService'
+import { extractDomainFromEmail } from '@/utils/emailHelpers'
 import axios from 'axios'
 
 
@@ -602,13 +603,13 @@ export class BuiltWithService {
                             role: 'user',
                             content: prompt
                         }
-                    ],
-                    max_completion_tokens: 8000 // Increased from 2000 to handle O1-Mini reasoning + response
-                    // Note: temperature is not supported by o1-mini model
+                    ]
                 }, {
                     headers: {
                         'Authorization': `Bearer ${apiKey}`,
-                        'Content-Type': 'application/json'
+                        'Content-Type': 'application/json',
+                        'HTTP-Referer': process.env.SITE_URL || 'http://localhost:3001',
+                        'X-Title': 'Cold Outreach AI'
                     },
                     timeout: 120000 // Increased from 90s to 120s for O1-Mini reasoning
                 })
@@ -641,40 +642,14 @@ export class BuiltWithService {
     }
 
     /**
-     * Extract domain from email address
+     * Extract domain from email
      * Ensures proper domain extraction for BuiltWith analysis
      */
     static extractDomainFromEmail(email: string): string | null {
-        try {
-            if (!email || !email.includes('@')) {
-                return null
-            }
-
-            const emailDomain = email.split('@')[1]?.toLowerCase()
-            if (!emailDomain) {
-                return null
-            }
-
-            // Skip common free email providers
-            const freeEmailProviders = [
-                'gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com',
-                'icloud.com', 'live.com', 'aol.com', 'protonmail.com',
-                'mail.com', 'yandex.com', 'zoho.com'
-            ]
-
-            if (freeEmailProviders.includes(emailDomain)) {
-                return null
-            }
-
-            // Remove www. prefix if present
-            const cleanDomain = emailDomain.replace(/^www\./, '')
-
-            console.log(`🔍 [BuiltWith]: Extracted clean domain: ${cleanDomain} from email: ${email}`)
-            return cleanDomain
-
-        } catch (error) {
-            console.error(`❌ [BuiltWith]: Failed to extract domain from email ${email}:`, error)
-            return null
+        const domain = extractDomainFromEmail(email)
+        if (domain) {
+            console.log(`🔍 [BuiltWith]: Extracted clean domain: ${domain} from email: ${email}`)
         }
+        return domain
     }
 } 

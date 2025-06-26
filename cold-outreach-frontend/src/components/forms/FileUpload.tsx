@@ -12,7 +12,7 @@ import { Progress } from '@/components/ui/progress';
 import { Card, CardContent } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import { apiClient, handleApiResponse, checkApiHealth } from '@/services/api';
+// Removed API imports for local-only processing
 
 interface UploadConfig {
   maxFileSize: number;
@@ -54,7 +54,7 @@ export default function FileUpload({
   const [uploadedFiles, setUploadedFiles] = useState<UploadProgress[]>([]);
   const [uploadConfig, setUploadConfig] = useState<UploadConfig | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [, setIsServerAvailable] = useState<boolean | null>(null);
+  // Removed server availability check for local-only processing
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Default configuration fallback
@@ -65,42 +65,11 @@ export default function FileUpload({
     allowedExtensions: ['.csv'],
   };
 
-  // Fetch upload configuration on component mount
+  // Use default configuration for local processing
   useEffect(() => {
-    fetchUploadConfig();
+    setUploadConfig(defaultConfig);
+    console.log('🔧 Using local file processing configuration');
   }, []);
-
-  const fetchUploadConfig = async () => {
-    // Check server availability first
-    const serverAvailable = await checkApiHealth();
-    setIsServerAvailable(serverAvailable);
-
-    if (serverAvailable) {
-      try {
-        const response = await apiClient.get('/api/uploads/config');
-        const data = await handleApiResponse(response);
-        if (data.success) {
-          setUploadConfig(data.data);
-        } else {
-          // Use default config if API returns unsuccessful response
-          console.warn(
-            'Upload config API returned unsuccessful response, using defaults'
-          );
-          setUploadConfig(defaultConfig);
-        }
-      } catch (error) {
-        console.warn('Failed to fetch upload config, using defaults:', error);
-        // Use default configuration if API call fails
-        setUploadConfig(defaultConfig);
-      }
-    } else {
-      // Server not available, use default config
-      console.log(
-        '🔄 Backend server not available, using default configuration'
-      );
-      setUploadConfig(defaultConfig);
-    }
-  };
 
   const validateFile = useCallback(
     (file: File): string | null => {
@@ -136,24 +105,7 @@ export default function FileUpload({
     [uploadConfig, acceptedFileTypes, defaultConfig]
   );
 
-  const validateFilePreUpload = async (file: File): Promise<boolean> => {
-    try {
-      const response = await apiClient.post('/api/uploads/validate', {
-        filename: file.name,
-        size: file.size,
-        mimetype: file.type,
-      });
-
-      const data = await handleApiResponse(response);
-      return data.success;
-    } catch (error) {
-      console.warn(
-        'File validation failed, skipping server validation:',
-        error
-      );
-      return true; // Allow upload if server validation fails
-    }
-  };
+  // Removed server-side validation - using local validation only
 
   const uploadFile = async (file: File) => {
     const validationError = validateFile(file);
@@ -163,120 +115,59 @@ export default function FileUpload({
       return;
     }
 
-    // Pre-upload validation
-    const isValid = await validateFilePreUpload(file);
-    if (!isValid) {
-      const error = 'File validation failed on server';
-      setError(error);
-      onUploadError?.(error);
-      return;
-    }
-
     setIsUploading(true);
     setError(null);
 
-    const formData = new FormData();
-    formData.append('file', file);
-
     try {
-      const response = await apiClient.upload('/api/uploads', formData);
-      const data = await handleApiResponse(response);
+      console.log('🔄 Processing CSV file locally (no server upload)...');
 
-      if (data.success) {
-        console.log('🚀 Backend upload successful, data:', data.data);
-        console.log(
-          '🚀 Checking if backend has preview data:',
-          !!data.data.preview
-        );
+      const localId = generateFallbackId();
+      const uploadInfo: UploadProgress = {
+        uploadId: localId,
+        filename: file.name,
+        progress: 50,
+        status: 'processing',
+        message: 'Processing CSV file locally...',
+        createdAt: new Date().toISOString(),
+      };
 
-        // Check if backend provided preview data (prospect count)
-        if (data.data.preview && data.data.preview.totalRows) {
-          console.log('🚀 Backend provided preview data, using it');
-          const uploadInfo: UploadProgress = {
-            uploadId: data.data.uploadId || generateFallbackId(),
-            filename: data.data.filename || file.name,
-            progress: 100,
-            status: 'completed',
-            message: 'File uploaded successfully',
-            createdAt: new Date().toISOString(),
-          };
+      setUploadedFiles(prev => [...prev, uploadInfo]);
+      onUploadProgress?.(uploadInfo);
 
-          setUploadedFiles(prev => [...prev, uploadInfo]);
-          onUploadProgress?.(uploadInfo);
+      // Generate local preview with enhanced validation
+      const localPreview = await generateLocalPreview(file);
+      console.log('📊 Local CSV preview generated:', localPreview);
 
-          console.log(
-            '🚀 About to call onUploadComplete with backend data:',
-            data.data
-          );
-          onUploadComplete?.(data.data);
-        } else {
-          console.log(
-            '🚀 Backend upload succeeded but no preview data, falling back to local processing'
-          );
-          // Don't throw error, just proceed to local fallback silently
-          throw new Error('FALLBACK_TO_LOCAL');
-        }
-      } else {
-        throw new Error(data.message || 'Upload failed');
-      }
+      // Update progress to completed
+      uploadInfo.progress = 100;
+      uploadInfo.status = 'completed';
+      uploadInfo.message = 'CSV processed successfully';
+
+      setUploadedFiles(prev =>
+        prev.map(f => f.uploadId === localId ? uploadInfo : f)
+      );
+      onUploadProgress?.(uploadInfo);
+
+      const uploadResult = {
+        localId: localId,
+        filename: file.name,
+        fileSize: file.size,
+        preview: localPreview,
+        // Store the raw file for later upload in step 3
+        rawFileData: file,
+        processedLocally: true,
+        processedAt: new Date().toISOString(),
+      };
+
+      console.log('📊 Local processing complete, calling onUploadComplete with:', uploadResult);
+      onUploadComplete?.(uploadResult);
+
     } catch (error) {
-      // Handle network errors, API not available, etc.
-      if (
-        error instanceof Error &&
-        (error.message.includes('API server not available') ||
-          error.message.includes('Service not found') ||
-          error.message.includes('fetch') ||
-          error.message === 'FALLBACK_TO_LOCAL')
-      ) {
-        // API server not available or backend processing incomplete - use local processing
-        console.log('🔄 Using local processing fallback...');
-
-        const fallbackInfo: UploadProgress = {
-          uploadId: generateFallbackId(),
-          filename: file.name,
-          progress: 100,
-          status: 'completed',
-          message: 'File processed successfully',
-          createdAt: new Date().toISOString(),
-        };
-
-        try {
-          const localPreview = await generateLocalPreview(file);
-          console.log('📊 Local CSV preview generated:', localPreview);
-
-          setUploadedFiles(prev => [...prev, fallbackInfo]);
-          onUploadProgress?.(fallbackInfo);
-
-          const uploadResult = {
-            uploadId: fallbackInfo.uploadId,
-            filename: file.name,
-            preview: localPreview,
-          };
-
-          console.log('📊 About to call onUploadComplete with:', uploadResult);
-          onUploadComplete?.(uploadResult);
-        } catch (parseError) {
-          // CSV parsing failed - show error
-          const errorMessage =
-            parseError instanceof Error
-              ? parseError.message
-              : 'Failed to parse CSV file';
-          console.error('❌ CSV parsing failed:', errorMessage);
-          setError(errorMessage);
-          onUploadError?.(errorMessage);
-          return;
-        }
-
-        setError(null); // Clear error since we handled it with fallback
-
-        // Show user-friendly message
-        console.log('✅ File processed successfully using local fallback');
-      } else {
-        const errorMessage =
-          error instanceof Error ? error.message : 'Upload failed';
-        setError(errorMessage);
-        onUploadError?.(errorMessage);
-      }
+      const errorMessage =
+        error instanceof Error ? error.message : 'Failed to process CSV file';
+      console.error('❌ Local CSV processing failed:', errorMessage);
+      setError(errorMessage);
+      onUploadError?.(errorMessage);
     } finally {
       setIsUploading(false);
     }
@@ -307,29 +198,31 @@ export default function FileUpload({
       e.stopPropagation();
       setIsDragOver(false);
 
-      if (disabled) return;
+      if (disabled || uploadedFiles.length > 0) return; // Prevent drop if file already uploaded
 
       const files = Array.from(e.dataTransfer.files);
-      const filesToUpload = files.slice(0, maxFiles);
-
-      filesToUpload.forEach(uploadFile);
+      if (files.length > 0 && files[0]) {
+        uploadFile(files[0]); // Only upload the first file
+      }
     },
-    [disabled, maxFiles, uploadFile]
+    [disabled, uploadedFiles.length, uploadFile]
   );
 
   const handleFileSelect = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
-      const files = Array.from(e.target.files || []);
-      const filesToUpload = files.slice(0, maxFiles);
+      if (uploadedFiles.length > 0) return; // Prevent selection if file already uploaded
 
-      filesToUpload.forEach(uploadFile);
+      const files = Array.from(e.target.files || []);
+      if (files.length > 0 && files[0]) {
+        uploadFile(files[0]); // Only upload the first file
+      }
 
       // Reset file input
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
     },
-    [maxFiles, uploadFile]
+    [uploadedFiles.length, uploadFile]
   );
 
   const handleBrowseFiles = () => {
@@ -339,17 +232,8 @@ export default function FileUpload({
   };
 
   const removeFile = async (uploadId: string) => {
-    try {
-      // Try to remove from server, but don't fail if server is unavailable
-      await apiClient.delete(`/api/uploads/${uploadId}`);
-    } catch (error) {
-      console.warn(
-        'Failed to remove file from server, removing locally only:',
-        error
-      );
-    }
-
-    // Always remove from local state regardless of server response
+    // Remove from local state only (no server interaction in step 1)
+    console.log('🗑️ Removing locally processed file:', uploadId);
     setUploadedFiles(prev => prev.filter(file => file.uploadId !== uploadId));
   };
 
@@ -410,17 +294,11 @@ export default function FileUpload({
       reader.onload = e => {
         try {
           const csvText = e.target?.result as string;
-          console.log(
-            'CSV file content preview:',
-            csvText.substring(0, 500) + '...'
-          );
+          console.log('📄 Processing CSV file locally...');
 
           // Split by newlines and filter out empty lines
           const allLines = csvText.split(/\r?\n/);
           const nonEmptyLines = allLines.filter(line => line.trim());
-
-          console.log('Total lines in file:', allLines.length);
-          console.log('Non-empty lines:', nonEmptyLines.length);
 
           if (nonEmptyLines.length === 0) {
             throw new Error('CSV file is empty');
@@ -442,9 +320,61 @@ export default function FileUpload({
             .map(line => parseCSVLine(line));
 
           const totalRowCount = Math.max(0, dataRows.length);
-          console.log('CSV parsing results - Headers:', headers);
-          console.log('CSV parsing results - Data rows count:', totalRowCount);
-          console.log('CSV parsing results - Preview rows:', previewRows);
+
+          // Validate required columns
+          const requiredColumns = [
+            { name: 'Name', found: false, mapping: null as string | null },
+            { name: 'Email', found: false, mapping: null as string | null },
+            { name: 'Company', found: false, mapping: null as string | null },
+          ];
+
+          // Check for required columns
+          headers.forEach(header => {
+            const normalizedHeader = header.toLowerCase().trim();
+
+            requiredColumns.forEach(req => {
+              const normalizedRequired = req.name.toLowerCase();
+              if (normalizedHeader.includes(normalizedRequired) ||
+                normalizedRequired.includes(normalizedHeader)) {
+                req.found = true;
+                req.mapping = header;
+              }
+            });
+          });
+
+          // Basic validation - count valid vs invalid rows
+          let validRows = 0;
+          let invalidRows = 0;
+
+          dataRows.forEach(line => {
+            const rowData = parseCSVLine(line);
+            let hasRequiredData = false;
+
+            // Check if row has some basic required data
+            for (let i = 0; i < headers.length; i++) {
+              const header = headers[i]?.toLowerCase() || '';
+              const value = rowData[i]?.trim() || '';
+
+              if ((header.includes('name') || header.includes('email')) && value) {
+                hasRequiredData = true;
+                break;
+              }
+            }
+
+            if (hasRequiredData) {
+              validRows++;
+            } else {
+              invalidRows++;
+            }
+          });
+
+          console.log('📊 Local CSV processing complete:', {
+            headers: headers.length,
+            totalRows: totalRowCount,
+            validRows,
+            invalidRows,
+            requiredColumnsFound: requiredColumns.filter(c => c.found).length
+          });
 
           if (totalRowCount === 0) {
             throw new Error('CSV file contains no data rows');
@@ -454,11 +384,12 @@ export default function FileUpload({
             headers,
             rows: previewRows,
             totalRows: totalRowCount,
-            validRows: totalRowCount,
-            invalidRows: 0,
+            validRows: Math.max(validRows, 1), // Ensure at least 1 valid row
+            invalidRows,
+            requiredColumns,
           });
         } catch (error) {
-          console.error('Error parsing CSV file:', error);
+          console.error('❌ Error parsing CSV file:', error);
           reject(
             new Error(
               `Failed to parse CSV file: ${error instanceof Error ? error.message : 'Unknown error'}`
@@ -467,7 +398,7 @@ export default function FileUpload({
         }
       };
       reader.onerror = error => {
-        console.error('FileReader error:', error);
+        console.error('❌ FileReader error:', error);
         reject(
           new Error(
             'Failed to read CSV file. Please ensure the file is not corrupted and try again.'
@@ -517,67 +448,69 @@ export default function FileUpload({
         </Alert>
       )}
 
-      {/* Drop Zone */}
-      <Card
-        className={`relative transition-all duration-200 ${
-          isDragOver
+      {/* Drop Zone - Only show if no files uploaded */}
+      {uploadedFiles.length === 0 && (
+        <Card
+          className={`relative transition-all duration-200 ${isDragOver
             ? 'border-primary border-2 bg-primary/5'
             : 'border-dashed border-2 border-gray-300 hover:border-gray-400'
-        } ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
-        onClick={handleBrowseFiles}
-      >
-        <CardContent className='p-8 text-center'>
-          <input
-            ref={fileInputRef}
-            type='file'
-            multiple={maxFiles > 1}
-            accept={
-              acceptedFileTypes?.join(',') ||
-              (uploadConfig || defaultConfig)?.allowedFileTypes.join(',')
-            }
-            onChange={handleFileSelect}
-            className='hidden'
-            disabled={disabled}
-          />
+            } ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+          onClick={handleBrowseFiles}
+        >
+          <CardContent className='p-8 text-center'>
+            <input
+              ref={fileInputRef}
+              type='file'
+              accept={
+                acceptedFileTypes?.join(',') ||
+                (uploadConfig || defaultConfig)?.allowedFileTypes.join(',')
+              }
+              onChange={handleFileSelect}
+              className='hidden'
+              disabled={disabled}
+            />
 
-          <div className='space-y-4'>
-            <div
-              className={`mx-auto w-16 h-16 rounded-full flex items-center justify-center ${
-                isDragOver ? 'bg-primary/10' : 'bg-gray-100'
-              }`}
-            >
-              {isUploading ? (
-                <Loader2 className='h-8 w-8 text-blue-500 animate-spin' />
-              ) : (
-                <Upload
-                  className={`h-8 w-8 ${isDragOver ? 'text-primary' : 'text-gray-400'}`}
-                />
-              )}
+            <div className='space-y-4'>
+              <div
+                className={`mx-auto w-16 h-16 rounded-full flex items-center justify-center ${isDragOver ? 'bg-primary/10' : 'bg-gray-100'
+                  }`}
+              >
+                {isUploading ? (
+                  <Loader2 className='h-8 w-8 text-blue-500 animate-spin' />
+                ) : (
+                  <Upload
+                    className={`h-8 w-8 ${isDragOver ? 'text-primary' : 'text-gray-400'}`}
+                  />
+                )}
+              </div>
+
+              <div>
+                <h3 className='text-lg font-medium text-gray-900'>
+                  {isUploading ? 'Processing...' : 'Drop CSV file here'}
+                </h3>
+                <p className='text-sm text-gray-500 mt-1'>
+                  Only one CSV file is allowed. Drag and drop or click to browse.
+                </p>
+              </div>
+
+              <Button
+                variant='outline'
+                disabled={disabled || isUploading}
+                onClick={e => {
+                  e.stopPropagation();
+                  handleBrowseFiles();
+                }}
+              >
+                <Upload className='h-4 w-4 mr-2' />
+                {isUploading ? 'Processing...' : 'Browse Files'}
+              </Button>
             </div>
-
-            <div>
-              <h3 className='text-lg font-medium text-gray-900'>
-                {isUploading ? 'Uploading...' : 'Drop CSV file here'}
-              </h3>
-            </div>
-
-            <Button
-              variant='outline'
-              disabled={disabled || isUploading}
-              onClick={e => {
-                e.stopPropagation();
-                handleBrowseFiles();
-              }}
-            >
-              <Upload className='h-4 w-4 mr-2' />
-              {isUploading ? 'Uploading...' : 'Browse Files'}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Uploaded Files List */}
       {uploadedFiles.length > 0 && (
@@ -599,24 +532,23 @@ export default function FileUpload({
 
                 <div className='flex items-center space-x-2'>
                   {getStatusBadge(file.status)}
-
-                  {(file.status === 'processing' ||
-                    file.status === 'uploading') && (
-                    <div className='w-16'>
-                      <Progress value={file.progress} className='h-2' />
-                    </div>
-                  )}
-
                   <Button
                     variant='ghost'
                     size='sm'
                     onClick={() => removeFile(file.uploadId)}
-                    className='h-8 w-8 p-0'
+                    className='h-8 w-8 p-0 text-gray-400 hover:text-red-500'
                   >
                     <X className='h-4 w-4' />
                   </Button>
                 </div>
               </div>
+
+              {/* Progress bar for processing */}
+              {file.status === 'processing' && (
+                <div className='mt-3'>
+                  <Progress value={file.progress} className='h-2' />
+                </div>
+              )}
             </Card>
           ))}
         </div>

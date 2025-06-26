@@ -6,6 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.BuiltWithService = void 0;
 const firecrawlService_1 = require("./firecrawlService");
 const apiConfigurationService_1 = require("./apiConfigurationService");
+const emailHelpers_1 = require("@/utils/emailHelpers");
 const axios_1 = __importDefault(require("axios"));
 /**
  * BuiltWith Service (using Firecrawl)
@@ -458,13 +459,13 @@ class BuiltWithService {
                             role: 'user',
                             content: prompt
                         }
-                    ],
-                    max_completion_tokens: 8000 // Increased from 2000 to handle O1-Mini reasoning + response
-                    // Note: temperature is not supported by o1-mini model
+                    ]
                 }, {
                     headers: {
                         'Authorization': `Bearer ${apiKey}`,
-                        'Content-Type': 'application/json'
+                        'Content-Type': 'application/json',
+                        'HTTP-Referer': process.env.SITE_URL || 'http://localhost:3001',
+                        'X-Title': 'Cold Outreach AI'
                     },
                     timeout: 120000 // Increased from 90s to 120s for O1-Mini reasoning
                 });
@@ -492,36 +493,15 @@ class BuiltWithService {
         throw new Error(`OpenRouter API failed after ${maxRetries} attempts: ${lastError?.message || 'Unknown error'}`);
     }
     /**
-     * Extract domain from email address
+     * Extract domain from email
      * Ensures proper domain extraction for BuiltWith analysis
      */
     static extractDomainFromEmail(email) {
-        try {
-            if (!email || !email.includes('@')) {
-                return null;
-            }
-            const emailDomain = email.split('@')[1]?.toLowerCase();
-            if (!emailDomain) {
-                return null;
-            }
-            // Skip common free email providers
-            const freeEmailProviders = [
-                'gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com',
-                'icloud.com', 'live.com', 'aol.com', 'protonmail.com',
-                'mail.com', 'yandex.com', 'zoho.com'
-            ];
-            if (freeEmailProviders.includes(emailDomain)) {
-                return null;
-            }
-            // Remove www. prefix if present
-            const cleanDomain = emailDomain.replace(/^www\./, '');
-            console.log(`🔍 [BuiltWith]: Extracted clean domain: ${cleanDomain} from email: ${email}`);
-            return cleanDomain;
+        const domain = (0, emailHelpers_1.extractDomainFromEmail)(email);
+        if (domain) {
+            console.log(`🔍 [BuiltWith]: Extracted clean domain: ${domain} from email: ${email}`);
         }
-        catch (error) {
-            console.error(`❌ [BuiltWith]: Failed to extract domain from email ${email}:`, error);
-            return null;
-        }
+        return domain;
     }
 }
 exports.BuiltWithService = BuiltWithService;

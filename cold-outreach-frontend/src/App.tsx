@@ -11,15 +11,12 @@ import ComponentShowcase from './pages/ComponentShowcase';
 
 // Import placeholder pages (we'll create these)
 import Dashboard from './pages/dashboard/Dashboard';
-import Campaigns from './pages/campaigns/Campaigns';
-import CreateCampaign from './pages/campaigns/CreateCampaign';
-import CampaignTemplates from './pages/campaigns/CampaignTemplates';
+import Templates from './pages/templates/Templates';
 import Prospects from './pages/prospects/Prospects';
-import ImportProspects from './pages/prospects/ImportProspects';
-import ProspectEnrichment from './pages/prospects/ProspectEnrichment';
-import EmailGeneration from './pages/emails/EmailGeneration';
+import Batches from './pages/batches/Batches';
 import Analytics from './pages/analytics/Analytics';
 import Settings from './pages/settings/Settings';
+import Profile from './pages/profile/Profile';
 import SimpleWorkflow from './pages/workflow/SimpleWorkflow';
 
 function App() {
@@ -36,22 +33,22 @@ function App() {
           <Route index element={<Navigate to='/dashboard' replace />} />
           <Route path='dashboard' element={<Dashboard />} />
 
-          {/* Campaign routes */}
-          <Route path='campaigns' element={<Campaigns />} />
-          <Route path='campaigns/new' element={<CreateCampaign />} />
-          <Route path='campaigns/templates' element={<CampaignTemplates />} />
+          {/* Template routes */}
+          <Route path='templates' element={<Templates />} />
+          <Route path='templates/create' element={<Templates />} />
 
           {/* Prospect routes */}
           <Route path='prospects' element={<Prospects />} />
-          <Route path='prospects/import' element={<ImportProspects />} />
-          <Route path='prospects/enrichment' element={<ProspectEnrichment />} />
+
+          {/* Batch routes */}
+          <Route path='batches' element={<Batches />} />
 
           {/* Workflow routes */}
           <Route path='workflow' element={<SimpleWorkflow />} />
 
           {/* Other routes */}
-          <Route path='emails' element={<EmailGeneration />} />
           <Route path='analytics' element={<Analytics />} />
+          <Route path='profile' element={<Profile />} />
           <Route path='settings' element={<Settings />} />
         </Route>
       </Routes>

@@ -40,6 +40,53 @@ const jobValidators_1 = require("@/validators/jobValidators");
 const validation_1 = require("@/middleware/validation");
 const router = (0, express_1.Router)();
 /**
+ * Specific routes must come before parameterized routes
+ */
+/**
+ * Worker Health Check
+ * GET /api/jobs/health
+ */
+router.get('/health', jobController_1.JobController.healthCheck);
+/**
+ * Queue Statistics
+ * GET /api/jobs/stats
+ */
+router.get('/stats', jobController_1.JobController.getQueueStats);
+/**
+ * SSE Statistics and Debugging
+ * GET /api/jobs/sse-stats
+ */
+router.get('/sse-stats', (req, res) => {
+    try {
+        const sseService = sseService_1.SSEService.getInstance();
+        const stats = sseService.getStats();
+        res.json({
+            success: true,
+            data: {
+                ...stats,
+                timestamp: new Date().toISOString()
+            }
+        });
+    }
+    catch (error) {
+        console.error('Error getting SSE stats:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to get SSE statistics',
+            error: error instanceof Error ? error.message : String(error)
+        });
+    }
+});
+/**
+ * Job Cleanup (specific routes)
+ */
+// Clean completed jobs
+// POST /api/jobs/clean/completed
+router.post('/clean/completed', jobController_1.JobController.cleanCompletedJobs);
+// Clean failed jobs
+// POST /api/jobs/clean/failed
+router.post('/clean/failedJobs', jobController_1.JobController.cleanFailedJobs);
+/**
  * Real-time Updates (Server-Sent Events)
  */
 // SSE connection for job progress updates
@@ -57,17 +104,7 @@ router.get('/stream/:userId', jobValidators_1.validateUserIdParam, validation_1.
     sseHandler(req, res);
 });
 /**
- * Queue Statistics
- * GET /api/jobs/stats
- */
-router.get('/stats', jobController_1.JobController.getQueueStats);
-/**
- * Worker Health Check
- * GET /api/jobs/health
- */
-router.get('/health', jobController_1.JobController.healthCheck);
-/**
- * Job Management
+ * Job Management (parameterized routes come after specific ones)
  */
 // Get specific job details
 // GET /api/jobs/:jobId
@@ -94,14 +131,8 @@ router.post('/queue/:queueName/pause', jobValidators_1.validateQueueNameParam, v
 // POST /api/jobs/queue/:queueName/resume
 router.post('/queue/:queueName/resume', jobValidators_1.validateQueueNameParam, validation_1.handleValidationErrors, jobController_1.JobController.resumeQueue);
 /**
- * Job Cleanup
+ * Job Cleanup - moved to top to avoid route conflicts
  */
-// Clean completed jobs
-// POST /api/jobs/clean/completed
-router.post('/clean/completed', jobController_1.JobController.cleanCompletedJobs);
-// Clean failed jobs
-// POST /api/jobs/clean/failed
-router.post('/clean/failedJobs', jobController_1.JobController.cleanFailedJobs);
 /**
  * Batch Processing
  */
