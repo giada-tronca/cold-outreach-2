@@ -11,7 +11,6 @@ import { Link, useLocation } from 'react-router-dom';
 import {
   Home,
   Users,
-  Upload,
   BarChart3,
   Settings,
   FileText,

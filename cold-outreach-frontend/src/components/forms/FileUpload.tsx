@@ -44,7 +44,6 @@ export default function FileUpload({
   onUploadComplete,
   onUploadError,
   onUploadProgress,
-  maxFiles = 1,
   className = '',
   acceptedFileTypes,
   disabled = false,

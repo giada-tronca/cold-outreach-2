@@ -67,7 +67,7 @@ export default function Dashboard() {
     window.location.href = '/cold-outreach/workflow';
   };
 
-  const handleBatchClick = (batchName: string) => {
+  const handleBatchClick = () => {
     window.location.href = '/cold-outreach/batches';
   };
 
@@ -179,7 +179,7 @@ export default function Dashboard() {
             <div className='space-y-3'>
               <div
                 className='flex items-center justify-between p-3 border rounded-lg cursor-pointer hover:bg-muted/50 transition-colors'
-                onClick={() => handleBatchClick('Tech Prospects Q4')}
+                onClick={() => handleBatchClick()}
               >
                 <div>
                   <p className='font-medium'>Tech Prospects Q4</p>
@@ -191,7 +191,7 @@ export default function Dashboard() {
               </div>
               <div
                 className='flex items-center justify-between p-3 border rounded-lg cursor-pointer hover:bg-muted/50 transition-colors'
-                onClick={() => handleBatchClick('SaaS Companies')}
+                onClick={() => handleBatchClick()}
               >
                 <div>
                   <p className='font-medium'>SaaS Companies</p>
@@ -203,7 +203,7 @@ export default function Dashboard() {
               </div>
               <div
                 className='flex items-center justify-between p-3 border rounded-lg cursor-pointer hover:bg-muted/50 transition-colors'
-                onClick={() => handleBatchClick('Healthcare Leads')}
+                onClick={() => handleBatchClick()}
               >
                 <div>
                   <p className='font-medium'>Healthcare Leads</p>

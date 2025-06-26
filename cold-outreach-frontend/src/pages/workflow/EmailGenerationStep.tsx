@@ -41,7 +41,7 @@ import type {
   EmailGenerationStatus,
   EmailGenerationJobStatus,
 } from '@/services/emailGenerationService';
-import { apiClient } from '@/services/api';
+// import { apiClient } from '@/services/api';
 
 interface EmailGenerationStepProps {
   prospectCount?: number;
@@ -67,8 +67,8 @@ export default function EmailGenerationStep({
   );
   const [prospects, setProspects] = useState<EmailGenerationStatus[]>([]);
   const [isStarted, setIsStarted] = useState(false);
-  const [isCompleted, setIsCompleted] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const [, setIsCompleted] = useState(false);
+  const [, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedTab, setSelectedTab] = useState<
     'overview' | 'prospects' | 'errors' | 'settings'
@@ -365,6 +365,56 @@ export default function EmailGenerationStep({
                     data.payload?.message
                   );
                   setError(data.payload?.message || 'Email generation error');
+                  break;
+
+                case 'notification':
+                  // Handle completion notifications
+                  console.log('📧 [EmailGenerationStep] Received notification:', data);
+
+                  if (data.title === 'Email Generation Complete') {
+                    console.log('✅ [EmailGenerationStep] Email generation completed!');
+
+                    // Update job status to completed
+                    setJobStatus(prev => {
+                      if (!prev) return null;
+                      return {
+                        ...prev,
+                        status: 'completed' as const,
+                        progress: 100,
+                        message: data.message,
+                        csvDownloadUrl: data.action?.url
+                      };
+                    });
+
+                    // Show success state
+                    setError(null);
+                    setIsStarted(true);
+                    setIsLoading(false);
+
+                    // If there's a CSV download URL, we can show download button
+                    if (data.action?.url) {
+                      console.log('📄 [EmailGenerationStep] CSV is ready for download');
+                      // The download button will be shown in the success view
+                    }
+
+                    // Call onStepComplete if needed
+                    const completionData = {
+                      emailGenerationResults: {
+                        status: 'completed',
+                        message: data.message,
+                        csvDownloadUrl: data.action?.url
+                      }
+                    };
+
+                    // Auto-complete step after showing success for a moment
+                    setTimeout(() => {
+                      onStepComplete?.(completionData);
+                    }, 2000);
+                  }
+                  break;
+
+                default:
+                  console.log('🔍 [EmailGenerationStep] Unknown SSE event:', data.type);
                   break;
               }
             } catch (parseError) {

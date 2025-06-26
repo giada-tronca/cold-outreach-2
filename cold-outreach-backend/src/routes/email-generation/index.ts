@@ -11,7 +11,6 @@ const router = Router()
 
 // Store job tracking similar to enrichment jobs
 export const emailGenerationJobs = new Map<string, EmailGenerationJob>()
-const workflowToJobMapping = new Map<string, string>()
 const sseClients = new Map<string, Set<any>>() // jobId -> Set of SSE connections
 
 // SSE event sending function (matching enrichment pattern)
@@ -89,7 +88,7 @@ async function updateJobStatus(batchId: string, completedProspectId: number, suc
 
     // Update the specific prospect
     const prospectIndex = job.prospects?.findIndex((p: any) => p.id === completedProspectId.toString()) ?? -1
-    if (prospectIndex !== -1 && job.prospects) {
+    if (prospectIndex !== -1 && job.prospects && job.prospects[prospectIndex]) {
         job.prospects[prospectIndex].status = success ? 'completed' : 'failed'
         job.prospects[prospectIndex].progress = 100
 
@@ -100,7 +99,9 @@ async function updateJobStatus(batchId: string, completedProspectId: number, suc
                 preview: emailData.preview || emailData.body?.substring(0, 100) + '...'
             }
         } else if (!success) {
-            job.prospects[prospectIndex].errors = job.prospects[prospectIndex].errors || []
+            if (!job.prospects[prospectIndex].errors) {
+                job.prospects[prospectIndex].errors = []
+            }
             job.prospects[prospectIndex].errors?.push('Email generation failed')
         }
     }

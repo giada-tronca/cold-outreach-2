@@ -3,6 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.emailGenerationJobs = void 0;
 exports.updateJobStatus = updateJobStatus;
 const express_1 = require("express");
 const errorHandler_1 = require("@/middleware/errorHandler");
@@ -13,8 +14,7 @@ const path_1 = __importDefault(require("path"));
 const promises_1 = __importDefault(require("fs/promises"));
 const router = (0, express_1.Router)();
 // Store job tracking similar to enrichment jobs
-const emailGenerationJobs = new Map();
-const workflowToJobMapping = new Map();
+exports.emailGenerationJobs = new Map();
 const sseClients = new Map(); // jobId -> Set of SSE connections
 // SSE event sending function (matching enrichment pattern)
 const sendSSEEvent = (jobId, type, payload) => {
@@ -41,24 +41,26 @@ const sendSSEEvent = (jobId, type, payload) => {
 };
 // Function to update job status when individual jobs complete
 async function updateJobStatus(batchId, completedProspectId, success, emailData) {
-    const job = emailGenerationJobs.get(batchId);
+    const job = exports.emailGenerationJobs.get(batchId);
     if (!job)
         return;
     // Update the specific prospect
-    const prospectIndex = job.prospects.findIndex((p) => p.id === completedProspectId.toString());
-    if (prospectIndex !== -1) {
+    const prospectIndex = job.prospects?.findIndex((p) => p.id === completedProspectId.toString()) ?? -1;
+    if (prospectIndex !== -1 && job.prospects && job.prospects[prospectIndex]) {
         job.prospects[prospectIndex].status = success ? 'completed' : 'failed';
         job.prospects[prospectIndex].progress = 100;
         if (success && emailData) {
             job.prospects[prospectIndex].generatedEmail = {
                 subject: emailData.subject,
                 body: emailData.body,
-                preview: emailData.preview || emailData.body.substring(0, 100) + '...'
+                preview: emailData.preview || emailData.body?.substring(0, 100) + '...'
             };
         }
         else if (!success) {
-            job.prospects[prospectIndex].errors = job.prospects[prospectIndex].errors || [];
-            job.prospects[prospectIndex].errors.push('Email generation failed');
+            if (!job.prospects[prospectIndex].errors) {
+                job.prospects[prospectIndex].errors = [];
+            }
+            job.prospects[prospectIndex].errors?.push('Email generation failed');
         }
     }
     // Update overall job status
@@ -84,7 +86,7 @@ async function updateJobStatus(batchId, completedProspectId, success, emailData)
             console.error(`❌ [EmailGeneration]: Failed to generate CSV for job ${batchId}:`, error);
         }
     }
-    emailGenerationJobs.set(batchId, job);
+    exports.emailGenerationJobs.set(batchId, job);
     // Send SSE updates (matching enrichment pattern)
     sendSSEEvent(batchId, 'job_status', job);
     // Check if job is complete (matching enrichment completion logic)
@@ -184,16 +186,13 @@ async function generateEmailCSV(campaignId, jobId) {
 // POST /api/email-generation/jobs
 router.post('/jobs', (0, errorHandler_1.asyncHandler)(async (req, res) => {
     console.log('📧 [EmailGeneration]: Received email generation job request:', req.body);
-    const { campaignId, workflowSessionId, configuration } = req.body;
+    const { campaignId, configuration } = req.body;
     const { parallelism = 2, aiProvider = 'openrouter', llmModelId } = configuration || {};
     const validAiProvider = aiProvider === 'gemini' ? 'gemini' : 'openrouter';
     console.log(`📧 [EmailGeneration]: Creating email generation jobs for campaign ${campaignId} using ${validAiProvider}${llmModelId ? ` (${llmModelId})` : ''}`);
     if (!campaignId) {
         return apiResponse_1.ApiResponseBuilder.error(res, 'Campaign ID is required', 400);
     }
-    // Generate batch ID for this job
-    const batchId = `email-gen-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    console.log(`📧 [EmailGeneration]: Creating email generation jobs for campaign ${campaignId}`);
     try {
         // Get all prospects from the campaign that have been enriched
         const prospects = await database_1.prisma.cOProspects.findMany({
@@ -206,40 +205,30 @@ router.post('/jobs', (0, errorHandler_1.asyncHandler)(async (req, res) => {
         if (prospects.length === 0) {
             return apiResponse_1.ApiResponseBuilder.error(res, 'No enriched prospects found for email generation', 400);
         }
-        // Create individual email generation jobs with parallelism control
+        // Create individual email generation jobs with proper parallelism control (like enrichment)
         const jobPromises = [];
-        const finalWorkflowSessionId = workflowSessionId || `email-gen-session-${Date.now()}`;
-        // Process prospects in batches based on parallelism setting
-        for (let i = 0; i < parallelism; i++) {
-            const prospectsForThisJob = prospects.filter((_, index) => index % parallelism === i);
-            if (prospectsForThisJob.length === 0)
-                continue;
-            // Create individual jobs for each prospect in this batch
-            for (const prospect of prospectsForThisJob) {
-                const jobData = {
-                    prospectId: prospect.id,
-                    campaignId: parseInt(campaignId),
-                    userId: 'default-user', // Use consistent userId for SSE
-                    aiProvider: validAiProvider,
-                    llmModelId: llmModelId, // Add specific LLM model ID
-                    workflowSessionId: finalWorkflowSessionId,
-                    batchId: batchId // Add batch ID for tracking
-                };
-                const jobPromise = queues_1.emailGenerationQueue.add(`email-generation-${prospect.id}-${Date.now()}`, jobData, {
-                    priority: 5,
-                    attempts: 3,
-                    delay: i * 1000, // Stagger job starts by 1 second per batch
-                });
-                jobPromises.push(jobPromise);
-            }
+        // Create individual jobs for each prospect
+        for (const prospect of prospects) {
+            const jobData = {
+                prospectId: prospect.id,
+                campaignId: parseInt(campaignId),
+                userId: 'default-user', // Use consistent userId for SSE
+                aiProvider: validAiProvider,
+                llmModelId: llmModelId, // Add specific LLM model ID
+            };
+            const jobPromise = queues_1.emailGenerationQueue.add(`email-generation-${prospect.id}-${Date.now()}`, jobData, {
+                priority: 5,
+                attempts: 3,
+            });
+            jobPromises.push(jobPromise);
         }
         // Wait for all jobs to be created
         const createdJobs = await Promise.all(jobPromises);
-        console.log(`✅ [EmailGeneration]: Created ${createdJobs.length} individual email generation jobs`);
-        // Create a batch tracking record
-        const batchJob = {
-            id: batchId,
-            workflowSessionId: finalWorkflowSessionId,
+        console.log(`✅ [EmailGeneration]: Created ${createdJobs.length} individual email generation jobs with parallelism ${parallelism}`);
+        // Create and store the job in the map for tracking
+        const jobId = `email-gen-${Date.now()}`;
+        const response = {
+            id: jobId,
             status: 'running',
             totalProspects: createdJobs.length,
             processedProspects: 0,
@@ -249,7 +238,8 @@ router.post('/jobs', (0, errorHandler_1.asyncHandler)(async (req, res) => {
             configuration: {
                 campaignId: parseInt(campaignId),
                 parallelism,
-                aiProvider: validAiProvider
+                aiProvider: validAiProvider,
+                llmModelId
             },
             prospects: prospects.map(prospect => ({
                 id: prospect.id.toString(),
@@ -265,11 +255,9 @@ router.post('/jobs', (0, errorHandler_1.asyncHandler)(async (req, res) => {
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString()
         };
-        // Store the job in our tracking map
-        emailGenerationJobs.set(batchId, batchJob);
-        // Store the workflow-to-job mapping for SSE updates
-        workflowToJobMapping.set(finalWorkflowSessionId, batchId);
-        return apiResponse_1.ApiResponseBuilder.success(res, batchJob, 'Email generation jobs created and queued successfully', 201);
+        // Store the job in the map for status tracking
+        exports.emailGenerationJobs.set(jobId, response);
+        return apiResponse_1.ApiResponseBuilder.success(res, response, 'Email generation jobs created and queued successfully', 201);
     }
     catch (error) {
         console.error('❌ [EmailGeneration]: Error creating email generation jobs:', error);
@@ -283,7 +271,7 @@ router.get('/jobs/:jobId', (0, errorHandler_1.asyncHandler)(async (req, res) => 
     if (!jobId) {
         return apiResponse_1.ApiResponseBuilder.error(res, 'Job ID is required', 400);
     }
-    const job = emailGenerationJobs.get(jobId);
+    const job = exports.emailGenerationJobs.get(jobId);
     if (!job) {
         return apiResponse_1.ApiResponseBuilder.error(res, 'Email generation job not found', 404);
     }
@@ -316,7 +304,7 @@ router.get('/jobs/:jobId/progress', (0, errorHandler_1.asyncHandler)(async (req,
         return;
     }
     // Check if job exists
-    const job = emailGenerationJobs.get(jobId);
+    const job = exports.emailGenerationJobs.get(jobId);
     if (!job) {
         apiResponse_1.ApiResponseBuilder.error(res, 'Email generation job not found', 404);
         return;

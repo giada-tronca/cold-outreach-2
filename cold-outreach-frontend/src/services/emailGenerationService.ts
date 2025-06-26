@@ -15,8 +15,17 @@ export interface EmailGenerationStatus {
     body: string;
     preview: string;
   };
-  errors?: string[];
+  errors: string[];
   processingTime?: number;
+  completedAt?: string;
+}
+
+export interface EmailGenerationError {
+  id: string;
+  message: string;
+  prospectId?: string;
+  timestamp: string;
+  severity: 'error' | 'warning';
 }
 
 export interface EmailGenerationJobStatus {
@@ -27,6 +36,8 @@ export interface EmailGenerationJobStatus {
   completedProspects: number;
   failedProspects: number;
   progress: number;
+  message?: string;
+  csvDownloadUrl?: string;
   configuration: {
     campaignId: number;
     parallelism: number;
@@ -34,16 +45,9 @@ export interface EmailGenerationJobStatus {
     llmModelId?: string;
   };
   prospects: EmailGenerationStatus[];
-  errors: Array<{
-    id: string;
-    message: string;
-    prospectId?: string;
-    timestamp: string;
-    severity: 'error' | 'warning';
-  }>;
-  createdAt: string;
-  updatedAt: string;
-  csvDownloadUrl?: string;
+  errors?: EmailGenerationError[];
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface EmailGenerationConfig {

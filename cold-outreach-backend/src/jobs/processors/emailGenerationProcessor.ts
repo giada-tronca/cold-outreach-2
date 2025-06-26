@@ -526,7 +526,7 @@ ${enrichment?.prospectAnalysis ? `Prospect Analysis: ${enrichment.prospectAnalys
         await this.checkAndGenerateCSV(job.data.campaignId, job.data.userId)
 
         // Update stored job status if it exists
-        await this.updateStoredJobStatus(job.data.campaignId, job.data.prospectId, true)
+        await this.updateStoredJobStatus(job.data.campaignId, job.data.prospectId, true, true)
     }
 
     /**
@@ -539,114 +539,130 @@ ${enrichment?.prospectAnalysis ? `Prospect Analysis: ${enrichment.prospectAnalys
         await this.checkAndGenerateCSV(job.data.campaignId, job.data.userId)
 
         // Update stored job status if it exists
-        await this.updateStoredJobStatus(job.data.campaignId, job.data.prospectId, false)
+        await this.updateStoredJobStatus(job.data.campaignId, job.data.prospectId, false, true)
     }
 
     /**
      * Update stored job status in emailGenerationJobs map
      */
-    static async updateStoredJobStatus(campaignId: number, prospectId: number, success: boolean) {
-        // Import the emailGenerationJobs map from the routes file
-        const { emailGenerationJobs } = require('../../routes/email-generation/index')
+    static async updateStoredJobStatus(campaignId: number, prospectId: number | null = null, isCompleted: boolean = false, isFinalUpdate: boolean = false) {
+        try {
+            // Import here to avoid circular dependency
+            const { emailGenerationJobs } = await import('@/routes/email-generation')
 
-        // Find the job by campaign ID
-        for (const [jobId, job] of emailGenerationJobs.entries()) {
-            if (job.configuration.campaignId === campaignId) {
-                // Update the specific prospect
-                const prospectIndex = job.prospects.findIndex((p: any) => p.id === prospectId.toString())
-                if (prospectIndex !== -1) {
-                    job.prospects[prospectIndex].status = success ? 'completed' : 'failed'
-                    job.prospects[prospectIndex].progress = 100
+            // Find job by campaign ID
+            let jobEntry: [string, any] | undefined
+            for (const [jobId, job] of emailGenerationJobs.entries()) {
+                if (job.configuration?.campaignId === campaignId) {
+                    jobEntry = [jobId, job]
+                    break
                 }
-
-                // Update overall job status
-                if (success) {
-                    job.completedProspects++
-                } else {
-                    job.failedProspects++
-                }
-                job.processedProspects++
-                job.progress = Math.min(100, Math.round((job.processedProspects / job.totalProspects) * 100))
-                job.updatedAt = new Date().toISOString()
-
-                // Check if job is complete
-                if (job.processedProspects >= job.totalProspects) {
-                    job.status = 'completed'
-                }
-
-                // Update the job in the map
-                emailGenerationJobs.set(jobId, job)
-                break
             }
+
+            if (jobEntry) {
+                const [jobId, job] = jobEntry
+
+                if (isFinalUpdate || prospectId === null) {
+                    // Final update - mark as completed
+                    job.status = isCompleted ? 'completed' : 'failed'
+                    job.progress = 100
+                    console.log(`📊 [Email Generation]: Updated stored job ${jobId} status to ${job.status}`)
+                } else if (prospectId) {
+                    // Update prospect-specific progress
+                    const prospectIndex = job.prospects?.findIndex((p: any) => p.id === prospectId.toString()) ?? -1
+                    if (prospectIndex !== -1 && job.prospects) {
+                        job.prospects[prospectIndex].status = isCompleted ? 'completed' : 'failed'
+                        job.prospects[prospectIndex].progress = 100
+
+                        // Update overall job progress
+                        const completed = job.prospects.filter((p: any) => p.status === 'completed').length
+                        const failed = job.prospects.filter((p: any) => p.status === 'failed').length
+                        const total = job.prospects.length
+
+                        job.completedProspects = completed
+                        job.failedProspects = failed
+                        job.processedProspects = completed + failed
+                        job.progress = total > 0 ? Math.round((completed + failed) / total * 100) : 0
+
+                        console.log(`📊 [Email Generation]: Updated stored job ${jobId} - ${completed}/${total} completed`)
+                    }
+                }
+            }
+        } catch (error) {
+            console.error(`❌ [Email Generation]: Error updating stored job status:`, error)
         }
     }
 
     /**
-     * Check if all prospects are processed and generate CSV if complete
+     * Check if all prospects are processed and generate CSV/send completion SSE
      */
-    private static async checkAndGenerateCSV(campaignId: number, userId: string) {
+    static async checkAndGenerateCSV(campaignId: number, userId: string) {
         try {
-            // Get all prospects for this campaign
-            const allProspects = await prisma.cOProspects.findMany({
-                where: {
-                    campaignId: campaignId,
-                    status: 'ENRICHED'
+            // Check how many prospects have been processed
+            const allProspects = await prisma.prospect.findMany({
+                where: { campaignId },
+                include: {
+                    enrichment: true,
+                    generatedEmail: true
                 }
             })
 
-            // Get all prospects with generated emails
-            const prospectsWithEmails = await prisma.cOGeneratedEmails.findMany({
-                where: {
-                    prospect: {
-                        campaignId: campaignId
-                    }
+            const totalProspects = allProspects.length
+            const completedProspects = allProspects.filter(p => p.generatedEmail).length
+            const failedProspects = allProspects.filter(p => !p.generatedEmail && p.status === 'FAILED').length
+            const processedProspects = completedProspects + failedProspects
+
+            console.log(`📊 [Email Generation]: Campaign ${campaignId} progress: ${processedProspects}/${totalProspects} prospects (${completedProspects} completed, ${failedProspects} failed)`)
+
+            // If all prospects are processed, generate CSV and send completion SSE
+            if (processedProspects >= totalProspects && totalProspects > 0) {
+                console.log(`🎉 [Email Generation]: All prospects processed for campaign ${campaignId}. Generating CSV and sending completion SSE...`)
+
+                try {
+                    // Generate CSV
+                    await this.generateEmailCSV(campaignId, allProspects)
+
+                    // Send completion SSE message using sendNotification
+                    const sseService = SSEService.getInstance()
+                    sseService.sendNotification(userId, {
+                        type: failedProspects === 0 ? 'success' : 'warning',
+                        title: 'Email Generation Complete',
+                        message: failedProspects === 0
+                            ? `All ${completedProspects} emails have been generated successfully!`
+                            : `Email generation completed with ${failedProspects} errors. ${completedProspects} emails generated successfully.`,
+                        action: {
+                            label: 'Download CSV',
+                            url: `/api/campaigns/${campaignId}/download-csv` // CSV download endpoint
+                        }
+                    })
+                    console.log(`📡 [Email Generation]: Sent completion notification for campaign ${campaignId}`)
+
+                    // Also update any stored job status
+                    await this.updateStoredJobStatus(campaignId, null, true, true) // Mark as completed
+
+                } catch (csvError) {
+                    console.error(`❌ [Email Generation]: Failed to generate CSV for campaign ${campaignId}:`, csvError)
+
+                    // Still send completion notification but without CSV
+                    const sseService = SSEService.getInstance()
+                    sseService.sendNotification(userId, {
+                        type: 'warning',
+                        title: 'Email Generation Complete',
+                        message: `Email generation completed but CSV generation failed. ${completedProspects} emails generated successfully.`
+                    })
                 }
-            })
-
-            console.log(`📊 [Email Generation]: Campaign ${campaignId} - ${prospectsWithEmails.length}/${allProspects.length} prospects have generated emails`)
-
-            // If all prospects have been processed (either completed or failed), generate CSV
-            if (prospectsWithEmails.length === allProspects.length) {
-                console.log(`📄 [Email Generation]: All prospects processed for campaign ${campaignId}, generating CSV...`)
-
-                const csvUrl = await this.generateEmailCSV(campaignId)
-
-                // Send SSE notification about CSV completion
-                const sseService = SSEService.getInstance()
-                sseService.sendNotification(userId, {
-                    type: 'success',
-                    title: 'Email Generation Complete',
-                    message: 'All emails have been generated successfully. CSV file is ready for download.',
-                    action: {
-                        label: 'Download CSV',
-                        url: csvUrl
-                    }
-                })
-
-                console.log(`✅ [Email Generation]: CSV generated for campaign ${campaignId}: ${csvUrl}`)
             }
+
         } catch (error) {
-            console.error(`❌ [Email Generation]: Error checking CSV generation for campaign ${campaignId}:`, error)
+            console.error(`❌ [Email Generation]: Error checking completion status for campaign ${campaignId}:`, error)
         }
     }
 
     /**
      * Generate CSV file with all prospect data and generated emails
      */
-    private static async generateEmailCSV(campaignId: number): Promise<string> {
+    private static async generateEmailCSV(campaignId: number, prospects: any[]): Promise<string> {
         try {
-            // Get all prospects with their generated emails
-            const prospects = await prisma.cOProspects.findMany({
-                where: {
-                    campaignId: campaignId,
-                    status: 'ENRICHED'
-                },
-                include: {
-                    generatedEmail: true,
-                    enrichment: true
-                }
-            })
-
             // Create CSV content
             const csvHeaders = [
                 'Name',
