@@ -191,9 +191,9 @@ class ProspectController {
                     c.id as campaign_id, c.name as campaign_name, c.email_subject, c.prompt,
                     b.id as batch_id, b.name as batch_name, b.status as batch_status, 
                     b.total_prospects, b.enriched_prospects
-                FROM "CO_prospects" p
-                LEFT JOIN "CO_campaigns" c ON p.campaign_id = c.id
-                LEFT JOIN "CO_batches" b ON p.batch_id = b.id
+                FROM "prospects" p
+                LEFT JOIN "campaigns" c ON p.campaign_id = c.id
+                LEFT JOIN "batches" b ON p.batch_id = b.id
                 ${whereClause}
                 ORDER BY p.created_at DESC
                 LIMIT $${params.length + 1} OFFSET $${params.length + 2}
@@ -201,7 +201,7 @@ class ProspectController {
             params.push(limitNum, skip);
             const countQuery = `
                 SELECT COUNT(*) as total
-                FROM "CO_prospects" p
+                FROM "prospects" p
                 ${whereClause}
             `;
             const [prospectsResult, totalResult] = await Promise.all([
@@ -523,7 +523,7 @@ const associateProspectsWithCampaign = async (req, res) => {
         // that were created with a temporary/default campaign during CSV upload
         // We'll find prospects created in the last 2 hours that aren't already in the target campaign
         const updateQuery = `
-            UPDATE "CO_prospects" 
+            UPDATE "prospects" 
             SET campaign_id = $1, updated_at = NOW()
             WHERE campaign_id != $1 
             AND created_at > NOW() - INTERVAL '2 hours'
@@ -546,7 +546,7 @@ const associateProspectsWithCampaign = async (req, res) => {
         // Update the prospects with the batch ID as well
         if (result > 0) {
             const updateBatchQuery = `
-                UPDATE "CO_prospects" 
+                UPDATE "prospects" 
                 SET batch_id = $1
                 WHERE campaign_id = $2 AND batch_id IS NULL
             `;

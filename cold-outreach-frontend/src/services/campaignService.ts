@@ -5,6 +5,7 @@ import type {
   ApiResponse,
   PaginatedResponse,
 } from '@/types';
+import { apiClient, handleApiResponse } from './api';
 
 const API_BASE = '/api/campaigns';
 
@@ -33,26 +34,16 @@ class CampaignService {
 
     const url = `${API_BASE}${searchParams.toString() ? `?${searchParams.toString()}` : ''}`;
 
-    const response = await fetch(url);
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch campaigns: ${response.statusText}`);
-    }
-
-    return response.json();
+    const response = await apiClient.get(url);
+    return handleApiResponse<PaginatedResponse<Campaign>>(response);
   }
 
   /**
    * Get a campaign by ID
    */
   async getCampaignById(id: number): Promise<ApiResponse<Campaign>> {
-    const response = await fetch(`${API_BASE}/${id}`);
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch campaign: ${response.statusText}`);
-    }
-
-    return response.json();
+    const response = await apiClient.get(`${API_BASE}/${id}`);
+    return handleApiResponse<ApiResponse<Campaign>>(response);
   }
 
   /**
@@ -61,22 +52,8 @@ class CampaignService {
   async createCampaign(
     campaignData: CreateCampaignData
   ): Promise<ApiResponse<Campaign>> {
-    const response = await fetch(API_BASE, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(campaignData),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(
-        errorData.message || `Failed to create campaign: ${response.statusText}`
-      );
-    }
-
-    return response.json();
+    const response = await apiClient.post(API_BASE, campaignData);
+    return handleApiResponse<ApiResponse<Campaign>>(response);
   }
 
   /**
@@ -86,22 +63,8 @@ class CampaignService {
     id: number,
     campaignData: UpdateCampaignData
   ): Promise<ApiResponse<Campaign>> {
-    const response = await fetch(`${API_BASE}/${id}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(campaignData),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(
-        errorData.message || `Failed to update campaign: ${response.statusText}`
-      );
-    }
-
-    return response.json();
+    const response = await apiClient.put(`${API_BASE}/${id}`, campaignData);
+    return handleApiResponse<ApiResponse<Campaign>>(response);
   }
 
   /**
@@ -110,37 +73,16 @@ class CampaignService {
   async deleteCampaign(
     id: number
   ): Promise<ApiResponse<{ deletedCampaignId: number }>> {
-    const response = await fetch(`${API_BASE}/${id}`, {
-      method: 'DELETE',
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(
-        errorData.message || `Failed to delete campaign: ${response.statusText}`
-      );
-    }
-
-    return response.json();
+    const response = await apiClient.delete(`${API_BASE}/${id}`);
+    return handleApiResponse<ApiResponse<{ deletedCampaignId: number }>>(response);
   }
 
   /**
-   * Duplicate a campaign
-   */
+ * Duplicate a campaign
+ */
   async duplicateCampaign(id: number): Promise<ApiResponse<Campaign>> {
-    const response = await fetch(`${API_BASE}/${id}/duplicate`, {
-      method: 'POST',
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(
-        errorData.message ||
-          `Failed to duplicate campaign: ${response.statusText}`
-      );
-    }
-
-    return response.json();
+    const response = await apiClient.post(`${API_BASE}/${id}/duplicate`);
+    return handleApiResponse<ApiResponse<Campaign>>(response);
   }
 }
 

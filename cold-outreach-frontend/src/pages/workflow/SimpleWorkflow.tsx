@@ -435,33 +435,24 @@ export default function SimpleWorkflow() {
           if (campaignData.campaignMode === 'new' && !campaignData.campaignId) {
             console.log('🚀 Creating new campaign before proceeding...');
 
-            // Call the campaign creation API
-            const response = await fetch(
-              `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001'}/api/campaigns`,
-              {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                  name: campaignData.campaignName,
-                  emailSubject: campaignData.emailSubject,
-                  prompt: campaignData.prompt,
-                  enrichmentFlags: campaignData.enrichmentServices.map(
-                    (s: any) => s.id
-                  ),
-                  serviceId: campaignData.serviceId,
-                }),
-              }
-            );
+            // Call the campaign creation API using apiClient
+            const result = await apiClient.post('/api/campaigns', {
+              name: campaignData.campaignName,
+              emailSubject: campaignData.emailSubject,
+              prompt: campaignData.prompt,
+              enrichmentFlags: campaignData.enrichmentServices.map(
+                (s: any) => s.id
+              ),
+              serviceId: campaignData.serviceId,
+            });
 
-            const result = await response.json();
+            const responseData = await handleApiResponse(result);
 
-            if (response.ok && result.success) {
-              console.log('✅ New campaign created with ID:', result.data.id);
-              finalCampaignData.campaignId = result.data.id;
+            if (responseData.success) {
+              console.log('✅ New campaign created with ID:', responseData.data.id);
+              finalCampaignData.campaignId = responseData.data.id;
             } else {
-              throw new Error(result.message || 'Failed to create campaign');
+              throw new Error(responseData.message || 'Failed to create campaign');
             }
           }
 

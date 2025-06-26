@@ -28,7 +28,7 @@ model COApiConfigurations {
   maxRetries             Int?     @default(3) @map("max_retries")
   domainKeywordsIndustry String?  @map("domain_keywords_industry")
 
-  @@map("CO_api_configurations")
+  @@map("api_configurations")
 }
 
 model COAutoServiceSettings {
@@ -38,7 +38,7 @@ model COAutoServiceSettings {
   createdAt       DateTime? @map("created_at")
   updatedAt       DateTime? @updatedAt @map("updated_at")
 
-  @@map("CO_auto_service_settings")
+  @@map("auto_service_settings")
 }
 
 model COBatches {
@@ -58,7 +58,7 @@ model COBatches {
   campaign          COCampaigns? @relation(fields: [campaignId], references: [id])
   prospects         COProspects[]
 
-  @@map("CO_batches")
+  @@map("batches")
 }
 
 model COCampaigns {
@@ -76,7 +76,7 @@ model COCampaigns {
   prospects        COProspects[]
   workflowSessions COWorkflowSessions[]
 
-  @@map("CO_campaigns")
+  @@map("campaigns")
 }
 
 model COGeneratedEmails {
@@ -95,7 +95,7 @@ model COGeneratedEmails {
   // Relationships
   prospect            COProspects @relation(fields: [prospectId], references: [id])
 
-  @@map("CO_generated_emails")
+  @@map("generated_emails")
 }
 
 model COPrompts {
@@ -110,7 +110,7 @@ model COPrompts {
   createdAt                DateTime  @default(now()) @map("created_at")
   updatedAt                DateTime  @default(now()) @updatedAt @map("updated_at")
 
-  @@map("CO_prompts")
+  @@map("prompts")
 }
 
 model COProspectEnrichments {
@@ -130,7 +130,7 @@ model COProspectEnrichments {
   // Relationships
   prospect                  COProspects @relation(fields: [prospectId], references: [id])
 
-  @@map("CO_prospect_enrichments")
+  @@map("prospect_enrichments")
 }
 
 model COProspects {
@@ -156,7 +156,7 @@ model COProspects {
   enrichment     COProspectEnrichments?
   generatedEmail COGeneratedEmails?
 
-  @@map("CO_prospects")
+  @@map("prospects")
   @@index([campaignId])
   @@index([uploadId])
   @@index([batchId])
@@ -170,7 +170,7 @@ model COServices {
   updatedAt       DateTime  @updatedAt @map("updated_at")
   promptTemplate  String?   @map("prompt_template")
 
-  @@map("CO_services")
+  @@map("services")
 }
 
 model COWorkflowSessions {
@@ -188,7 +188,7 @@ model COWorkflowSessions {
   // Relationships
   campaign           COCampaigns? @relation(fields: [campaignId], references: [id])
 
-  @@map("CO_workflow_sessions")
+  @@map("workflow_sessions")
 }
 
 model Profiles {
