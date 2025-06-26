@@ -16,6 +16,8 @@ const index_6 = __importDefault(require("./enrichment/index"));
 const index_7 = __importDefault(require("./email-generation/index"));
 const index_8 = __importDefault(require("./services/index"));
 const index_9 = __importDefault(require("./jobs/index"));
+// Import API configuration controller
+const apiConfigurationController_1 = require("@/controllers/apiConfigurationController");
 const router = (0, express_1.Router)();
 // Health check endpoint
 router.get('/health', async (_req, res) => {
@@ -355,6 +357,11 @@ router.post('/uploads', upload.single('file'), async (req, res) => {
 // CSV import is now handled by the real prospectImportController via /api/prospects/import/csv
 // Temporary enrichment endpoints removed - using real enrichment routes
 // Temporary enrichment job progress endpoint removed - using real SSE endpoint from enrichmentRoutes
+// API Configuration routes
+router.get('/configuration', apiConfigurationController_1.getApiConfiguration);
+router.get('/configuration/company-info', apiConfigurationController_1.getSelfCompanyInfo);
+router.put('/configuration/company-info', apiConfigurationController_1.updateSelfCompanyInfo);
+router.get('/configuration/validate', apiConfigurationController_1.validateApiConfiguration);
 // Mount route modules
 router.use('/auth', index_1.default);
 router.use('/campaigns', index_2.default);

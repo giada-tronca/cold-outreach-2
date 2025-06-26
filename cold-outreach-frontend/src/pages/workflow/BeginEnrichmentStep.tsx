@@ -8,29 +8,20 @@ import {
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { Badge } from '@/components/ui/badge';
+
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import {
   Play,
-  Pause,
-  Square,
-  RefreshCw,
   CheckCircle,
   AlertCircle,
-  Clock,
-  Users,
-  TrendingUp,
-  Activity,
-  AlertTriangle,
   XCircle,
   Loader2,
-  BarChart3,
-  Timer,
   Settings2,
   ArrowLeft,
+  Users,
 } from 'lucide-react';
 
 import ReactMarkdown from 'react-markdown';
@@ -147,7 +138,7 @@ export default function BeginEnrichmentStep({
   const [error, setError] = useState<string | null>(null);
   const [jobStatus, setJobStatus] = useState<EnrichmentJobStatus | null>(null);
   const [prospects, setProspects] = useState<ProspectEnrichmentStatus[]>([]);
-  const [selectedTab, setSelectedTab] = useState<'overview' | 'prospects' | 'errors' | 'settings'>('overview');
+
   const eventSourceRef = useRef<EventSource | null>(null);
 
   // SSE connection for real-time updates
@@ -729,7 +720,7 @@ Jane Smith,jane@company.com,Company Inc,CTO
     try {
       console.log(`📡 [Step 3] Setting up SSE connection for user: ${userId}, job: ${jobId}`);
 
-      // Use the user-specific SSE connection for more reliable updates
+      // Use the user-specific SSE connection for final prospect completion only
       eventSourceRef.current = ProspectEnrichmentService.createSSEConnection(
         userId,
         event => {
@@ -808,89 +799,76 @@ Jane Smith,jane@company.com,Company Inc,CTO
                 break;
 
               case 'prospect-enrichment':
-                // Handle individual prospect updates
-                console.log(`[Step 3] Prospect update: ${data.prospectId} - ${data.status}`);
+                // Handle ONLY final prospect completion/failure (no intermediate updates)
+                console.log(`[Step 3] Prospect final result: ${data.prospectId} - ${data.status}`);
 
-                // Update specific prospect in the list
-                setProspects(prev =>
-                  prev.map(p => {
-                    if (p.id.toString() === data.prospectId || `csv-${p.id - 1}` === data.prospectId) {
-                      return {
-                        ...p,
-                        status: data.isDuplicate ? 'skipped' :
-                          data.status === 'duplicate_found' ? 'skipped' :
-                            data.status === 'completed' ? 'completed' :
-                              data.status === 'error' ? 'failed' : p.status,
-                        progress: data.progress || p.progress,
-                        enrichedData: data.enrichmentData || p.enrichedData,
-                        errors: data.error ? [data.error] : p.errors,
-                        completedAt: data.status === 'completed' ? new Date().toISOString() : p.completedAt
-                      } as ProspectData;
+                // Only process completed or error status (final states)
+                if (data.status === 'completed' || data.status === 'error') {
+                  // Update specific prospect in the list
+                  setProspects(prev =>
+                    prev.map(p => {
+                      if (p.id.toString() === data.prospectId || `csv-${p.id - 1}` === data.prospectId) {
+                        return {
+                          ...p,
+                          status: data.status === 'completed' ? 'completed' : 'failed',
+                          progress: data.status === 'completed' ? 100 : 0,
+                          enrichedData: data.enrichmentData || p.enrichedData,
+                          errors: data.error ? [data.error] : p.errors,
+                          completedAt: new Date().toISOString()
+                        } as ProspectData;
+                      }
+                      return p;
+                    })
+                  );
+
+                  // Update job status counters
+                  setJobStatus(prev => {
+                    if (!prev) return prev;
+
+                    const updatedStatus = { ...prev };
+
+                    if (data.status === 'completed') {
+                      updatedStatus.completedProspects = (prev.completedProspects || 0) + 1;
+                    } else if (data.status === 'error') {
+                      updatedStatus.failedProspects = (prev.failedProspects || 0) + 1;
                     }
-                    return p;
-                  })
-                );
 
-                // Update job status counters
-                setJobStatus(prev => {
-                  if (!prev) return prev;
+                    const processed = (updatedStatus.completedProspects || 0) + (updatedStatus.failedProspects || 0);
+                    // Cap progress at 100% to fix the 150% issue
+                    updatedStatus.progress = Math.min(100, prev.totalProspects > 0 ? Math.round((processed / prev.totalProspects) * 100) : 0);
 
-                  const updatedStatus = { ...prev };
+                    // Auto-transition to Step 4 when all prospects are processed
+                    if (processed >= prev.totalProspects) {
+                      console.log('[Step 3] All prospects processed, auto-transitioning to Step 4');
 
-                  if (data.status === 'completed' || data.status === 'duplicate_skipped') {
-                    updatedStatus.completedProspects = (prev.completedProspects || 0) + 1;
-                  } else if (data.status === 'error') {
-                    updatedStatus.failedProspects = (prev.failedProspects || 0) + 1;
-                  }
+                      const completeStepData = {
+                        enrichmentResults: {
+                          id: prev.id,
+                          status: updatedStatus.failedProspects === 0 ? 'completed' : 'completed_with_errors',
+                          totalProspects: prev.totalProspects,
+                          completedProspects: updatedStatus.completedProspects || 0,
+                          failedProspects: updatedStatus.failedProspects || 0,
+                          prospects: prospects,
+                          progress: 100,
+                          message: updatedStatus.failedProspects === 0 ? 'Enrichment completed successfully' : 'Enrichment completed with some errors'
+                        },
+                        enrichmentSettings: {
+                          concurrency: concurrency[0],
+                          retryAttempts: retryAttempts[0],
+                          websitePages: websitePages[0],
+                          selectedModel: enrichmentConfig?.selectedModel
+                        },
+                        ...stepData
+                      };
 
-                  const processed = (updatedStatus.completedProspects || 0) + (updatedStatus.failedProspects || 0);
-                  // Cap progress at 100% to fix the 150% issue
-                  updatedStatus.progress = Math.min(100, prev.totalProspects > 0 ? Math.round((processed / prev.totalProspects) * 100) : 0);
+                      setTimeout(() => {
+                        onStepComplete?.(completeStepData);
+                      }, 1000); // Small delay to ensure UI updates
+                    }
 
-                  // TEMPORARY FIX: Auto-transition to Step 4 when progress >= 100%
-                  if (updatedStatus.progress >= 100 && processed >= prev.totalProspects) {
-                    console.log('[Step 3] Progress reached 100%, auto-transitioning to Step 4');
-
-                    const completeStepData = {
-                      enrichmentResults: {
-                        id: prev.id,
-                        status: 'completed',
-                        totalProspects: prev.totalProspects,
-                        completedProspects: updatedStatus.completedProspects || 0,
-                        failedProspects: updatedStatus.failedProspects || 0,
-                        prospects: prospects,
-                        progress: 100,
-                        message: 'Enrichment completed successfully'
-                      },
-                      enrichmentSettings: {
-                        concurrency: concurrency[0],
-                        retryAttempts: retryAttempts[0],
-                        websitePages: websitePages[0],
-                        selectedModel: enrichmentConfig?.selectedModel
-                      },
-                      ...stepData
-                    };
-
-                    setTimeout(() => {
-                      onStepComplete?.(completeStepData);
-                    }, 1000); // Small delay to ensure UI updates
-                  }
-
-                  return updatedStatus;
-                });
-                break;
-
-              case 'batch-progress':
-                // Handle batch progress updates
-                console.log('[Step 3] Batch progress:', data.progress);
-                setJobStatus(prev => ({
-                  ...prev,
-                  progress: Math.min(100, data.progress || 0),
-                  processedProspects: data.processed,
-                  totalProspects: data.total,
-                  failedProspects: data.failed,
-                  status: data.status
-                } as EnrichmentJobStatus));
+                    return updatedStatus;
+                  });
+                }
                 break;
 
               case 'connected':
@@ -920,766 +898,11 @@ Jane Smith,jane@company.com,Company Inc,CTO
         }
       );
 
-      // Add a polling fallback to check job status periodically
-      const pollInterval = setInterval(async () => {
-        if (!jobStatus?.id) return;
-
-        try {
-          // Check if all prospects are completed by polling the prospects endpoint
-          const response = await fetch(`/api/prospects?campaignId=${campaignId || stepData?.campaignData?.campaignId}&limit=100`);
-          if (response.ok) {
-            const data = await response.json();
-            const allProspects = data.prospects || [];
-
-            if (allProspects.length > 0) {
-              const enrichedCount = allProspects.filter((p: any) => p.status === 'ENRICHED' || p.status === 'COMPLETED').length;
-              const failedCount = allProspects.filter((p: any) => p.status === 'FAILED').length;
-              const totalCount = allProspects.length;
-
-              // Check if all prospects are done (enriched or failed)
-              if (enrichedCount + failedCount >= totalCount && totalCount > 0) {
-                console.log('[Step 3] Polling detected completion:', { enrichedCount, failedCount, totalCount });
-
-                // Clear the polling interval
-                clearInterval(pollInterval);
-
-                // Prepare completion data
-                const jobResult = {
-                  id: jobStatus.id,
-                  status: failedCount === 0 ? 'completed' : 'completed_with_errors',
-                  totalProspects: totalCount,
-                  completedProspects: enrichedCount,
-                  failedProspects: failedCount,
-                  prospects: allProspects,
-                  progress: 100,
-                  message: failedCount === 0 ? 'Enrichment completed successfully' : 'Enrichment completed with some errors'
-                };
-
-                setJobStatus(prev => {
-                  if (!prev) return null;
-                  return {
-                    ...prev,
-                    status: jobResult.status as any,
-                    totalProspects: totalCount,
-                    processedProspects: enrichedCount + failedCount,
-                    completedProspects: enrichedCount,
-                    failedProspects: failedCount,
-                    progress: 100,
-                    metrics: prev.metrics || {
-                      averageProcessingTime: 0,
-                      successRate: totalCount > 0 ? (enrichedCount / totalCount * 100) : 0,
-                      enrichmentQuality: 0,
-                      costPerProspect: 0.12,
-                      totalCost: totalCount * 0.12,
-                    }
-                  };
-                });
-
-                // Update prospects list
-                setProspects(allProspects.map((p: any) => ({
-                  id: p.id,
-                  name: p.name,
-                  email: p.email,
-                  company: p.company,
-                  position: p.position,
-                  status: p.status === 'ENRICHED' ? 'completed' : p.status === 'FAILED' ? 'failed' : 'pending',
-                  progress: p.status === 'ENRICHED' || p.status === 'FAILED' ? 100 : 0,
-                  enrichedData: p.enrichment ? {
-                    linkedinSummary: p.enrichment.linkedinSummary,
-                    companySummary: p.enrichment.companySummary,
-                    techStack: p.enrichment.techStackData,
-                    prospectAnalysisSummary: p.enrichment.prospectAnalysisSummary
-                  } : undefined,
-                  errors: [],
-                  retryCount: 0,
-                  completedAt: p.updatedAt
-                })));
-
-                // Prepare complete data package for Step 4
-                const completeStepData = {
-                  enrichmentResults: jobResult,
-                  enrichmentSettings: {
-                    concurrency: concurrency[0],
-                    retryAttempts: retryAttempts[0],
-                    websitePages: websitePages[0],
-                    selectedModel: enrichmentConfig?.selectedModel
-                  },
-                  ...stepData
-                };
-
-                console.log(`[Step 3] Polling-based completion - proceeding to Step 4`);
-
-                // Show success message and update UI
-                setError(null);
-                setIsLoading(false);
-
-                // Auto-proceed to Step 4 after a brief delay to show completion
-                setTimeout(() => {
-                  onStepComplete?.(completeStepData);
-                }, 1500);
-              }
-            }
-          }
-        } catch (error) {
-          console.error('[Step 3] Polling error:', error);
-        }
-      }, 5000); // Poll every 5 seconds
-
-      // Store the cleanup function for polling
-      const cleanupPolling = () => {
-        clearInterval(pollInterval);
-      };
-
-      // Store cleanup function for later use
-      if (eventSourceRef.current) {
-        const originalClose = eventSourceRef.current.close;
-        eventSourceRef.current.close = () => {
-          originalClose.call(eventSourceRef.current);
-          cleanupPolling();
-        };
-      }
-
     } catch (err) {
       console.error('Failed to setup SSE connection:', err);
       setError('Failed to establish real-time connection');
     }
   };
-
-  const pauseEnrichment = async () => {
-    if (!jobStatus?.id) return;
-
-    try {
-      await ProspectEnrichmentService.controlEnrichmentJob(
-        jobStatus.id,
-        'pause'
-      );
-      console.log('⏸️ Paused enrichment job');
-    } catch (err) {
-      console.error('Failed to pause job:', err);
-      setError('Failed to pause enrichment');
-    }
-  };
-
-  const resumeEnrichment = async () => {
-    if (!jobStatus?.id) return;
-
-    try {
-      await ProspectEnrichmentService.controlEnrichmentJob(
-        jobStatus.id,
-        'resume'
-      );
-      console.log('▶️ Resumed enrichment job');
-    } catch (err) {
-      console.error('Failed to resume job:', err);
-      setError('Failed to resume enrichment');
-    }
-  };
-
-  const cancelEnrichment = async () => {
-    if (!jobStatus?.id) return;
-
-    try {
-      await ProspectEnrichmentService.controlEnrichmentJob(
-        jobStatus.id,
-        'cancel'
-      );
-      console.log('⏹️ Cancelled enrichment job');
-
-      // Close SSE connection
-      if (eventSourceRef.current) {
-        eventSourceRef.current.close();
-      }
-    } catch (err) {
-      console.error('Failed to cancel job:', err);
-      setError('Failed to cancel enrichment');
-    }
-  };
-
-  const retryFailedProspects = async () => {
-    if (!jobStatus?.id) return;
-
-    const failedProspects = prospects.filter(p => p.status === 'failed');
-    if (failedProspects.length === 0) {
-      setError('No failed prospects to retry');
-      return;
-    }
-
-    try {
-      await ProspectEnrichmentService.controlEnrichmentJob(
-        jobStatus.id,
-        'retry'
-      );
-      console.log(`🔄 Retrying ${failedProspects.length} failed prospects`);
-    } catch (err) {
-      console.error('Failed to retry prospects:', err);
-      setError('Failed to retry failed prospects');
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return 'text-green-600';
-      case 'completed_with_errors':
-        return 'text-yellow-600';
-      case 'running':
-      case 'processing':
-        return 'text-blue-600';
-      case 'paused':
-        return 'text-yellow-600';
-      case 'failed':
-      case 'cancelled':
-        return 'text-red-600';
-      case 'skipped':
-        return 'text-gray-600';
-      default:
-        return 'text-gray-600';
-    }
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return <CheckCircle className='h-4 w-4' />;
-      case 'completed_with_errors':
-        return <AlertTriangle className='h-4 w-4' />;
-      case 'running':
-      case 'processing':
-        return <Activity className='h-4 w-4 animate-pulse' />;
-      case 'paused':
-        return <Pause className='h-4 w-4' />;
-      case 'failed':
-        return <XCircle className='h-4 w-4' />;
-      case 'cancelled':
-        return <Square className='h-4 w-4' />;
-      case 'retrying':
-        return <RefreshCw className='h-4 w-4 animate-spin' />;
-      case 'skipped':
-        return <AlertTriangle className='h-4 w-4' />;
-      default:
-        return <Clock className='h-4 w-4' />;
-    }
-  };
-
-  const renderJobOverview = () => (
-    <div className='space-y-6'>
-      {/* Status Cards */}
-      <div className='grid gap-4 md:grid-cols-4'>
-        <Card>
-          <CardContent className='p-4'>
-            <div className='flex items-center gap-3'>
-              <div className='flex items-center justify-center w-10 h-10 bg-blue-100 text-blue-600 rounded-lg'>
-                <Users className='h-5 w-5' />
-              </div>
-              <div>
-                <div className='text-2xl font-bold'>
-                  {jobStatus?.totalProspects || prospectCount}
-                </div>
-                <div className='text-sm text-muted-foreground'>
-                  Total Prospects
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className='p-4'>
-            <div className='flex items-center gap-3'>
-              <div className='flex items-center justify-center w-10 h-10 bg-green-100 text-green-600 rounded-lg'>
-                <CheckCircle className='h-5 w-5' />
-              </div>
-              <div>
-                <div className='text-2xl font-bold'>
-                  {jobStatus?.completedProspects || 0}
-                </div>
-                <div className='text-sm text-muted-foreground'>Completed</div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className='p-4'>
-            <div className='flex items-center gap-3'>
-              <div className='flex items-center justify-center w-10 h-10 bg-red-100 text-red-600 rounded-lg'>
-                <AlertCircle className='h-5 w-5' />
-              </div>
-              <div>
-                <div className='text-2xl font-bold'>
-                  {jobStatus?.failedProspects || 0}
-                </div>
-                <div className='text-sm text-muted-foreground'>Failed</div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className='p-4'>
-            <div className='flex items-center gap-3'>
-              <div className='flex items-center justify-center w-10 h-10 bg-purple-100 text-purple-600 rounded-lg'>
-                <TrendingUp className='h-5 w-5' />
-              </div>
-              <div>
-                <div className='text-2xl font-bold'>
-                  {jobStatus?.processingRate?.toFixed(0) || '0'}
-                </div>
-                <div className='text-sm text-muted-foreground'>Per Minute</div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Progress Section */}
-      <Card>
-        <CardHeader>
-          <CardTitle className='flex items-center gap-2'>
-            <Activity className='h-5 w-5' />
-            Enrichment Progress
-            {jobStatus?.status === 'running' && (
-              <Badge variant='outline' className='text-green-600 ml-2'>
-                <div className='w-2 h-2 bg-green-500 rounded-full mr-1 animate-pulse'></div>
-                Live Updates
-              </Badge>
-            )}
-          </CardTitle>
-          <CardDescription>
-            Real-time progress of prospect enrichment processing
-          </CardDescription>
-        </CardHeader>
-        <CardContent className='space-y-4'>
-          <div className='space-y-2'>
-            <div className='flex justify-between text-sm'>
-              <span>Overall Progress</span>
-              <span>{jobStatus?.progress || 0}%</span>
-            </div>
-            <Progress value={jobStatus?.progress || 0} className='h-3' />
-          </div>
-
-          <div className='grid gap-4 md:grid-cols-2'>
-            <div className='space-y-2'>
-              <div className='flex justify-between text-sm'>
-                <span>Processed</span>
-                <span>
-                  {jobStatus?.processedProspects || 0} of{' '}
-                  {jobStatus?.totalProspects || prospectCount}
-                </span>
-              </div>
-              <Progress
-                value={
-                  jobStatus && jobStatus.totalProspects > 0
-                    ? (jobStatus.processedProspects /
-                      jobStatus.totalProspects) *
-                    100
-                    : 0
-                }
-                className='h-2'
-              />
-            </div>
-            <div className='space-y-2'>
-              <div className='flex justify-between text-sm'>
-                <span>Success Rate</span>
-                <span>
-                  {jobStatus?.processedProspects
-                    ? Math.floor(
-                      (jobStatus.completedProspects /
-                        jobStatus.processedProspects) *
-                      100
-                    )
-                    : 0}
-                  %
-                </span>
-              </div>
-              <Progress
-                value={
-                  jobStatus?.processedProspects
-                    ? (jobStatus.completedProspects /
-                      jobStatus.processedProspects) *
-                    100
-                    : 0
-                }
-                className='h-2'
-              />
-            </div>
-          </div>
-
-          {/* Timing Information */}
-          {jobStatus?.startedAt && (
-            <div className='grid gap-4 md:grid-cols-2 pt-4 border-t text-sm'>
-              <div className='flex items-center gap-2'>
-                <Timer className='h-4 w-4 text-blue-600' />
-                <span className='text-muted-foreground'>Started:</span>
-                <span>
-                  {new Date(jobStatus.startedAt).toLocaleTimeString()}
-                </span>
-              </div>
-              {jobStatus.estimatedCompletion &&
-                jobStatus.status === 'running' && (
-                  <div className='flex items-center gap-2'>
-                    <Clock className='h-4 w-4 text-orange-600' />
-                    <span className='text-muted-foreground'>
-                      Est. Completion:
-                    </span>
-                    <span>
-                      {new Date(
-                        jobStatus.estimatedCompletion
-                      ).toLocaleTimeString()}
-                    </span>
-                  </div>
-                )}
-            </div>
-          )}
-
-          {/* Status and Controls */}
-          <div className='flex items-center justify-between pt-4 border-t'>
-            <div className='flex items-center gap-3'>
-              <div
-                className={`flex items-center gap-2 ${getStatusColor(jobStatus?.status || 'pending')}`}
-              >
-                {getStatusIcon(jobStatus?.status || 'pending')}
-                <span className='font-medium capitalize'>
-                  {jobStatus?.status || 'Not Started'}
-                </span>
-              </div>
-            </div>
-
-            <div className='flex gap-2'>
-              {!isStarted && (
-                <Button
-                  onClick={startEnrichment}
-                  disabled={
-                    disabled ||
-                    isLoading ||
-                    (prospects.length === 0 && prospectCount === 0)
-                  }
-                  className='gap-2'
-                  size='lg'
-                >
-                  {isLoading ? (
-                    <Loader2 className='h-4 w-4 animate-spin' />
-                  ) : (
-                    <Play className='h-4 w-4' />
-                  )}
-                  Start Enrichment
-                </Button>
-              )}
-
-              {isStarted && jobStatus?.status === 'running' && (
-                <Button
-                  variant='outline'
-                  onClick={pauseEnrichment}
-                  className='gap-2'
-                >
-                  <Pause className='h-4 w-4' />
-                  Pause
-                </Button>
-              )}
-
-              {isStarted && jobStatus?.status === 'paused' && (
-                <Button onClick={resumeEnrichment} className='gap-2'>
-                  <Play className='h-4 w-4' />
-                  Resume
-                </Button>
-              )}
-
-              {isStarted &&
-                ['running', 'paused'].includes(jobStatus?.status || '') && (
-                  <Button
-                    variant='destructive'
-                    onClick={cancelEnrichment}
-                    className='gap-2'
-                  >
-                    <Square className='h-4 w-4' />
-                    Cancel
-                  </Button>
-                )}
-
-              {jobStatus?.failedProspects && jobStatus.failedProspects > 0 && (
-                <Button
-                  variant='outline'
-                  onClick={retryFailedProspects}
-                  className='gap-2'
-                >
-                  <RefreshCw className='h-4 w-4' />
-                  Retry Failed ({jobStatus.failedProspects})
-                </Button>
-              )}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Metrics */}
-      {jobStatus?.metrics && (
-        <Card>
-          <CardHeader>
-            <CardTitle className='flex items-center gap-2'>
-              <BarChart3 className='h-5 w-5' />
-              Performance Metrics
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className='grid gap-4 md:grid-cols-2 lg:grid-cols-4'>
-              <div className='space-y-1'>
-                <div className='text-sm text-muted-foreground'>
-                  Avg Processing Time
-                </div>
-                <div className='text-2xl font-bold'>
-                  {jobStatus.metrics?.averageProcessingTime?.toFixed(1) ||
-                    '0.0'}
-                  s
-                </div>
-              </div>
-              <div className='space-y-1'>
-                <div className='text-sm text-muted-foreground'>
-                  Success Rate
-                </div>
-                <div className='text-2xl font-bold text-green-600'>
-                  {jobStatus.metrics?.successRate || '0'}%
-                </div>
-              </div>
-              <div className='space-y-1'>
-                <div className='text-sm text-muted-foreground'>
-                  Quality Score
-                </div>
-                <div className='text-2xl font-bold text-blue-600'>
-                  {jobStatus.metrics?.enrichmentQuality || '0'}%
-                </div>
-              </div>
-              <div className='space-y-1'>
-                <div className='text-sm text-muted-foreground'>Total Cost</div>
-                <div className='text-2xl font-bold text-purple-600'>
-                  ${jobStatus.metrics?.totalCost?.toFixed(2) || '0.00'}
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-    </div>
-  );
-
-  const renderProspectDetails = () => (
-    <div className='space-y-4'>
-      <div className='flex items-center justify-between'>
-        <h3 className='text-lg font-semibold'>Prospect Details</h3>
-        <div className='text-sm text-muted-foreground'>
-          Showing {prospects.length} prospects
-        </div>
-      </div>
-
-      <div className='space-y-2'>
-        {prospects.map(prospect => (
-          <Card key={prospect.id} className='p-4'>
-            <div className='flex items-center justify-between'>
-              <div className='flex items-center gap-4'>
-                <div
-                  className={`flex items-center gap-2 ${getStatusColor(prospect.status)}`}
-                >
-                  {getStatusIcon(prospect.status)}
-                </div>
-                <div>
-                  <div className='font-medium'>{prospect.name}</div>
-                  <div className='text-sm text-muted-foreground'>
-                    {prospect.position} at {prospect.company}
-                  </div>
-                  <div className='text-xs text-muted-foreground'>
-                    {prospect.email}
-                  </div>
-                </div>
-              </div>
-
-              <div className='flex items-center gap-4'>
-                <Badge variant='outline'>{prospect.progress}% Complete</Badge>
-
-                {prospect.enrichedData && (
-                  <div className='flex gap-1'>
-                    {prospect.enrichedData.linkedinSummary && (
-                      <Badge variant='secondary' className='text-xs'>
-                        LinkedIn ✓
-                      </Badge>
-                    )}
-                    {prospect.enrichedData.companySummary && (
-                      <Badge variant='secondary' className='text-xs'>
-                        Company ✓
-                      </Badge>
-                    )}
-                    {prospect.enrichedData.techStack && (
-                      <Badge variant='secondary' className='text-xs'>
-                        TechStack ✓
-                      </Badge>
-                    )}
-                    {prospect.enrichedData.prospectAnalysisSummary && (
-                      <Badge variant='secondary' className='text-xs'>
-                        Analysis ✓
-                      </Badge>
-                    )}
-                  </div>
-                )}
-
-                <div className='w-20'>
-                  <Progress value={prospect.progress} className='h-2' />
-                </div>
-
-                <div className='text-right text-sm'>
-                  <div
-                    className={`font-medium ${getStatusColor(prospect.status)}`}
-                  >
-                    {prospect.status.charAt(0).toUpperCase() +
-                      prospect.status.slice(1)}
-                  </div>
-                  {prospect.processingTime && (
-                    <div className='text-xs text-muted-foreground'>
-                      {(prospect.processingTime / 1000).toFixed(1)}s
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {prospect.errors && prospect.errors.length > 0 && (
-              <div className='mt-2 pt-2 border-t'>
-                <div className='text-sm text-red-600'>
-                  Errors: {prospect.errors.join(', ')}
-                </div>
-              </div>
-            )}
-          </Card>
-        ))}
-      </div>
-    </div>
-  );
-
-  const renderErrors = () => (
-    <div className='space-y-4'>
-      <div className='flex items-center justify-between'>
-        <h3 className='text-lg font-semibold'>Errors & Issues</h3>
-        <Badge variant='destructive' className='text-sm'>
-          {jobStatus?.errors?.length || 0} total errors
-        </Badge>
-      </div>
-
-      {(jobStatus?.errors?.length || 0) === 0 ? (
-        <Card className='p-8 text-center'>
-          <CheckCircle className='h-12 w-12 mx-auto text-green-500 mb-4' />
-          <h3 className='font-semibold mb-2'>No Errors</h3>
-          <p className='text-sm text-muted-foreground'>
-            Enrichment is running smoothly without any errors.
-          </p>
-        </Card>
-      ) : (
-        <div className='space-y-2'>
-          {jobStatus?.errors.map(error => (
-            <Alert
-              key={error.id}
-              variant={error.severity === 'error' ? 'destructive' : 'default'}
-            >
-              {error.severity === 'error' ? (
-                <AlertCircle className='h-4 w-4' />
-              ) : (
-                <AlertTriangle className='h-4 w-4' />
-              )}
-              <AlertDescription>
-                <div className='flex justify-between items-start'>
-                  <div>
-                    <div className='font-medium'>{error.message}</div>
-                    {error.prospectId && (
-                      <div className='text-sm text-muted-foreground'>
-                        Prospect: {error.prospectId}
-                      </div>
-                    )}
-                  </div>
-                  <div className='text-xs text-muted-foreground'>
-                    {new Date(error.timestamp).toLocaleTimeString()}
-                  </div>
-                </div>
-              </AlertDescription>
-            </Alert>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-
-  const renderSettings = () => (
-    <div className='space-y-6'>
-      <div>
-        <h3 className='text-lg font-semibold mb-4'>Processing Configuration</h3>
-        <div className='space-y-6'>
-          <div className='space-y-2'>
-            <Label htmlFor='concurrency'>
-              Concurrency: {concurrency[0]} parallel requests
-            </Label>
-            <Slider
-              id='concurrency'
-              min={1}
-              max={10}
-              step={1}
-              value={concurrency}
-              onValueChange={setConcurrency}
-              className='w-full'
-              disabled={isStarted}
-            />
-            <p className='text-sm text-muted-foreground'>
-              Number of prospects to enrich simultaneously. Higher concurrency
-              increases speed but may hit rate limits.
-            </p>
-          </div>
-
-          <div className='space-y-2'>
-            <Label htmlFor='retry-attempts'>
-              LLM API Retry Limit: {retryAttempts[0]}
-            </Label>
-            <Slider
-              id='retry-attempts'
-              min={0}
-              max={5}
-              step={1}
-              value={retryAttempts}
-              onValueChange={setRetryAttempts}
-              className='w-full'
-              disabled={isStarted}
-            />
-            <p className='text-sm text-muted-foreground'>
-              Number of times to retry failed LLM API calls before marking
-              as failed.
-            </p>
-          </div>
-
-          <div className='space-y-2'>
-            <Label htmlFor='website-pages'>
-              Website Pages to Scrape: {websitePages[0]}
-            </Label>
-            <Slider
-              id='website-pages'
-              min={1}
-              max={10}
-              step={1}
-              value={websitePages}
-              onValueChange={setWebsitePages}
-              className='w-full'
-              disabled={isStarted}
-            />
-            <p className='text-sm text-muted-foreground'>
-              Maximum number of pages to scrape from each company website.
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {isStarted && (
-        <Alert>
-          <AlertCircle className='h-4 w-4' />
-          <AlertDescription>
-            Configuration changes cannot be applied to a running job. Cancel the
-            current job or wait for completion to modify settings.
-          </AlertDescription>
-        </Alert>
-      )}
-    </div>
-  );
 
   // Render the initial view before enrichment starts
   const renderInitialView = () => (
@@ -1774,28 +997,61 @@ Jane Smith,jane@company.com,Company Inc,CTO
 
   // Render the progress view after enrichment starts
   const renderProgressView = () => (
-    <Card className="w-full">
-      <CardHeader>
-        <CardTitle>Enrichment Progress</CardTitle>
-        <CardDescription>
-          Real-time progress of prospect enrichment processing
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <Tabs value={selectedTab} onValueChange={(value: any) => setSelectedTab(value)}>
-          <TabsList>
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="prospects">Prospects</TabsTrigger>
-            <TabsTrigger value="errors">Errors</TabsTrigger>
-            <TabsTrigger value="settings">Settings</TabsTrigger>
-          </TabsList>
-          <TabsContent value="overview">{renderJobOverview()}</TabsContent>
-          <TabsContent value="prospects">{renderProspectDetails()}</TabsContent>
-          <TabsContent value="errors">{renderErrors()}</TabsContent>
-          <TabsContent value="settings">{renderSettings()}</TabsContent>
-        </Tabs>
-      </CardContent>
-    </Card>
+    <div className='max-w-6xl mx-auto space-y-6'>
+      {/* Page Title */}
+      <div className='text-center space-y-2'>
+        <h2 className='text-2xl font-bold text-gray-900'>Prospect Enrichment</h2>
+        <p className='text-gray-600'>Configure and start the enrichment process for {prospectCount} prospects</p>
+      </div>
+
+      {/* Simple Progress Bar */}
+      <Card className="w-full">
+        <CardContent className="pt-6">
+          <div className="space-y-4">
+            <div className="flex justify-between text-sm">
+              <span>Progress</span>
+              <span>{Math.round(jobStatus?.progress || 0)}%</span>
+            </div>
+            <Progress value={jobStatus?.progress || 0} className="w-full" />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Success & Failed Cards */}
+      <div className="grid grid-cols-2 gap-4">
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center space-x-2">
+              <CheckCircle className="h-5 w-5 text-green-500" />
+              <div>
+                <p className="text-sm font-medium">Success</p>
+                <p className="text-2xl font-bold text-green-600">{jobStatus?.completedProspects || 0}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center space-x-2">
+              <XCircle className="h-5 w-5 text-red-500" />
+              <div>
+                <p className="text-sm font-medium">Failed</p>
+                <p className="text-2xl font-bold text-red-600">{jobStatus?.failedProspects || 0}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Error Display */}
+      {error && (
+        <Alert variant='destructive'>
+          <AlertCircle className='h-4 w-4' />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+    </div>
   );
 
   const renderErrorView = () => (

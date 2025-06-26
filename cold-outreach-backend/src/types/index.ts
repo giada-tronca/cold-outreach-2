@@ -124,6 +124,7 @@ export interface COApiConfigurations {
   timeoutSeconds?: number;
   maxRetries?: number;
   domainKeywordsIndustry?: string;
+  selfCompanyInfo?: string;
 }
 
 export interface COAutoServiceSettings {

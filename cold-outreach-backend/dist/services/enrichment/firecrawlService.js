@@ -8,6 +8,7 @@ const axios_1 = __importDefault(require("axios"));
 const apiConfigurationService_1 = require("./apiConfigurationService");
 const errors_1 = require("@/utils/errors");
 const emailHelpers_1 = require("@/utils/emailHelpers");
+const templateHelpers_1 = require("@/utils/templateHelpers");
 /**
  * Firecrawl API Service for V1 API
  * Handles website content scraping and crawling according to official documentation
@@ -70,19 +71,14 @@ class FirecrawlService {
             console.log(`🔍 [Firecrawl]: Scraping website: ${url}`);
             const axiosInstance = await this.createAxiosInstance();
             const config = await apiConfigurationService_1.ApiConfigurationService.getModelConfiguration();
-            // V1 API payload according to official documentation
+            // V1 API payload with optimized configuration for clean markdown content
             const scrapePayload = {
                 url: url,
-                formats: ['markdown'], // V1 API uses 'formats' array
-                onlyMainContent: true,
-                includeTags: [], // Optional: specify HTML tags to include
-                excludeTags: ['script', 'style', 'nav', 'footer'], // Exclude non-content elements
-                timeout: 30000,
-                waitFor: 0, // Wait time in milliseconds before scraping
-                mobile: false, // Use desktop user agent
-                skipTlsVerification: false,
-                removeBase64Images: true, // Remove base64 images to reduce response size
-                blockAds: true // Block ads for cleaner content
+                formats: ["markdown"], // Only request markdown format
+                onlyMainContent: true, // Extract only main content, no headers/footers/navigation
+                maxAge: 3600000, // Cache for 1 hour (3600000ms)
+                mobile: false, // Use desktop user agent for better content
+                storeInCache: true // Store in Firecrawl cache for faster subsequent requests
             };
             console.log(`🔍 [Firecrawl]: Making API request with ${config.retryAttempts || 3} retry attempts`);
             const response = await this.retryRequest(() => axiosInstance.post('/v1/scrape', scrapePayload), config.retryAttempts || 3);
@@ -139,67 +135,67 @@ class FirecrawlService {
             console.log(`🔍 [Firecrawl]: Extracting structured data from: ${url}`);
             const axiosInstance = await this.createAxiosInstance();
             const config = await apiConfigurationService_1.ApiConfigurationService.getModelConfiguration();
-            // Default extraction schema for company data
-            const defaultSchema = {
-                type: "object",
-                properties: {
-                    company_name: {
-                        type: "string",
-                        description: "The name of the company"
-                    },
-                    description: {
-                        type: "string",
-                        description: "Brief description of what the company does"
-                    },
-                    industry: {
-                        type: "string",
-                        description: "The industry or sector the company operates in"
-                    },
-                    services: {
-                        type: "array",
-                        items: { type: "string" },
-                        description: "List of services offered by the company"
-                    },
-                    products: {
-                        type: "array",
-                        items: { type: "string" },
-                        description: "List of products offered by the company"
-                    },
-                    key_people: {
-                        type: "array",
-                        items: { type: "string" },
-                        description: "Names of key executives or team members"
-                    },
-                    contact_info: {
-                        type: "object",
-                        properties: {
-                            email: { type: "string", description: "Contact email address" },
-                            phone: { type: "string", description: "Contact phone number" },
-                            address: { type: "string", description: "Physical address" }
-                        }
-                    },
-                    founded_year: {
-                        type: "string",
-                        description: "Year the company was founded"
-                    },
-                    company_size: {
-                        type: "string",
-                        description: "Size of the company (employees, revenue, etc.)"
-                    }
-                },
-                required: ["company_name", "description"]
-            };
+            // Default extraction schema for company data (currently disabled)
+            // const defaultSchema = {
+            //     type: "object",
+            //     properties: {
+            //         company_name: {
+            //             type: "string",
+            //             description: "The name of the company"
+            //         },
+            //         description: {
+            //             type: "string",
+            //             description: "Brief description of what the company does"
+            //         },
+            //         industry: {
+            //             type: "string",
+            //             description: "The industry or sector the company operates in"
+            //         },
+            //         services: {
+            //             type: "array",
+            //             items: { type: "string" },
+            //             description: "List of services offered by the company"
+            //         },
+            //         products: {
+            //             type: "array",
+            //             items: { type: "string" },
+            //             description: "List of products offered by the company"
+            //         },
+            //         key_people: {
+            //             type: "array",
+            //             items: { type: "string" },
+            //             description: "Names of key executives or team members"
+            //         },
+            //         contact_info: {
+            //             type: "object",
+            //             properties: {
+            //                 email: { type: "string", description: "Contact email address" },
+            //                 phone: { type: "string", description: "Contact phone number" },
+            //                 address: { type: "string", description: "Physical address" }
+            //             }
+            //         },
+            //         founded_year: {
+            //             type: "string",
+            //             description: "Year the company was founded"
+            //         },
+            //         company_size: {
+            //             type: "string",
+            //             description: "Size of the company (employees, revenue, etc.)"
+            //         }
+            //     },
+            //     required: ["company_name", "description"]
+            // }
             // V1 API payload with JSON extraction
             const extractPayload = {
                 url: url,
                 formats: ['extract'],
                 onlyMainContent: true,
                 timeout: 30000,
-                extract: {
-                    schema: defaultSchema,
-                    systemPrompt: "You are an expert at extracting company information from websites. Extract accurate and relevant information only.",
-                    prompt: extractionPrompt || "Extract comprehensive company information from this website including company name, description, industry, services, products, key people, and contact information."
-                },
+                // extract: {
+                //     schema: defaultSchema,
+                //     systemPrompt: "You are an expert at extracting company information from websites. Extract accurate and relevant information only.",
+                //     prompt: extractionPrompt || "Extract comprehensive company information from this website including company name, description, industry, services, products, key people, and contact information."
+                // },
                 removeBase64Images: true,
                 blockAds: true
             };
@@ -229,7 +225,7 @@ class FirecrawlService {
         try {
             console.log(`🚀 [Firecrawl]: Starting crawl job for: ${url}`);
             const axiosInstance = await this.createAxiosInstance();
-            // V1 API crawl payload according to official documentation
+            // V1 API crawl payload with optimized scrape options
             const crawlPayload = {
                 url: url,
                 excludePaths: options.excludePaths || [
@@ -242,15 +238,11 @@ class FirecrawlService {
                 allowBackwardLinks: options.allowBackwardLinks || false,
                 allowExternalLinks: options.allowExternalLinks || false,
                 scrapeOptions: {
-                    formats: ['markdown'],
-                    onlyMainContent: true,
-                    excludeTags: ['script', 'style', 'nav', 'footer', 'header'],
-                    timeout: 30000,
-                    waitFor: 0,
-                    mobile: false,
-                    skipTlsVerification: false,
-                    removeBase64Images: true,
-                    blockAds: true
+                    formats: ["markdown"], // Only request markdown format
+                    onlyMainContent: true, // Extract only main content
+                    maxAge: 3600000, // Cache for 1 hour
+                    mobile: false, // Use desktop user agent
+                    storeInCache: true // Store in cache
                 }
             };
             const response = await axiosInstance.post('/v1/crawl', crawlPayload);
@@ -397,8 +389,10 @@ class FirecrawlService {
         try {
             // Get company summary prompt from database
             const prompt = await apiConfigurationService_1.ApiConfigurationService.getPrompt('company_summary_prompt');
-            // Replace placeholder with the multi-page content
-            const finalPrompt = prompt.replace('${WEBSITE_CONTENT}', multiPageContent);
+            // Replace template variables with actual data using standardized format
+            const finalPrompt = (0, templateHelpers_1.replaceTemplateVariables)(prompt, {
+                WEBSITE_CONTENT: multiPageContent
+            });
             console.log(`🤖 [Firecrawl]: Generating company summary using ${aiProvider} with ${multiPageContent.length} characters of content`);
             return await this.generateAISummary(finalPrompt, aiProvider);
         }
@@ -480,7 +474,13 @@ class FirecrawlService {
                 console.log('🔍 [Firecrawl]: OpenRouter response choices length:', response.data?.choices?.length || 0);
                 const aiSummary = response.data.choices[0]?.message?.content?.trim();
                 if (!aiSummary) {
-                    console.error('❌ [Firecrawl]: OpenRouter returned empty response:', JSON.stringify(response.data, null, 2));
+                    console.error('❌ [Firecrawl]: OpenRouter returned empty response (response truncated to prevent log clutter):', {
+                        hasChoices: !!response.data?.choices,
+                        choicesLength: response.data?.choices?.length || 0,
+                        hasMessage: !!response.data?.choices?.[0]?.message,
+                        hasContent: !!response.data?.choices?.[0]?.message?.content,
+                        contentLength: response.data?.choices?.[0]?.message?.content?.length || 0
+                    });
                     throw new Error('No AI summary returned from OpenRouter API');
                 }
                 console.log('✅ [Firecrawl]: Successfully generated summary with OpenRouter');
@@ -488,7 +488,27 @@ class FirecrawlService {
             }
             catch (error) {
                 lastError = error instanceof Error ? error : new Error(String(error));
-                console.error(`❌ [Firecrawl]: Attempt ${attempt} failed:`, lastError.message);
+                // Log input data that was fed to the API when it fails
+                console.error(`❌ [Firecrawl]: OpenRouter attempt ${attempt} failed with input data:`, {
+                    promptLength: prompt?.length || 0,
+                    promptPreview: prompt?.substring(0, 200) + '...',
+                    model: 'openai/o1-mini',
+                    attempt: attempt,
+                    maxRetries: maxRetries
+                });
+                // Log concise error information without the full response
+                if (axios_1.default.isAxiosError(error)) {
+                    console.error(`❌ [Firecrawl]: OpenRouter API error (response truncated to prevent log clutter):`, {
+                        status: error.response?.status,
+                        statusText: error.response?.statusText,
+                        message: error.message,
+                        hasResponseData: !!error.response?.data,
+                        responseDataKeys: error.response?.data ? Object.keys(error.response.data) : []
+                    });
+                }
+                else {
+                    console.error(`❌ [Firecrawl]: OpenRouter error:`, lastError.message);
+                }
                 // Wait before retry (exponential backoff)
                 if (attempt < maxRetries) {
                     const delay = Math.pow(2, attempt) * 1000; // 2s, 4s, 8s
@@ -599,12 +619,11 @@ class FirecrawlService {
             const axiosInstance = await this.createAxiosInstance();
             const scrapePayload = {
                 url: url,
-                formats: ['markdown'],
-                onlyMainContent: true,
-                excludeTags: ['script', 'style', 'nav', 'footer'],
-                timeout: 30000,
-                waitFor: 0,
-                mobile: false,
+                formats: ["markdown"], // Only request markdown format
+                onlyMainContent: true, // Extract only main content
+                maxAge: 3600000, // Cache for 1 hour
+                mobile: false, // Use desktop user agent
+                storeInCache: true // Store in cache
             };
             const response = await this.retryRequest(async () => {
                 return await axiosInstance.post('/v1/scrape', scrapePayload);

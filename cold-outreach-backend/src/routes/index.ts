@@ -13,6 +13,14 @@ import emailGenerationRoutes from './email-generation/index';
 import serviceRoutes from './services/index';
 import jobRoutes from './jobs/index';
 
+// Import API configuration controller
+import {
+  getApiConfiguration,
+  getSelfCompanyInfo,
+  updateSelfCompanyInfo,
+  validateApiConfiguration
+} from '@/controllers/apiConfigurationController';
+
 const router = Router();
 
 // Health check endpoint
@@ -434,6 +442,12 @@ router.post('/uploads', upload.single('file'), async (req, res) => {
 // Temporary enrichment endpoints removed - using real enrichment routes
 
 // Temporary enrichment job progress endpoint removed - using real SSE endpoint from enrichmentRoutes
+
+// API Configuration routes
+router.get('/configuration', getApiConfiguration);
+router.get('/configuration/company-info', getSelfCompanyInfo);
+router.put('/configuration/company-info', updateSelfCompanyInfo);
+router.get('/configuration/validate', validateApiConfiguration);
 
 // Mount route modules
 router.use('/auth', authRoutes);

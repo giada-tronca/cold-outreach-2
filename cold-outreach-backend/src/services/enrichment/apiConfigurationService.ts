@@ -128,6 +128,52 @@ export class ApiConfigurationService {
     }
 
     /**
+     * Get self company information
+     */
+    static async getSelfCompanyInfo(): Promise<string | null> {
+        try {
+            const config = await prisma.cOApiConfigurations.findFirst({
+                where: { isActive: true },
+                orderBy: { createdAt: 'desc' }
+            })
+
+            return config?.selfCompanyInfo || null
+
+        } catch (error) {
+            console.error('Failed to fetch self company info:', error)
+            return null
+        }
+    }
+
+    /**
+     * Update self company information
+     */
+    static async updateSelfCompanyInfo(selfCompanyInfo: string): Promise<void> {
+        try {
+            const config = await prisma.cOApiConfigurations.findFirst({
+                where: { isActive: true },
+                orderBy: { createdAt: 'desc' }
+            })
+
+            if (!config) {
+                throw new DatabaseError('No active API configuration found')
+            }
+
+            await prisma.cOApiConfigurations.update({
+                where: { id: config.id },
+                data: { selfCompanyInfo }
+            })
+
+            // Clear cache to ensure fresh data on next fetch
+            this.clearCache()
+
+        } catch (error) {
+            console.error('Failed to update self company info:', error)
+            throw new DatabaseError('Failed to update self company information')
+        }
+    }
+
+    /**
      * Clear cache (useful for testing or config updates)
      */
     static clearCache(): void {

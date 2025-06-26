@@ -27,6 +27,7 @@ model COApiConfigurations {
   timeoutSeconds         Int?     @default(60) @map("timeout_seconds")
   maxRetries             Int?     @default(3) @map("max_retries")
   domainKeywordsIndustry String?  @map("domain_keywords_industry")
+  selfCompanyInfo        String?  @map("self_company_info")
 
   @@map("api_configurations")
 }

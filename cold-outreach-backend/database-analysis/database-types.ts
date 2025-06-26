@@ -18,6 +18,7 @@ export interface COApiConfigurations {
   timeoutSeconds?: number;
   maxRetries?: number;
   domainKeywordsIndustry?: string;
+  selfCompanyInfo?: string;
 }
 
 export interface CreateCOApiConfigurationsInput {
@@ -36,6 +37,7 @@ export interface CreateCOApiConfigurationsInput {
   timeoutSeconds?: number;
   maxRetries?: number;
   domainKeywordsIndustry?: string;
+  selfCompanyInfo?: string;
 }
 
 export interface UpdateCOApiConfigurationsInput {
@@ -54,6 +56,7 @@ export interface UpdateCOApiConfigurationsInput {
   timeoutSeconds?: number;
   maxRetries?: number;
   domainKeywordsIndustry?: string;
+  selfCompanyInfo?: string;
 }
 
 export interface COAutoServiceSettings {

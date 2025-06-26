@@ -7,6 +7,7 @@ exports.BuiltWithService = void 0;
 const firecrawlService_1 = require("./firecrawlService");
 const apiConfigurationService_1 = require("./apiConfigurationService");
 const emailHelpers_1 = require("@/utils/emailHelpers");
+const templateHelpers_1 = require("@/utils/templateHelpers");
 const axios_1 = __importDefault(require("axios"));
 /**
  * BuiltWith Service (using Firecrawl)
@@ -346,7 +347,9 @@ class BuiltWithService {
             const formattedData = this.formatBuiltWithDataForAI(scrapedData, cleanDomain);
             // Get the BuiltWith summary prompt from database
             const prompt = await apiConfigurationService_1.ApiConfigurationService.getPrompt('tech_stack_prompt');
-            const finalPrompt = prompt.replace('{builtwith_content_placeholder}', formattedData);
+            const finalPrompt = (0, templateHelpers_1.replaceTemplateVariables)(prompt, {
+                BUILTWITH_RAW_MD_DATA: formattedData
+            });
             // Generate summary using AI LLM
             let aiSummary;
             if (aiProvider === 'gemini') {
@@ -473,7 +476,13 @@ class BuiltWithService {
                 console.log('🔍 [BuiltWith]: OpenRouter response choices length:', response.data?.choices?.length || 0);
                 const aiSummary = response.data.choices[0]?.message?.content?.trim();
                 if (!aiSummary) {
-                    console.error('❌ [BuiltWith]: OpenRouter returned empty response:', JSON.stringify(response.data, null, 2));
+                    console.error('❌ [BuiltWith]: OpenRouter returned empty response (response truncated to prevent log clutter):', {
+                        hasChoices: !!response.data?.choices,
+                        choicesLength: response.data?.choices?.length || 0,
+                        hasMessage: !!response.data?.choices?.[0]?.message,
+                        hasContent: !!response.data?.choices?.[0]?.message?.content,
+                        contentLength: response.data?.choices?.[0]?.message?.content?.length || 0
+                    });
                     throw new Error('No AI summary returned from OpenRouter API');
                 }
                 console.log('✅ [BuiltWith]: Successfully generated summary with OpenRouter');
@@ -481,7 +490,27 @@ class BuiltWithService {
             }
             catch (error) {
                 lastError = error instanceof Error ? error : new Error(String(error));
-                console.error(`❌ [BuiltWith]: Attempt ${attempt} failed:`, lastError.message);
+                // Log input data that was fed to the API when it fails
+                console.error(`❌ [BuiltWith]: OpenRouter attempt ${attempt} failed with input data:`, {
+                    promptLength: prompt?.length || 0,
+                    promptPreview: prompt?.substring(0, 200) + '...',
+                    model: 'openai/o1-mini',
+                    attempt: attempt,
+                    maxRetries: maxRetries
+                });
+                // Log concise error information without the full response
+                if (axios_1.default.isAxiosError(error)) {
+                    console.error(`❌ [BuiltWith]: OpenRouter API error (response truncated to prevent log clutter):`, {
+                        status: error.response?.status,
+                        statusText: error.response?.statusText,
+                        message: error.message,
+                        hasResponseData: !!error.response?.data,
+                        responseDataKeys: error.response?.data ? Object.keys(error.response.data) : []
+                    });
+                }
+                else {
+                    console.error(`❌ [BuiltWith]: OpenRouter error:`, lastError.message);
+                }
                 // Wait before retry (exponential backoff)
                 if (attempt < maxRetries) {
                     const delay = Math.pow(2, attempt) * 1000; // 2s, 4s, 8s

@@ -3,6 +3,7 @@ import axios from 'axios'
 import { ApiConfigurationService } from './apiConfigurationService'
 import { FirecrawlService } from './firecrawlService'
 import { DatabaseError } from '@/utils/errors'
+import { replaceTemplateVariables } from '@/utils/templateHelpers'
 
 interface LinkedInProfileData {
     public_identifier?: string
@@ -396,8 +397,10 @@ export class ProspectEnricher {
             const apiKey = await ApiConfigurationService.getApiKey('geminiApiKey')
             const prompt = await ApiConfigurationService.getPrompt('linkedin_summary_prompt')
 
-            // Replace placeholder with actual data
-            const finalPrompt = prompt.replace('{linkedin_data_placeholder}', profileSummary)
+            // Replace template variables with actual data using standardized format
+            const finalPrompt = replaceTemplateVariables(prompt, {
+                LINKEDIN_PROFILE_DATA: profileSummary
+            })
 
             const response = await axios.post(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`, {
                 contents: [{
@@ -443,8 +446,10 @@ export class ProspectEnricher {
                 const apiKey = await ApiConfigurationService.getApiKey('openrouterApiKey')
                 const prompt = await ApiConfigurationService.getPrompt('linkedin_summary_prompt')
 
-                // Replace placeholder with actual data
-                const finalPrompt = prompt.replace('{linkedin_data_placeholder}', profileSummary)
+                // Replace template variables with actual data using standardized format
+                const finalPrompt = replaceTemplateVariables(prompt, {
+                    LINKEDIN_PROFILE_DATA: profileSummary
+                })
 
                 console.log(`🔗 [ProspectEnricher]: Making OpenRouter API call (attempt ${attempt}/${maxRetries})...`)
                 const response = await axios.post('https://openrouter.ai/api/v1/chat/completions', {
@@ -946,8 +951,10 @@ export class ProspectEnricher {
             // Get tech stack analysis prompt from database
             const prompt = await ApiConfigurationService.getPrompt('tech_stack_prompt')
 
-            // Replace placeholder with BuiltWith content
-            const finalPrompt = prompt.replace('${BUILTWITH_CONTENT}', builtwithContent)
+            // Replace template variables with actual data using standardized format
+            const finalPrompt = replaceTemplateVariables(prompt, {
+                BUILTWITH_RAW_MD_DATA: builtwithContent
+            })
 
             // Generate AI analysis
             const aiResponse = await this.generateTechStackAnalysis(finalPrompt, aiProvider)
@@ -1270,12 +1277,9 @@ export class ProspectEnricher {
             console.log(`   - Company: ${hasCompanyData ? '✅' : '❌'}`)
             console.log(`   - Tech Stack: ${hasTechStackData ? '✅' : '❌'}`)
 
-            // Step 3: Prepare combined data for AI analysis
-            const combinedData = this.prepareCombinedEnrichmentData(existingProspect, enrichmentData)
-
-            // Step 4: Generate AI prospect analysis using database prompt
+            // Step 3: Generate AI prospect analysis using database prompt
             const aiProvider = options.aiProvider || 'openrouter'
-            const prospectAnalysis = await this.generateProspectAnalysisWithAI(combinedData, aiProvider, options.llmModelId)
+            const prospectAnalysis = await this.generateProspectAnalysisWithAI(existingProspect, enrichmentData, aiProvider, options.llmModelId)
 
             // Step 5: Update prospect enrichment with analysis data
             await prisma.cOProspectEnrichments.update({
@@ -1322,66 +1326,26 @@ export class ProspectEnricher {
         }
     }
 
-    /**
-     * Prepare combined enrichment data for AI analysis
-     */
-    private static prepareCombinedEnrichmentData(prospect: any, enrichmentData: any): string {
-        const sections: string[] = []
 
-        // Prospect basic information
-        sections.push('=== PROSPECT BASIC INFORMATION ===')
-        if (prospect.name) sections.push(`Name: ${prospect.name}`)
-        if (prospect.email) sections.push(`Email: ${prospect.email}`)
-        if (prospect.company) sections.push(`Company: ${prospect.company}`)
-        if (prospect.position) sections.push(`Position: ${prospect.position}`)
-        if (prospect.linkedinUrl) sections.push(`LinkedIn: ${prospect.linkedinUrl}`)
-
-        // LinkedIn Summary
-        if (enrichmentData.linkedinSummary) {
-            sections.push('\n=== LINKEDIN PROFILE ANALYSIS ===')
-            sections.push(enrichmentData.linkedinSummary)
-        }
-
-        // Company Summary
-        if (enrichmentData.companySummary) {
-            sections.push('\n=== COMPANY ANALYSIS ===')
-            sections.push(enrichmentData.companySummary)
-        }
-
-        // Tech Stack Analysis
-        if (enrichmentData.techStack && Array.isArray(enrichmentData.techStack)) {
-            sections.push('\n=== TECHNOLOGY STACK ===')
-
-            // Group technologies by category
-            const techByCategory: { [key: string]: string[] } = {}
-            enrichmentData.techStack.forEach((tech: any) => {
-                if (tech.name && tech.category) {
-                    if (!techByCategory[tech.category]) {
-                        techByCategory[tech.category] = []
-                    }
-                    techByCategory[tech.category]!.push(tech.name)
-                }
-            })
-
-            // Format tech stack by category
-            Object.entries(techByCategory).forEach(([category, technologies]) => {
-                sections.push(`${category}: ${technologies.join(', ')}`)
-            })
-        }
-
-        return sections.join('\n')
-    }
 
     /**
      * Generate prospect analysis using AI with database prompt
      */
-    private static async generateProspectAnalysisWithAI(combinedData: string, aiProvider: 'gemini' | 'openrouter', llmModelId?: string): Promise<string> {
+    private static async generateProspectAnalysisWithAI(prospect: any, enrichmentData: any, aiProvider: 'gemini' | 'openrouter', llmModelId?: string): Promise<string> {
         try {
             // Get prospect analysis prompt from database
             const prompt = await ApiConfigurationService.getPrompt('prospect_analysis_prompt')
 
-            // Replace placeholder with combined enrichment data
-            const finalPrompt = prompt.replace('${COMBINED_ENRICHMENT_DATA}', combinedData)
+            // Get self company info from API configuration
+            const selfCompanyInfo = await ApiConfigurationService.getSelfCompanyInfo()
+
+            // Replace template variables with actual data using standardized format
+            const finalPrompt = replaceTemplateVariables(prompt, {
+                SELF_COMPANY_INFO: selfCompanyInfo || 'Company information not configured',
+                LINKEDIN_INFO: enrichmentData.linkedinSummary || 'LinkedIn information not available',
+                FIRECRAWL_INFO: enrichmentData.companySummary || 'Company website information not available',
+                BUILTWITH_INFO: enrichmentData.builtwithSummary || 'Technology stack information not available'
+            })
 
             // Generate AI analysis
             const aiResponse = await this.generateProspectAnalysis(finalPrompt, aiProvider, llmModelId)

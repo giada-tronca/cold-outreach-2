@@ -101,6 +101,46 @@ class ApiConfigurationService {
         return key;
     }
     /**
+     * Get self company information
+     */
+    static async getSelfCompanyInfo() {
+        try {
+            const config = await database_1.prisma.cOApiConfigurations.findFirst({
+                where: { isActive: true },
+                orderBy: { createdAt: 'desc' }
+            });
+            return config?.selfCompanyInfo || null;
+        }
+        catch (error) {
+            console.error('Failed to fetch self company info:', error);
+            return null;
+        }
+    }
+    /**
+     * Update self company information
+     */
+    static async updateSelfCompanyInfo(selfCompanyInfo) {
+        try {
+            const config = await database_1.prisma.cOApiConfigurations.findFirst({
+                where: { isActive: true },
+                orderBy: { createdAt: 'desc' }
+            });
+            if (!config) {
+                throw new errors_1.DatabaseError('No active API configuration found');
+            }
+            await database_1.prisma.cOApiConfigurations.update({
+                where: { id: config.id },
+                data: { selfCompanyInfo }
+            });
+            // Clear cache to ensure fresh data on next fetch
+            this.clearCache();
+        }
+        catch (error) {
+            console.error('Failed to update self company info:', error);
+            throw new errors_1.DatabaseError('Failed to update self company information');
+        }
+    }
+    /**
      * Clear cache (useful for testing or config updates)
      */
     static clearCache() {

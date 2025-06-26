@@ -7,6 +7,7 @@ exports.ProxycurlService = void 0;
 const axios_1 = __importDefault(require("axios"));
 const apiConfigurationService_1 = require("./apiConfigurationService");
 const errors_1 = require("@/utils/errors");
+const templateHelpers_1 = require("@/utils/templateHelpers");
 /**
  * Proxycurl service for enriching LinkedIn profiles
  * Uses the official Proxycurl API with Bearer authentication
@@ -59,7 +60,7 @@ class ProxycurlService {
      * Enrich person profile by LinkedIn URL
      * Enhanced to capture ALL possible LinkedIn data
      */
-    static async enrichPersonProfile(linkedinUrl) {
+    static async enrichPersonProfile(linkedinUrl, aiProvider, llmModelId) {
         try {
             console.log(`🔍 [Proxycurl]: Enriching person profile: ${linkedinUrl}`);
             const axiosInstance = await this.createAxiosInstance();
@@ -112,8 +113,15 @@ class ProxycurlService {
             };
             console.log(`✅ [Proxycurl]: Successfully enriched person profile for ${profile.full_name} (Cost: ${creditCost} credits)`);
             // Generate LinkedIn summary using AI with ALL captured data
-            const linkedinSummary = await this.generateLinkedInSummaryWithAI(profile);
-            enrichedData.linkedinSummary = linkedinSummary;
+            // Only generate summary if AI provider and model are provided
+            if (aiProvider && llmModelId) {
+                const linkedinSummary = await this.generateLinkedInSummaryWithAI(profile, aiProvider, llmModelId);
+                enrichedData.linkedinSummary = linkedinSummary;
+            }
+            else {
+                console.log(`⚠️ [Proxycurl]: No AI provider or model specified, skipping LinkedIn summary generation`);
+                enrichedData.linkedinSummary = 'LinkedIn summary generation skipped - no AI model specified';
+            }
             return enrichedData;
         }
         catch (error) {
@@ -130,18 +138,21 @@ class ProxycurlService {
      * Generate LinkedIn summary using AI with comprehensive data from Proxycurl
      * Uses database prompt from CO_prompts table
      */
-    static async generateLinkedInSummaryWithAI(profileData) {
+    static async generateLinkedInSummaryWithAI(profileData, aiProvider, llmModelId) {
         try {
             console.log(`🤖 [Proxycurl]: Generating LinkedIn summary using AI with comprehensive data`);
             // Get the LinkedIn summary prompt from database
             const prompt = await apiConfigurationService_1.ApiConfigurationService.getPrompt('linkedin_summary_prompt');
             // Format ALL LinkedIn data for AI processing
             const comprehensiveLinkedInData = this.formatAllLinkedInDataForAI(profileData);
-            // Replace placeholder with comprehensive data
-            const finalPrompt = prompt.replace('{linkedin_data_placeholder}', comprehensiveLinkedInData);
-            // Use OpenRouter as default (can be made configurable)
-            const aiProvider = 'openrouter';
-            const summary = await this.generateSummaryWithAI(finalPrompt, aiProvider);
+            // Replace template variables with actual data using standardized format
+            const finalPrompt = (0, templateHelpers_1.replaceTemplateVariables)(prompt, {
+                LINKEDIN_PROFILE_DATA: comprehensiveLinkedInData
+            });
+            // Log which AI model is being used before making the API call
+            console.log(`🤖 [Proxycurl]: Making AI API call using ${aiProvider} with model: ${llmModelId}`);
+            // Use the AI provider and model specified by the user
+            const summary = await this.generateSummaryWithAI(finalPrompt, aiProvider, llmModelId);
             console.log(`✅ [Proxycurl]: Generated comprehensive LinkedIn summary using database prompt`);
             return summary;
         }
@@ -447,13 +458,13 @@ class ProxycurlService {
     /**
      * Generate summary using AI (supports both Gemini and OpenRouter)
      */
-    static async generateSummaryWithAI(prompt, aiProvider) {
+    static async generateSummaryWithAI(prompt, aiProvider, llmModelId) {
         try {
             if (aiProvider === 'gemini') {
-                return await this.generateSummaryWithGemini(prompt);
+                return await this.generateSummaryWithGemini(prompt, llmModelId);
             }
             else {
-                return await this.generateSummaryWithOpenRouter(prompt);
+                return await this.generateSummaryWithOpenRouter(prompt, llmModelId);
             }
         }
         catch (error) {
@@ -464,10 +475,12 @@ class ProxycurlService {
     /**
      * Generate summary using Google Gemini
      */
-    static async generateSummaryWithGemini(prompt) {
+    static async generateSummaryWithGemini(prompt, llmModelId) {
         try {
             const apiKey = await apiConfigurationService_1.ApiConfigurationService.getApiKey('geminiApiKey');
-            const response = await axios_1.default.post(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`, {
+            // Log which model is being used before making the API call
+            console.log(`🤖 [Proxycurl]: Making Gemini API call with model: ${llmModelId}`);
+            const response = await axios_1.default.post(`https://generativelanguage.googleapis.com/v1beta/models/${llmModelId}:generateContent?key=${apiKey}`, {
                 contents: [{
                         parts: [{
                                 text: prompt
@@ -499,15 +512,16 @@ class ProxycurlService {
     /**
      * Generate summary using OpenRouter with retry logic
      */
-    static async generateSummaryWithOpenRouter(prompt) {
+    static async generateSummaryWithOpenRouter(prompt, llmModelId) {
         const maxRetries = 3;
         let lastError = null;
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
             try {
                 const apiKey = await apiConfigurationService_1.ApiConfigurationService.getApiKey('openrouterApiKey');
-                console.log(`🔗 [Proxycurl]: Making OpenRouter API call (attempt ${attempt}/${maxRetries})...`);
+                // Log which model is being used before making the API call
+                console.log(`🤖 [Proxycurl]: Making OpenRouter API call (attempt ${attempt}/${maxRetries}) with model: ${llmModelId}`);
                 const response = await axios_1.default.post('https://openrouter.ai/api/v1/chat/completions', {
-                    model: 'openai/o1-mini',
+                    model: llmModelId,
                     messages: [
                         {
                             role: 'user',
