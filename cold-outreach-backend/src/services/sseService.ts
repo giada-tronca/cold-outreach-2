@@ -236,7 +236,7 @@ export class SSEService extends EventEmitter {
       processingTime?: number;
     }
   ): void {
-    this.sendToUser(userId, 'prospect-enrichment', {
+    const sseData = {
       type: 'prospect-enrichment',
       prospectId: prospectData.prospectId,
       status: prospectData.status,
@@ -247,7 +247,11 @@ export class SSEService extends EventEmitter {
       isDuplicate: prospectData.isDuplicate,
       processingTime: prospectData.processingTime,
       timestamp: new Date().toISOString(),
-    });
+    };
+
+    console.log(`📡 [SSE]: Sending prospect enrichment update to user ${userId}:`, JSON.stringify(sseData));
+    const sentCount = this.sendToUser(userId, 'prospect-enrichment', sseData);
+    console.log(`📡 [SSE]: Prospect enrichment update sent to ${sentCount} connections`);
   }
 
   /**

@@ -497,10 +497,9 @@ Please provide a well-structured, professional summary that would be useful for 
             apiRequestData = result.requestData;
             apiResponseData = result.responseData;
         }
-        // Store API request/response data in techStack column
-        if (existingProspectInfo?.prospectId) {
-            await this.updateTechStackWithApiData(existingProspectInfo.prospectId, 'linkedin_summary', { request: apiRequestData, response: apiResponseData });
-        }
+        // Store API request/response data in rawLlmRequests for final storage
+        this.rawLlmRequests.requests.linkedinSummary.apiRequest = apiRequestData;
+        this.rawLlmRequests.requests.linkedinSummary.apiResponse = apiResponseData;
         return summary;
     }
     /**
@@ -554,10 +553,20 @@ Please provide a well-structured summary that highlights the company's technical
                 requestData = result.requestData;
                 responseData = result.responseData;
             }
-            // Store API request/response data in techStack column
-            if (existingProspectInfo?.prospectId) {
-                await this.updateTechStackWithApiData(existingProspectInfo.prospectId, 'builtwith_summary', { request: requestData, response: responseData });
-            }
+            // Store API request/response data in rawLlmRequests for final storage
+            this.rawLlmRequests.requests.builtwithSummary = {
+                timestamp: new Date().toISOString(),
+                type: 'builtwith_summary',
+                prompt: techStackPrompt,
+                builtwithData,
+                domain,
+                aiProvider,
+                llmModelId,
+                isExistingProspect,
+                existingProspectInfo,
+                apiRequest: requestData,
+                apiResponse: responseData
+            };
             return summary;
         }
         catch (error) {
@@ -634,10 +643,20 @@ Focus on actionable insights that would help in sales outreach and relationship 
                 requestData = result.requestData;
                 responseData = result.responseData;
             }
-            // Store API request/response data in techStack column
-            if (existingProspectInfo?.prospectId) {
-                await this.updateTechStackWithApiData(existingProspectInfo.prospectId, 'prospect_analysis_summary', { request: requestData, response: responseData });
-            }
+            // Store API request/response data in rawLlmRequests for final storage
+            this.rawLlmRequests.requests.prospectAnalysis = {
+                timestamp: new Date().toISOString(),
+                type: 'prospect_analysis_summary',
+                prompt: prospectAnalysisPrompt,
+                prospectInfo,
+                enrichmentData,
+                aiProvider,
+                llmModelId,
+                isExistingProspect,
+                existingProspectInfo,
+                apiRequest: requestData,
+                apiResponse: responseData
+            };
             return summary;
         }
         catch (error) {
@@ -709,10 +728,20 @@ ${formattedContent}`;
                 requestData = result.requestData;
                 responseData = result.responseData;
             }
-            // Store API request/response data in techStack column
-            if (existingProspectInfo?.prospectId) {
-                await this.updateTechStackWithApiData(existingProspectInfo.prospectId, 'company_summary', { request: requestData, response: responseData });
-            }
+            // Store API request/response data in rawLlmRequests for final storage
+            this.rawLlmRequests.requests.companySummary = {
+                timestamp: new Date().toISOString(),
+                type: 'company_summary',
+                prompt: companySummaryPrompt,
+                formattedContent,
+                companyWebsite,
+                aiProvider,
+                llmModelId,
+                isExistingProspect,
+                existingProspectInfo,
+                apiRequest: requestData,
+                apiResponse: responseData
+            };
             return summary;
         }
         catch (error) {
@@ -1080,49 +1109,6 @@ Skills: ${data.skills?.join(', ') || 'Not available'}
                 console.error('❌ [Enrichment]: OpenRouter API error:', error instanceof Error ? error.message : 'Unknown error');
             }
             throw new Error(`OpenRouter API error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        }
-    }
-    /**
-     * Update techStack column with API request/response data
-     */
-    static async updateTechStackWithApiData(prospectId, dataKey, data) {
-        try {
-            // Get the current techStack value
-            const currentRecord = await database_1.prisma.cOProspectEnrichments.findUnique({
-                where: { prospectId },
-                select: { techStack: true }
-            });
-            let techStackData = {};
-            // If techStack already has data, parse it
-            if (currentRecord?.techStack && typeof currentRecord.techStack === 'object') {
-                techStackData = { ...currentRecord.techStack };
-            }
-            // Add the new data based on the key
-            if (dataKey === 'linkedin_summary') {
-                techStackData.linkedin_summary_request = data.request;
-                techStackData.linkedin_summary_response = data.response;
-            }
-            else if (dataKey === 'company_summary') {
-                techStackData.company_summary_request = data.request;
-                techStackData.company_summary_response = data.response;
-            }
-            else if (dataKey === 'builtwith_summary') {
-                techStackData.builtwith_summary_request = data.request;
-                techStackData.builtwith_summary_response = data.response;
-            }
-            else if (dataKey === 'prospect_analysis_summary') {
-                techStackData.prospect_analysis_summary_request = data.request;
-                techStackData.prospect_analysis_summary_response = data.response;
-            }
-            // Update the techStack column
-            await database_1.prisma.cOProspectEnrichments.update({
-                where: { prospectId },
-                data: { techStack: techStackData }
-            });
-            console.log(`✅ [Enrichment]: Updated techStack with ${dataKey} API data for prospect ${prospectId}`);
-        }
-        catch (error) {
-            console.error(`❌ [Enrichment]: Error updating techStack with ${dataKey} data:`, error);
         }
     }
 }

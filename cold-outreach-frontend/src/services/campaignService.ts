@@ -74,12 +74,14 @@ class CampaignService {
     id: number
   ): Promise<ApiResponse<{ deletedCampaignId: number }>> {
     const response = await apiClient.delete(`${API_BASE}/${id}`);
-    return handleApiResponse<ApiResponse<{ deletedCampaignId: number }>>(response);
+    return handleApiResponse<ApiResponse<{ deletedCampaignId: number }>>(
+      response
+    );
   }
 
   /**
- * Duplicate a campaign
- */
+   * Duplicate a campaign
+   */
   async duplicateCampaign(id: number): Promise<ApiResponse<Campaign>> {
     const response = await apiClient.post(`${API_BASE}/${id}/duplicate`);
     return handleApiResponse<ApiResponse<Campaign>>(response);

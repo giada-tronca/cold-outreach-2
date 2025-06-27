@@ -38,7 +38,7 @@ exports.emailGenerationWorker = new bullmq_1.Worker(queues_1.JobType.EMAIL_GENER
     return await emailGenerationProcessor_1.EmailGenerationProcessor.process(job);
 }, {
     ...workerOptions,
-    concurrency: 2, // Lower concurrency for AI tasks
+    concurrency: 10, // Higher concurrency to support user parallelism settings (1-10)
 });
 /**
  * Batch Enrichment Worker

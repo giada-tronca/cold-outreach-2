@@ -9,22 +9,12 @@ import {
   AlertCircle,
   Loader2,
   Mail,
-  Eye,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { Slider } from '@/components/ui/slider';
 import FileUpload from '@/components/forms/FileUpload';
 import { apiClient, handleApiResponse } from '@/services/api';
 import CampaignSettingsStep from './CampaignSettingsStep';
@@ -66,14 +56,7 @@ export default function SimpleWorkflow() {
   // Step 1 specific state
   const [batchName, setBatchName] = useState<string>('');
 
-  // Email generation states
-  const [showEmailGenerationSettings, setShowEmailGenerationSettings] =
-    useState(false);
-  const [emailGenerationParallelism, setEmailGenerationParallelism] = useState<
-    number[]
-  >([2]);
-  const [isEmailGenerationStarting, setIsEmailGenerationStarting] =
-    useState(false);
+  // Email generation states removed - now handled by EmailGenerationStep component
 
   // Workflow session will only be created when needed in step 3
   // Removed workflow session for local-only processing in step 1
@@ -132,7 +115,10 @@ export default function SimpleWorkflow() {
         // Validate that we have valid prospect count
         if (!stepData.preview?.totalRows || stepData.preview.totalRows <= 0) {
           const errorMsg = `Invalid CSV file: No prospect data found. Found ${stepData.preview?.totalRows || 0} rows. Please check your CSV file format.`;
-          console.error('❌ Invalid prospect count:', stepData.preview?.totalRows);
+          console.error(
+            '❌ Invalid prospect count:',
+            stepData.preview?.totalRows
+          );
           throw new Error(errorMsg);
         }
 
@@ -145,14 +131,23 @@ export default function SimpleWorkflow() {
       } else if (currentStep === 3) {
         updatedData.enrichmentResults = stepData;
         console.log('✅ Step 3 Complete - Enrichment Results:', stepData);
+      } else if (currentStep === 4) {
+        updatedData.emailGenerationResults = stepData;
+        console.log('✅ Step 4 Complete - Email Generation Results:', stepData);
       }
 
       setWorkflowData(updatedData);
       setCompletedSteps(prev => [...prev, currentStep]);
-      setCurrentStep(currentStep + 1);
+
+      // Only advance to next step if not on the final step
+      if (currentStep < steps.length) {
+        setCurrentStep(currentStep + 1);
+      }
     } catch (error) {
       console.error('❌ Error in handleStepComplete:', error);
-      setError(error instanceof Error ? error.message : 'An unknown error occurred');
+      setError(
+        error instanceof Error ? error.message : 'An unknown error occurred'
+      );
     } finally {
       setIsLoading(false);
     }
@@ -163,158 +158,7 @@ export default function SimpleWorkflow() {
     console.error('Step error:', error);
   };
 
-  const startEmailGeneration = async () => {
-    console.log('🔥 BUTTON CLICKED! Email generation starting...');
-    console.log('🔍 Current workflow data:', workflowData);
-
-    // Try different possible locations for campaign ID
-    const campaignId =
-      workflowData.campaignData?.campaignId ||
-      workflowData.campaignData?.campaignData?.campaignId;
-    console.log('🔍 Campaign ID found:', campaignId);
-    console.log('🔍 Campaign data structure:', workflowData.campaignData);
-
-    if (!campaignId) {
-      const errorMsg =
-        'Campaign ID is required for email generation. Please complete campaign configuration in Step 2.';
-      console.error('❌ Missing campaign ID:', errorMsg);
-      console.error('❌ Available campaign data:', workflowData.campaignData);
-      setError(errorMsg);
-      return;
-    }
-
-    // Extract LLM selection from enrichment configuration
-    let selectedAiProvider: 'gemini' | 'openrouter' = 'openrouter'; // Default fallback
-    let selectedLLMModelId: string = 'openrouter-o1-mini'; // Default fallback
-
-    // Try to extract LLM model from enrichment configuration data
-    const enrichmentConfigData = workflowData.enrichmentData?.data;
-    console.log(
-      '🔍 Enrichment config data for LLM extraction:',
-      enrichmentConfigData
-    );
-
-    if (enrichmentConfigData?.selectedModel?.id) {
-      const llmModelId = enrichmentConfigData.selectedModel.id;
-      console.log('🔍 Found LLM model ID:', llmModelId);
-      selectedLLMModelId = llmModelId;
-
-      // Convert LLM model ID to aiProvider
-      if (llmModelId === 'gemini-2.0-flash') {
-        selectedAiProvider = 'gemini';
-        console.log('✅ Using Gemini AI provider based on user selection');
-      } else if (llmModelId === 'openrouter-o1-mini') {
-        selectedAiProvider = 'openrouter';
-        console.log('✅ Using OpenRouter AI provider based on user selection');
-      } else {
-        selectedAiProvider = 'openrouter';
-        console.log(
-          '✅ Using OpenRouter AI provider for model:',
-          llmModelId
-        );
-      }
-    } else if (enrichmentConfigData?.configuration?.llmModel) {
-      const llmModelId = enrichmentConfigData.configuration.llmModel;
-      console.log('🔍 Found LLM model in configuration:', llmModelId);
-      selectedLLMModelId = llmModelId;
-
-      // Convert LLM model ID to aiProvider
-      if (llmModelId === 'gemini-2.0-flash') {
-        selectedAiProvider = 'gemini';
-        console.log('✅ Using Gemini AI provider based on user selection');
-      } else if (llmModelId === 'openrouter-o1-mini') {
-        selectedAiProvider = 'openrouter';
-        console.log('✅ Using OpenRouter AI provider based on user selection');
-      } else {
-        selectedAiProvider = 'openrouter';
-        console.log(
-          '✅ Using OpenRouter AI provider for model:',
-          llmModelId
-        );
-      }
-    } else {
-      console.log(
-        '⚠️ No LLM selection found in workflow data, using default OpenRouter with o1-mini'
-      );
-      console.log(
-        '🔍 Available enrichment data keys:',
-        Object.keys(workflowData.enrichmentData || {})
-      );
-    }
-
-    console.log('🔍 Final LLM selection:', {
-      selectedAiProvider,
-      selectedLLMModelId
-    });
-
-    setIsEmailGenerationStarting(true);
-    setError(null);
-
-    try {
-      console.log('🚀 Starting email generation with:', {
-        campaignId,
-        parallelism: emailGenerationParallelism[0],
-        selectedAiProvider,
-        selectedLLMModelId,
-        totalProspects:
-          workflowData.enrichmentResults?.completedProspects ||
-          workflowData.prospectCount,
-      });
-
-      // Create email generation jobs
-      const batchJobResponse = await apiClient.post(
-        '/api/email-generation/jobs',
-        {
-          campaignId,
-          workflowSessionId: `workflow-${Date.now()}`,
-          configuration: {
-            parallelism: emailGenerationParallelism[0],
-            aiProvider: selectedAiProvider,
-            llmModelId: selectedLLMModelId, // Always include the LLM model ID
-          },
-        }
-      );
-
-      // Parse the JSON response using handleApiResponse
-      const apiResponse = await handleApiResponse(batchJobResponse);
-      console.log('🔍 Full API response:', apiResponse);
-
-      // The API response structure is { success: true, data: { id, ... }, message: '...' }
-      const responseData = apiResponse?.data;
-
-      console.log('✅ Email generation job created:', responseData);
-
-      if (!responseData || !responseData.id) {
-        throw new Error(
-          'Invalid response from email generation API - missing job data or ID'
-        );
-      }
-
-      // Update workflow data with email generation job info
-      setWorkflowData(prev => ({
-        ...prev,
-        emailGenerationJobId: responseData.id,
-        emailGenerationResults: responseData,
-      }));
-
-      // Mark step 4 as completed
-      setCompletedSteps(prev => [...prev, 4]);
-
-      console.log(
-        '✅ Email generation started successfully - UI state updated'
-      );
-    } catch (error) {
-      console.error('❌ Failed to start email generation:', error);
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error';
-      console.error('❌ Full error details:', error);
-      setError(`Failed to start email generation: ${errorMessage}`);
-    } finally {
-      // Ensure this always runs to prevent the UI from getting stuck in loading state
-      console.log('🔄 Resetting email generation loading state');
-      setIsEmailGenerationStarting(false);
-    }
-  };
+  // Email generation is now handled by the EmailGenerationStep component
 
   const handleUploadComplete = useCallback((result: any) => {
     // Clear any previous errors since upload completed successfully
@@ -325,9 +169,12 @@ export default function SimpleWorkflow() {
       let actualProspectCount = 0;
       if (result.preview && result.preview.totalRows) {
         actualProspectCount = result.preview.totalRows;
-        console.log(`📊 Local CSV processing found ${actualProspectCount} prospects`);
+        console.log(
+          `📊 Local CSV processing found ${actualProspectCount} prospects`
+        );
       } else {
-        const errorMsg = 'CSV processing completed but no prospect data was found';
+        const errorMsg =
+          'CSV processing completed but no prospect data was found';
         console.error('📊 No preview data found in processing result');
         throw new Error(errorMsg);
       }
@@ -349,7 +196,9 @@ export default function SimpleWorkflow() {
         rawFileData: result.rawFileData || null,
       };
 
-      console.log(`✅ Local CSV processing completed with ${stepData.preview.totalRows} prospects - ready for next step`);
+      console.log(
+        `✅ Local CSV processing completed with ${stepData.preview.totalRows} prospects - ready for next step`
+      );
 
       // Store the processed data locally and reset batch name for new upload
       setWorkflowData(prev => ({
@@ -369,7 +218,6 @@ export default function SimpleWorkflow() {
 
       const autoGeneratedBatchName = `Batch_${day}-${month}-${year}-${hours}:${minutes}:${seconds}`;
       setBatchName(autoGeneratedBatchName);
-
     } catch (error) {
       const errorMessage =
         error instanceof Error
@@ -385,7 +233,9 @@ export default function SimpleWorkflow() {
       if (currentStep === 1 && workflowData.csvData) {
         // Validate batch name
         if (!batchName.trim()) {
-          setError('Please enter a batch name before proceeding to the next step');
+          setError(
+            'Please enter a batch name before proceeding to the next step'
+          );
           return;
         }
 
@@ -405,7 +255,7 @@ export default function SimpleWorkflow() {
           validRows: workflowData.csvData.preview.validRows,
           currentStep: 1,
           nextStep: 2,
-          completedSteps: completedSteps
+          completedSteps: completedSteps,
         });
         handleStepComplete(step1Data);
       }
@@ -449,10 +299,15 @@ export default function SimpleWorkflow() {
             const responseData = await handleApiResponse(result);
 
             if (responseData.success) {
-              console.log('✅ New campaign created with ID:', responseData.data.id);
+              console.log(
+                '✅ New campaign created with ID:',
+                responseData.data.id
+              );
               finalCampaignData.campaignId = responseData.data.id;
             } else {
-              throw new Error(responseData.message || 'Failed to create campaign');
+              throw new Error(
+                responseData.message || 'Failed to create campaign'
+              );
             }
           }
 
@@ -550,7 +405,10 @@ export default function SimpleWorkflow() {
                   <CardContent className='p-6'>
                     <div className='space-y-4'>
                       <div>
-                        <Label htmlFor='batch-name' className='text-sm font-medium text-gray-700'>
+                        <Label
+                          htmlFor='batch-name'
+                          className='text-sm font-medium text-gray-700'
+                        >
                           Batch Name *
                         </Label>
                         <Input
@@ -558,12 +416,13 @@ export default function SimpleWorkflow() {
                           type='text'
                           placeholder='Enter a name for this batch (e.g., "Q1 2024 Prospects")'
                           value={batchName}
-                          onChange={(e) => setBatchName(e.target.value)}
+                          onChange={e => setBatchName(e.target.value)}
                           className='mt-1'
                           disabled={isLoading}
                         />
                         <p className='text-xs text-gray-500 mt-1'>
-                          This name will help you identify this batch of prospects in your campaign.
+                          This name will help you identify this batch of
+                          prospects in your campaign.
                         </p>
                       </div>
                     </div>
@@ -598,7 +457,9 @@ export default function SimpleWorkflow() {
                         <div className='text-2xl font-bold text-green-600'>
                           {workflowData.csvData.preview.validRows}
                         </div>
-                        <div className='text-sm text-gray-600'>Valid Records</div>
+                        <div className='text-sm text-gray-600'>
+                          Valid Records
+                        </div>
                       </CardContent>
                     </Card>
                     <Card>
@@ -637,15 +498,17 @@ export default function SimpleWorkflow() {
                             {workflowData.csvData.preview.rows.map(
                               (row: string[], rowIndex: number) => (
                                 <tr key={rowIndex} className='hover:bg-gray-50'>
-                                  {row.map((cell: string, cellIndex: number) => (
-                                    <td
-                                      key={cellIndex}
-                                      className='px-4 py-3 text-sm text-gray-900 whitespace-nowrap max-w-xs truncate'
-                                      title={cell} // Show full content on hover
-                                    >
-                                      {cell || '-'}
-                                    </td>
-                                  ))}
+                                  {row.map(
+                                    (cell: string, cellIndex: number) => (
+                                      <td
+                                        key={cellIndex}
+                                        className='px-4 py-3 text-sm text-gray-900 whitespace-nowrap max-w-xs truncate'
+                                        title={cell} // Show full content on hover
+                                      >
+                                        {cell || '-'}
+                                      </td>
+                                    )
+                                  )}
                                 </tr>
                               )
                             )}
@@ -654,7 +517,8 @@ export default function SimpleWorkflow() {
                       </div>
                       {workflowData.csvData.preview.totalRows > 5 && (
                         <p className='text-xs text-gray-500 mt-3'>
-                          Showing 5 of {workflowData.csvData.preview.totalRows} total rows
+                          Showing 5 of {workflowData.csvData.preview.totalRows}{' '}
+                          total rows
                         </p>
                       )}
                     </CardContent>
@@ -663,8 +527,9 @@ export default function SimpleWorkflow() {
                   {/* Success Message */}
                   <div className='p-4 bg-green-50 rounded-lg border border-green-200'>
                     <p className='text-sm text-green-800'>
-                      ✅ Your CSV file has been successfully processed. Enter a batch name above and click
-                      "Next" to continue with campaign configuration.
+                      ✅ Your CSV file has been successfully processed. Enter a
+                      batch name above and click "Next" to continue with
+                      campaign configuration.
                     </p>
                   </div>
                 </div>
@@ -678,17 +543,26 @@ export default function SimpleWorkflow() {
           const enrichmentConfig = workflowData.enrichmentData || {
             selectedModel: {
               id: workflowData.campaignData?.aiProvider || '',
-              name: workflowData.campaignData?.aiProvider || ''
+              name: workflowData.campaignData?.aiProvider || '',
             },
             // Include other campaign settings
-            ...workflowData.campaignData
+            ...workflowData.campaignData,
           };
 
           console.log('[SimpleWorkflow] Rendering Step 3 with data:');
           console.log('  • Prospect Count:', workflowData.prospectCount || 0);
-          console.log('  • Campaign ID:', workflowData.campaignData?.campaignId);
-          console.log('  • CSV Data:', workflowData.csvData ? 'Available' : 'Missing');
-          console.log('  • AI Model:', enrichmentConfig?.selectedModel?.name || 'Not specified');
+          console.log(
+            '  • Campaign ID:',
+            workflowData.campaignData?.campaignId
+          );
+          console.log(
+            '  • CSV Data:',
+            workflowData.csvData ? 'Available' : 'Missing'
+          );
+          console.log(
+            '  • AI Model:',
+            enrichmentConfig?.selectedModel?.name || 'Not specified'
+          );
 
           return (
             <BeginEnrichmentStep
@@ -704,8 +578,14 @@ export default function SimpleWorkflow() {
           );
         case 4:
           console.log('[SimpleWorkflow] Rendering Step 4 - Email Generation');
-          console.log('[SimpleWorkflow] Workflow data available:', !!workflowData);
-          console.log('[SimpleWorkflow] Enrichment data structure:', workflowData.enrichmentData);
+          console.log(
+            '[SimpleWorkflow] Workflow data available:',
+            !!workflowData
+          );
+          console.log(
+            '[SimpleWorkflow] Enrichment data structure:',
+            workflowData.enrichmentData
+          );
 
           // If email generation has started, show the EmailGenerationStep component
           if (workflowData.emailGenerationJobId) {
@@ -722,109 +602,16 @@ export default function SimpleWorkflow() {
             );
           }
 
-          // Otherwise, show the initial "Enrichment Complete" view
+          // Otherwise, render the EmailGenerationStep component directly
           return (
-            <div className='space-y-6'>
-              <div className='text-center'>
-                <div className='w-16 h-16 mx-auto bg-green-100 rounded-full flex items-center justify-center mb-4'>
-                  <CheckCircle className='h-8 w-8 text-green-600' />
-                </div>
-                <h2 className='text-2xl font-bold text-gray-900 mb-2'>
-                  Enrichment Complete!
-                </h2>
-                <p className='text-gray-600'>
-                  Your prospects have been enriched successfully. You can now
-                  view the results or start email generation.
-                </p>
-              </div>
-
-              <div className='flex justify-center gap-4'>
-                <Button
-                  variant='outline'
-                  className='gap-2'
-                  onClick={() => (window.location.href = '/prospects')}
-                >
-                  <Eye className='h-4 w-4' />
-                  View Prospects
-                </Button>
-
-                {/* Email Generation Settings Dialog */}
-                <Dialog
-                  open={showEmailGenerationSettings}
-                  onOpenChange={setShowEmailGenerationSettings}
-                >
-                  <DialogTrigger asChild>
-                    <Button
-                      variant='outline'
-                      size='sm'
-                      className='p-2'
-                      title='Email Generation Settings'
-                    >
-                      <Settings className='h-4 w-4' />
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className='sm:max-w-[425px]'>
-                    <DialogHeader>
-                      <DialogTitle>Email Generation Settings</DialogTitle>
-                      <DialogDescription>
-                        Configure how emails will be generated for your
-                        prospects.
-                      </DialogDescription>
-                    </DialogHeader>
-                    <div className='grid gap-4 py-4'>
-                      <div className='space-y-2'>
-                        <Label htmlFor='email-parallelism'>
-                          Parallel Processing: {emailGenerationParallelism[0]}{' '}
-                          emails at once
-                        </Label>
-                        <Slider
-                          id='email-parallelism'
-                          min={1}
-                          max={10}
-                          step={1}
-                          value={emailGenerationParallelism}
-                          onValueChange={setEmailGenerationParallelism}
-                          className='w-full'
-                        />
-                        <p className='text-sm text-muted-foreground'>
-                          Number of emails to generate simultaneously. Higher
-                          values increase speed but use more resources.
-                        </p>
-                      </div>
-                    </div>
-                    <div className='flex justify-end gap-2'>
-                      <Button
-                        variant='outline'
-                        onClick={() => setShowEmailGenerationSettings(false)}
-                      >
-                        Cancel
-                      </Button>
-                      <Button
-                        onClick={() => setShowEmailGenerationSettings(false)}
-                      >
-                        Save Settings
-                      </Button>
-                    </div>
-                  </DialogContent>
-                </Dialog>
-
-                <Button
-                  className='gap-2'
-                  onClick={() => {
-                    console.log('🔥 Button onClick triggered!');
-                    startEmailGeneration();
-                  }}
-                  disabled={isEmailGenerationStarting}
-                >
-                  {isEmailGenerationStarting ? (
-                    <Loader2 className='h-4 w-4 animate-spin' />
-                  ) : (
-                    <Mail className='h-4 w-4' />
-                  )}
-                  Start Email Generation
-                </Button>
-              </div>
-            </div>
+            <EmailGenerationStep
+              prospectCount={workflowData.prospectCount || 0}
+              campaignId={workflowData.campaignData?.campaignId}
+              enrichmentData={workflowData.enrichmentData}
+              onStepComplete={handleStepComplete}
+              onError={handleStepError}
+              disabled={isLoading}
+            />
           );
         default:
           return <div>Invalid step</div>;
@@ -879,12 +666,13 @@ export default function SimpleWorkflow() {
                 <React.Fragment key={step.id}>
                   <div className='flex flex-col items-center'>
                     <div
-                      className={`flex items-center justify-center w-12 h-12 rounded-full border-2 transition-all duration-200 font-semibold text-sm z-10 ${step.completed
-                        ? 'bg-green-500 border-green-500 text-white shadow-sm'
-                        : step.active
-                          ? 'bg-blue-500 border-blue-500 text-white shadow-md ring-2 ring-blue-200'
-                          : 'bg-white border-gray-300 text-gray-500'
-                        }`}
+                      className={`flex items-center justify-center w-12 h-12 rounded-full border-2 transition-all duration-200 font-semibold text-sm z-10 ${
+                        step.completed
+                          ? 'bg-green-500 border-green-500 text-white shadow-sm'
+                          : step.active
+                            ? 'bg-blue-500 border-blue-500 text-white shadow-md ring-2 ring-blue-200'
+                            : 'bg-white border-gray-300 text-gray-500'
+                      }`}
                     >
                       {step.completed ? (
                         <CheckCircle className='h-6 w-6' />
@@ -927,20 +715,22 @@ export default function SimpleWorkflow() {
               Step {currentStep} of {steps.length}
             </div>
 
-            <Button
-              onClick={handleNext}
-              disabled={
-                currentStep === steps.length ||
-                isLoading ||
-                (currentStep === 1 && !workflowData.csvData) ||
-                (currentStep === 3 && !workflowData.enrichmentResults)
-              }
-              className='flex items-center'
-            >
-              {isLoading && <Loader2 className='h-4 w-4 mr-2 animate-spin' />}
-              Next
-              <ChevronRight className='h-4 w-4 ml-2' />
-            </Button>
+            {currentStep < steps.length && (
+              <Button
+                onClick={handleNext}
+                disabled={
+                  currentStep === steps.length ||
+                  isLoading ||
+                  (currentStep === 1 && !workflowData.csvData) ||
+                  (currentStep === 3 && !workflowData.enrichmentResults)
+                }
+                className='flex items-center'
+              >
+                {isLoading && <Loader2 className='h-4 w-4 mr-2 animate-spin' />}
+                Next
+                <ChevronRight className='h-4 w-4 ml-2' />
+              </Button>
+            )}
           </div>
         </div>
       </div>

@@ -77,7 +77,8 @@ export default function Dashboard() {
       <div className='mb-6'>
         <h1 className='text-3xl font-bold'>Dashboard</h1>
         <p className='text-muted-foreground'>
-          Welcome to Cold Outreach AI - Enhance your sales with AI-powered Email generation
+          Welcome to Cold Outreach AI - Enhance your sales with AI-powered Email
+          generation
         </p>
       </div>
 
@@ -130,7 +131,8 @@ export default function Dashboard() {
               {loading ? '...' : formatNumber(stats.totalProspects)}
             </div>
             <p className='text-xs text-muted-foreground'>
-              {loading ? '...' : formatPercentage(stats.changes.totalProspects)} from last month
+              {loading ? '...' : formatPercentage(stats.changes.totalProspects)}{' '}
+              from last month
             </p>
           </CardContent>
         </Card>
@@ -147,14 +149,19 @@ export default function Dashboard() {
               {loading ? '...' : formatNumber(stats.enrichedProspects)}
             </div>
             <p className='text-xs text-muted-foreground'>
-              {loading ? '...' : formatPercentage(stats.changes.enrichedProspects)} from last month
+              {loading
+                ? '...'
+                : formatPercentage(stats.changes.enrichedProspects)}{' '}
+              from last month
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className='flex flex-row items-center justify-between space-y-0 pb-2'>
-            <CardTitle className='text-sm font-medium'>Emails Generated</CardTitle>
+            <CardTitle className='text-sm font-medium'>
+              Emails Generated
+            </CardTitle>
             <Mail className='h-4 w-4 text-muted-foreground' />
           </CardHeader>
           <CardContent>
@@ -162,7 +169,10 @@ export default function Dashboard() {
               {loading ? '...' : formatNumber(stats.emailsGenerated)}
             </div>
             <p className='text-xs text-muted-foreground'>
-              {loading ? '...' : formatPercentage(stats.changes.emailsGenerated)} from last month
+              {loading
+                ? '...'
+                : formatPercentage(stats.changes.emailsGenerated)}{' '}
+              from last month
             </p>
           </CardContent>
         </Card>
@@ -224,26 +234,38 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className='space-y-4'>
-              <Link to="/workflow">
-                <Button variant='outline' className='w-full justify-start cursor-pointer'>
+              <Link to='/workflow'>
+                <Button
+                  variant='outline'
+                  className='w-full justify-start cursor-pointer'
+                >
                   <Upload className='mr-2 h-4 w-4' />
                   Upload New CSV
                 </Button>
               </Link>
-              <Link to="/prospects">
-                <Button variant='outline' className='w-full justify-start cursor-pointer'>
+              <Link to='/prospects'>
+                <Button
+                  variant='outline'
+                  className='w-full justify-start cursor-pointer'
+                >
                   <Users className='mr-2 h-4 w-4' />
                   View All Prospects
                 </Button>
               </Link>
-              <Link to="/templates">
-                <Button variant='outline' className='w-full justify-start cursor-pointer'>
+              <Link to='/templates'>
+                <Button
+                  variant='outline'
+                  className='w-full justify-start cursor-pointer'
+                >
                   <FileText className='mr-2 h-4 w-4' />
                   Manage Templates
                 </Button>
               </Link>
-              <Link to="/analytics">
-                <Button variant='outline' className='w-full justify-start cursor-pointer'>
+              <Link to='/analytics'>
+                <Button
+                  variant='outline'
+                  className='w-full justify-start cursor-pointer'
+                >
                   <TrendingUp className='mr-2 h-4 w-4' />
                   View Analytics
                 </Button>

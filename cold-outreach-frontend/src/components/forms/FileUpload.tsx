@@ -143,7 +143,7 @@ export default function FileUpload({
       uploadInfo.message = 'CSV processed successfully';
 
       setUploadedFiles(prev =>
-        prev.map(f => f.uploadId === localId ? uploadInfo : f)
+        prev.map(f => (f.uploadId === localId ? uploadInfo : f))
       );
       onUploadProgress?.(uploadInfo);
 
@@ -158,9 +158,11 @@ export default function FileUpload({
         processedAt: new Date().toISOString(),
       };
 
-      console.log('📊 Local processing complete, calling onUploadComplete with:', uploadResult);
+      console.log(
+        '📊 Local processing complete, calling onUploadComplete with:',
+        uploadResult
+      );
       onUploadComplete?.(uploadResult);
-
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : 'Failed to process CSV file';
@@ -333,8 +335,10 @@ export default function FileUpload({
 
             requiredColumns.forEach(req => {
               const normalizedRequired = req.name.toLowerCase();
-              if (normalizedHeader.includes(normalizedRequired) ||
-                normalizedRequired.includes(normalizedHeader)) {
+              if (
+                normalizedHeader.includes(normalizedRequired) ||
+                normalizedRequired.includes(normalizedHeader)
+              ) {
                 req.found = true;
                 req.mapping = header;
               }
@@ -354,7 +358,10 @@ export default function FileUpload({
               const header = headers[i]?.toLowerCase() || '';
               const value = rowData[i]?.trim() || '';
 
-              if ((header.includes('name') || header.includes('email')) && value) {
+              if (
+                (header.includes('name') || header.includes('email')) &&
+                value
+              ) {
                 hasRequiredData = true;
                 break;
               }
@@ -372,7 +379,7 @@ export default function FileUpload({
             totalRows: totalRowCount,
             validRows,
             invalidRows,
-            requiredColumnsFound: requiredColumns.filter(c => c.found).length
+            requiredColumnsFound: requiredColumns.filter(c => c.found).length,
           });
 
           if (totalRowCount === 0) {
@@ -450,10 +457,11 @@ export default function FileUpload({
       {/* Drop Zone - Only show if no files uploaded */}
       {uploadedFiles.length === 0 && (
         <Card
-          className={`relative transition-all duration-200 ${isDragOver
-            ? 'border-primary border-2 bg-primary/5'
-            : 'border-dashed border-2 border-gray-300 hover:border-gray-400'
-            } ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+          className={`relative transition-all duration-200 ${
+            isDragOver
+              ? 'border-primary border-2 bg-primary/5'
+              : 'border-dashed border-2 border-gray-300 hover:border-gray-400'
+          } ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
@@ -474,8 +482,9 @@ export default function FileUpload({
 
             <div className='space-y-4'>
               <div
-                className={`mx-auto w-16 h-16 rounded-full flex items-center justify-center ${isDragOver ? 'bg-primary/10' : 'bg-gray-100'
-                  }`}
+                className={`mx-auto w-16 h-16 rounded-full flex items-center justify-center ${
+                  isDragOver ? 'bg-primary/10' : 'bg-gray-100'
+                }`}
               >
                 {isUploading ? (
                   <Loader2 className='h-8 w-8 text-blue-500 animate-spin' />
@@ -491,7 +500,8 @@ export default function FileUpload({
                   {isUploading ? 'Processing...' : 'Drop CSV file here'}
                 </h3>
                 <p className='text-sm text-gray-500 mt-1'>
-                  Only one CSV file is allowed. Drag and drop or click to browse.
+                  Only one CSV file is allowed. Drag and drop or click to
+                  browse.
                 </p>
               </div>
 

@@ -203,4 +203,17 @@
     body {
         @apply bg-background text-foreground;
     }
+
+    /* Ensure all interactive elements have cursor pointer */
+    button,
+    [role="button"],
+    input[type="submit"],
+    input[type="button"],
+    input[type="checkbox"],
+    input[type="radio"],
+    select,
+    a,
+    label[for] {
+        cursor: pointer;
+    }
 }

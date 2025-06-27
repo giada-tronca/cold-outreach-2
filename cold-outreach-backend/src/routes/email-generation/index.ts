@@ -175,7 +175,7 @@ async function generateEmailCSV(campaignId: number, jobId: string): Promise<stri
         const prospects = await prisma.cOProspects.findMany({
             where: {
                 campaignId: campaignId,
-                status: 'ENRICHED'
+                status: 'EMAIL_GENERATED'
             },
             include: {
                 generatedEmail: true,
@@ -213,7 +213,7 @@ async function generateEmailCSV(campaignId: number, jobId: string): Promise<stri
                 prospect.linkedinUrl || '',
                 phone,
                 location,
-                (prospect.enrichment as any)?.industry || '',
+                (prospect.enrichment as any)?.industryMappings || '',
                 (prospect.enrichment as any)?.companySize || '',
                 ((prospect.enrichment as any)?.techStack as any)?.join(', ') || '',
                 generatedEmail?.subject || '',
@@ -245,18 +245,41 @@ router.post('/jobs', asyncHandler(async (req, res) => {
     const { parallelism = 2, aiProvider = 'openrouter', llmModelId } = configuration || {}
     const validAiProvider: 'gemini' | 'openrouter' = aiProvider === 'gemini' ? 'gemini' : 'openrouter'
 
-    console.log(`📧 [EmailGeneration]: Creating email generation jobs for campaign ${campaignId} using ${validAiProvider}${llmModelId ? ` (${llmModelId})` : ''}`)
+    console.log(`📧 [EmailGeneration]: Creating email generation jobs for campaign ${campaignId} using ${validAiProvider}${llmModelId ? ` (${llmModelId})` : ''} with parallelism ${parallelism}`)
 
     if (!campaignId) {
         return ApiResponseBuilder.error(res, 'Campaign ID is required', 400)
     }
 
+    if (!parallelism || parallelism < 1 || parallelism > 10) {
+        return ApiResponseBuilder.error(res, 'Parallelism must be between 1 and 10', 400)
+    }
+
     try {
+        // Get campaign settings to validate email generation configuration
+        const campaign = await prisma.cOCampaigns.findUnique({
+            where: { id: parseInt(campaignId) }
+        })
+
+        if (!campaign) {
+            return ApiResponseBuilder.error(res, 'Campaign not found', 404)
+        }
+
+        if (!campaign.emailSubject || !campaign.prompt) {
+            return ApiResponseBuilder.error(res, 'Campaign missing email subject or prompt configuration. Please configure these in Step 2.', 400)
+        }
+
+        console.log(`📧 [EmailGeneration]: Campaign ${campaignId} has email subject template: "${campaign.emailSubject?.substring(0, 50)}..."`)
+        console.log(`📧 [EmailGeneration]: Campaign ${campaignId} has email body template: "${campaign.prompt?.substring(0, 50)}..."`)
+
         // Get all prospects from the campaign that have been enriched
         const prospects = await prisma.cOProspects.findMany({
             where: {
                 campaignId: parseInt(campaignId),
                 status: 'ENRICHED' // Only generate emails for enriched prospects
+            },
+            orderBy: {
+                id: 'asc' // Consistent ordering for batch processing
             }
         })
 
@@ -266,49 +289,19 @@ router.post('/jobs', asyncHandler(async (req, res) => {
             return ApiResponseBuilder.error(res, 'No enriched prospects found for email generation', 400)
         }
 
-        // Create individual email generation jobs with proper parallelism control (like enrichment)
-        const jobPromises: Promise<any>[] = []
-
-        // Create individual jobs for each prospect
-        for (const prospect of prospects) {
-            const jobData: EmailGenerationJobData = {
-                prospectId: prospect.id,
-                campaignId: parseInt(campaignId),
-                userId: 'default-user', // Use consistent userId for SSE
-                aiProvider: validAiProvider,
-                llmModelId: llmModelId, // Add specific LLM model ID
-            }
-
-            const jobPromise = emailGenerationQueue.add(
-                `email-generation-${prospect.id}-${Date.now()}`,
-                jobData,
-                {
-                    priority: 5,
-                    attempts: 3,
-                }
-            )
-
-            jobPromises.push(jobPromise)
-        }
-
-        // Wait for all jobs to be created
-        const createdJobs = await Promise.all(jobPromises)
-
-        console.log(`✅ [EmailGeneration]: Created ${createdJobs.length} individual email generation jobs with parallelism ${parallelism}`)
-
-        // Create and store the job in the map for tracking
+        // Create the batch job tracking first
         const jobId = `email-gen-${Date.now()}`
-        const response = {
+        const batchJob: EmailGenerationJob = {
             id: jobId,
-            status: 'running' as const,
-            totalProspects: createdJobs.length,
+            status: 'running',
+            totalProspects: prospects.length,
             processedProspects: 0,
             completedProspects: 0,
             failedProspects: 0,
             progress: 0,
             configuration: {
                 campaignId: parseInt(campaignId),
-                parallelism,
+                parallelism: parseInt(parallelism),
                 aiProvider: validAiProvider,
                 llmModelId
             },
@@ -318,7 +311,7 @@ router.post('/jobs', asyncHandler(async (req, res) => {
                 email: prospect.email || '',
                 company: prospect.company || '',
                 title: prospect.position || '',
-                status: 'pending' as const,
+                status: 'pending',
                 progress: 0,
                 retryCount: 0
             })),
@@ -327,10 +320,62 @@ router.post('/jobs', asyncHandler(async (req, res) => {
             updatedAt: new Date().toISOString()
         }
 
-        // Store the job in the map for status tracking
-        emailGenerationJobs.set(jobId, response as EmailGenerationJob)
+        // Store the batch job for tracking
+        emailGenerationJobs.set(jobId, batchJob)
 
-        return ApiResponseBuilder.success(res, response, 'Email generation jobs created and queued successfully', 201)
+        // Create individual email generation jobs with controlled parallelism
+        console.log(`📧 [EmailGeneration]: Creating ${prospects.length} individual jobs with parallelism ${parallelism}`)
+
+        const jobPromises: Promise<any>[] = []
+
+        // Process prospects in batches based on parallelism setting
+        for (let i = 0; i < prospects.length; i += parallelism) {
+            const batch = prospects.slice(i, i + parallelism)
+
+            // Create jobs for this batch
+            const batchPromises = batch.map((prospect, batchIndex) => {
+                const globalIndex = i + batchIndex
+                const jobData: EmailGenerationJobData = {
+                    prospectId: prospect.id,
+                    campaignId: parseInt(campaignId),
+                    userId: 'default-user', // Use consistent userId for SSE
+                    aiProvider: validAiProvider,
+                    llmModelId: llmModelId,
+                    configuration: configuration // Pass the full configuration including language and calendarLink
+                }
+
+                const jobPromise = emailGenerationQueue.add(
+                    `email-generation-${prospect.id}-${Date.now()}-${globalIndex}`,
+                    jobData,
+                    {
+                        priority: 5,
+                        attempts: 3,
+                        delay: globalIndex * 100, // Small delay between jobs to prevent overwhelming APIs
+                        jobId: `${jobId}-prospect-${prospect.id}` // Link to batch job
+                    }
+                )
+
+                return jobPromise
+            })
+
+            jobPromises.push(...batchPromises)
+
+            // If this isn't the last batch, add a delay before processing the next batch
+            if (i + parallelism < prospects.length) {
+                console.log(`📧 [EmailGeneration]: Batch ${Math.floor(i / parallelism) + 1} created, will process next batch after current completes`)
+            }
+        }
+
+        // Wait for all jobs to be queued (not completed)
+        const createdJobs = await Promise.all(jobPromises)
+
+        console.log(`✅ [EmailGeneration]: Successfully queued ${createdJobs.length} individual email generation jobs`)
+        console.log(`📊 [EmailGeneration]: Job processing will respect parallelism limit of ${parallelism} concurrent jobs`)
+
+        // Send initial SSE update
+        sendSSEEvent(jobId, 'job_status', batchJob)
+
+        return ApiResponseBuilder.success(res, batchJob, 'Email generation jobs created and queued successfully', 201)
 
     } catch (error) {
         console.error('❌ [EmailGeneration]: Error creating email generation jobs:', error)
@@ -456,7 +501,5 @@ router.get('/jobs/:jobId/progress', asyncHandler(async (req, res): Promise<void>
 
 // Export the updateJobStatus function so it can be used by the processor
 export { updateJobStatus }
-
-
 
 export default router 

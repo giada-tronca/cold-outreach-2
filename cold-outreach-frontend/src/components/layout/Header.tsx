@@ -17,9 +17,11 @@ import {
   User,
   LogOut,
   Zap,
+  UserPlus,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface HeaderProps {
   onMenuClick: () => void;
@@ -35,6 +37,7 @@ export function Header({
   className,
 }: HeaderProps) {
   const navigate = useNavigate();
+  const { user, logout } = useAuth();
 
   const handleProfileClick = () => {
     navigate('/profile');
@@ -42,6 +45,21 @@ export function Header({
 
   const handleSettingsClick = () => {
     navigate('/settings');
+  };
+
+  const handleAddUserClick = () => {
+    navigate('/add-user');
+  };
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
+
+  // Get user initials for avatar
+  const getUserInitials = () => {
+    if (!user) return 'U';
+    return `${user.firstName?.charAt(0) || ''}${user.lastName?.charAt(0) || ''}`.toUpperCase();
   };
 
   return (
@@ -122,34 +140,56 @@ export function Header({
         {/* User menu */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant='ghost' className='relative h-8 w-8 rounded-full cursor-pointer'>
+            <Button
+              variant='ghost'
+              className='relative h-8 w-8 rounded-full cursor-pointer'
+            >
               <Avatar className='h-8 w-8'>
-                <AvatarFallback>
-                  <User className='h-4 w-4' />
-                </AvatarFallback>
+                <AvatarFallback>{getUserInitials()}</AvatarFallback>
               </Avatar>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent className='w-56' align='end' forceMount>
             <DropdownMenuLabel className='font-normal'>
               <div className='flex flex-col space-y-1'>
-                <p className='text-sm font-medium leading-none'>John Doe</p>
+                <p className='text-sm font-medium leading-none'>
+                  {user ? `${user.firstName} ${user.lastName}` : 'User'}
+                </p>
                 <p className='text-xs leading-none text-muted-foreground'>
-                  john@example.com
+                  {user?.email || 'user@example.com'}
                 </p>
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className='cursor-pointer' onClick={handleProfileClick}>
+            <DropdownMenuItem
+              className='cursor-pointer'
+              onClick={handleProfileClick}
+            >
               <User className='mr-2 h-4 w-4' />
               <span>Profile</span>
             </DropdownMenuItem>
-            <DropdownMenuItem className='cursor-pointer' onClick={handleSettingsClick}>
+            <DropdownMenuItem
+              className='cursor-pointer'
+              onClick={handleSettingsClick}
+            >
               <Settings className='mr-2 h-4 w-4' />
               <span>Settings</span>
             </DropdownMenuItem>
+            {/* Show Add User option only for admin users */}
+            {user?.role === 'ADMIN' && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className='cursor-pointer'
+                  onClick={handleAddUserClick}
+                >
+                  <UserPlus className='mr-2 h-4 w-4' />
+                  <span>Add User</span>
+                </DropdownMenuItem>
+              </>
+            )}
             <DropdownMenuSeparator />
-            <DropdownMenuItem className='cursor-pointer'>
+            <DropdownMenuItem className='cursor-pointer' onClick={handleLogout}>
               <LogOut className='mr-2 h-4 w-4' />
               <span>Log out</span>
             </DropdownMenuItem>

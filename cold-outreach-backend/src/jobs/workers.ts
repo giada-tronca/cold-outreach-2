@@ -46,7 +46,7 @@ export const emailGenerationWorker = new Worker(
   },
   {
     ...workerOptions,
-    concurrency: 2, // Lower concurrency for AI tasks
+    concurrency: 10, // Higher concurrency to support user parallelism settings (1-10)
   }
 );
 

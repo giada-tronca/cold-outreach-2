@@ -209,3 +209,24 @@ model Profiles {
 
   @@map("profiles")
 }
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+model COUsers {
+  id          Int       @id @default(autoincrement())
+  firstName   String    @db.VarChar(100) @map("first_name")
+  lastName    String    @db.VarChar(100) @map("last_name")
+  email       String    @unique @db.VarChar(255)
+  password    String    @db.VarChar(255) // Hashed password
+  role        UserRole  @default(USER)
+  isActive    Boolean   @default(true) @map("is_active")
+  lastLoginAt DateTime? @map("last_login_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@map("users")
+  @@index([email])
+}

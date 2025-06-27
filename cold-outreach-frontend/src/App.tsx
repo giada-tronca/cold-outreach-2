@@ -5,6 +5,8 @@ import {
   Navigate,
 } from 'react-router-dom';
 import { AppLayout } from './components/layout/AppLayout';
+import ProtectedRoute from './components/auth/ProtectedRoute';
+import { AuthProvider } from './contexts/AuthContext';
 import WorkflowDemo from './pages/WorkflowDemo';
 import LayoutDemo from './pages/LayoutDemo';
 import ComponentShowcase from './pages/ComponentShowcase';
@@ -18,41 +20,65 @@ import Analytics from './pages/analytics/Analytics';
 import Settings from './pages/settings/Settings';
 import Profile from './pages/profile/Profile';
 import SimpleWorkflow from './pages/workflow/SimpleWorkflow';
+import Login from './pages/auth/Login';
+import AddUser from './pages/auth/AddUser';
 
 function App() {
   return (
-    <Router basename="/cold-outreach">
-      <Routes>
-        {/* Demo routes (keep these for development) */}
-        <Route path='/demo/workflow' element={<WorkflowDemo />} />
-        <Route path='/demo/layout' element={<LayoutDemo />} />
-        <Route path='/demo/components' element={<ComponentShowcase />} />
+    <AuthProvider>
+      <Router basename='/cold-outreach'>
+        <Routes>
+          {/* Authentication routes (no layout) */}
+          <Route path='/login' element={<Login />} />
 
-        {/* Main application routes */}
-        <Route path='/' element={<AppLayout />}>
-          <Route index element={<Navigate to='/dashboard' replace />} />
-          <Route path='dashboard' element={<Dashboard />} />
+          {/* Demo routes (keep these for development) */}
+          <Route path='/demo/workflow' element={<WorkflowDemo />} />
+          <Route path='/demo/layout' element={<LayoutDemo />} />
+          <Route path='/demo/components' element={<ComponentShowcase />} />
 
-          {/* Template routes */}
-          <Route path='templates' element={<Templates />} />
-          <Route path='templates/create' element={<Templates />} />
+          {/* Main application routes (protected) */}
+          <Route
+            path='/'
+            element={
+              <ProtectedRoute>
+                <AppLayout />
+              </ProtectedRoute>
+            }
+          >
+            <Route index element={<Navigate to='/dashboard' replace />} />
+            <Route path='dashboard' element={<Dashboard />} />
 
-          {/* Prospect routes */}
-          <Route path='prospects' element={<Prospects />} />
+            {/* Template routes */}
+            <Route path='templates' element={<Templates />} />
+            <Route path='templates/create' element={<Templates />} />
 
-          {/* Batch routes */}
-          <Route path='batches' element={<Batches />} />
+            {/* Prospect routes */}
+            <Route path='prospects' element={<Prospects />} />
 
-          {/* Workflow routes */}
-          <Route path='workflow' element={<SimpleWorkflow />} />
+            {/* Batch routes */}
+            <Route path='batches' element={<Batches />} />
 
-          {/* Other routes */}
-          <Route path='analytics' element={<Analytics />} />
-          <Route path='profile' element={<Profile />} />
-          <Route path='settings' element={<Settings />} />
-        </Route>
-      </Routes>
-    </Router>
+            {/* Workflow routes */}
+            <Route path='workflow' element={<SimpleWorkflow />} />
+
+            {/* Other routes */}
+            <Route path='analytics' element={<Analytics />} />
+            <Route path='profile' element={<Profile />} />
+            <Route path='settings' element={<Settings />} />
+          </Route>
+
+          {/* Admin-only route */}
+          <Route
+            path='/add-user'
+            element={
+              <ProtectedRoute requireAdmin={true}>
+                <AddUser />
+              </ProtectedRoute>
+            }
+          />
+        </Routes>
+      </Router>
+    </AuthProvider>
   );
 }
 

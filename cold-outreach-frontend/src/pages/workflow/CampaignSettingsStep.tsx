@@ -45,7 +45,12 @@ interface NewCampaignData {
   name: string;
   emailSubjectPrompt: string;
   emailBodyPrompt: string;
-  language: 'English' | 'Italian';
+}
+
+// Separate interface for required campaign settings that apply to all campaigns
+interface CampaignRequiredSettings {
+  language: 'English' | 'Italian' | 'Spanish' | 'French' | 'German';
+  calendarLink: string;
 }
 
 interface CampaignSettingsStepProps {
@@ -105,28 +110,42 @@ export default function CampaignSettingsStep({
   void onError;
   void disabled;
   // Campaign selection state
-  const [templateMode, setTemplateMode] = useState<'existing' | 'new'>('existing');
+  const [templateMode, setTemplateMode] = useState<'existing' | 'new'>(
+    'existing'
+  );
   const [existingCampaigns, setExistingCampaigns] = useState<Campaign[]>([]);
-  const [selectedCampaignId, setSelectedCampaignId] = useState<number | null>(null);
+  const [selectedCampaignId, setSelectedCampaignId] = useState<number | null>(
+    null
+  );
   const [loadingCampaigns, setLoadingCampaigns] = useState(false);
 
   // AI Model state - Default to OpenRouter Gemini 2.5 Pro
-  const [selectedLLMModel, setSelectedLLMModel] = useState('openrouter-gemini-2.5-pro');
+  const [selectedLLMModel, setSelectedLLMModel] = useState(
+    'openrouter-gemini-2.5-pro'
+  );
 
   // New campaign form state
   const [newCampaign, setNewCampaign] = useState<NewCampaignData>({
     name: '',
     emailSubjectPrompt: '',
     emailBodyPrompt: '',
-    language: 'English' // Default to English
+  });
+
+  // Required campaign settings (applies to both existing and new campaigns)
+  const [campaignSettings, setCampaignSettings] = useState<CampaignRequiredSettings>({
+    language: 'English', // Default to English
+    calendarLink: '',
   });
 
   // Enrichment services state - Updated with the 3 requested services (PRE-SELECTED)
-  const [enrichmentServices, setEnrichmentServices] = useState<EnrichmentService[]>([
+  const [enrichmentServices, setEnrichmentServices] = useState<
+    EnrichmentService[]
+  >([
     {
       id: 'company-data',
       name: 'Company website enrichment',
-      description: 'Enrich company information, size, industry, and revenue data',
+      description:
+        'Enrich company information, size, industry, and revenue data',
       pricePerProspect: 0.02,
       icon: <Building className='h-5 w-5' />,
       enabled: true, // PRE-SELECTED
@@ -134,7 +153,8 @@ export default function CampaignSettingsStep({
     {
       id: 'linkedin-profile',
       name: 'LinkedIn profile enrichment',
-      description: 'Gather LinkedIn profiles, job titles, and professional background',
+      description:
+        'Gather LinkedIn profiles, job titles, and professional background',
       pricePerProspect: 0.025,
       icon: <Linkedin className='h-5 w-5' />,
       enabled: true, // PRE-SELECTED
@@ -142,7 +162,8 @@ export default function CampaignSettingsStep({
     {
       id: 'website-technology',
       name: 'Company website technology analysis',
-      description: 'Analyze technology stack, tools, and software used by companies',
+      description:
+        'Analyze technology stack, tools, and software used by companies',
       pricePerProspect: 0.015,
       icon: <Calculator className='h-5 w-5' />,
       enabled: true, // PRE-SELECTED
@@ -178,15 +199,15 @@ export default function CampaignSettingsStep({
     setLoadingCampaigns(true);
     try {
       const response = await campaignService.getAllCampaigns();
-      // Handle the paginated response structure  
-      const campaigns = (response.data || []) as Campaign[];
+      // Handle the paginated response structure
+      const campaigns = response.data || [];
       setExistingCampaigns(campaigns);
       setErrors(prev => ({ ...prev, campaigns: '' }));
     } catch (error) {
       console.error('Failed to load campaigns:', error);
       setErrors(prev => ({
         ...prev,
-        campaigns: 'Failed to load existing campaigns'
+        campaigns: 'Failed to load existing campaigns',
       }));
     } finally {
       setLoadingCampaigns(false);
@@ -195,8 +216,15 @@ export default function CampaignSettingsStep({
 
   // Create new campaign
   const handleCreateCampaign = async () => {
-    if (!newCampaign.name.trim() || !newCampaign.emailSubjectPrompt.trim() || !newCampaign.emailBodyPrompt.trim()) {
-      setErrors(prev => ({ ...prev, createCampaign: 'Please fill in all required fields' }));
+    if (
+      !newCampaign.name.trim() ||
+      !newCampaign.emailSubjectPrompt.trim() ||
+      !newCampaign.emailBodyPrompt.trim()
+    ) {
+      setErrors(prev => ({
+        ...prev,
+        createCampaign: 'Please fill in all required fields',
+      }));
       return;
     }
 
@@ -215,17 +243,27 @@ export default function CampaignSettingsStep({
       const response = await campaignService.createCampaign(campaignData);
 
       if (response.success && response.data) {
-        console.log('[Step 2] Campaign created successfully:', response.data.name, '(ID:', response.data.id + ')');
+        console.log(
+          '[Step 2] Campaign created successfully:',
+          response.data.name,
+          '(ID:',
+          response.data.id + ')'
+        );
 
         // Show success message
-        setSuccessMessage(`Campaign "${response.data.name}" created successfully!`);
+        setSuccessMessage(
+          `Campaign "${response.data.name}" created successfully!`
+        );
 
         // Clear the form
         setNewCampaign({
           name: '',
           emailSubjectPrompt: '',
           emailBodyPrompt: '',
-          language: 'English'
+        });
+        setCampaignSettings({
+          language: 'English',
+          calendarLink: '',
         });
 
         // Reload campaigns list
@@ -240,7 +278,8 @@ export default function CampaignSettingsStep({
       }
     } catch (error) {
       console.error('❌ Failed to create campaign:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Failed to create campaign';
+      const errorMessage =
+        error instanceof Error ? error.message : 'Failed to create campaign';
       setErrors(prev => ({ ...prev, createCampaign: errorMessage }));
     } finally {
       setIsCreatingCampaign(false);
@@ -266,13 +305,20 @@ export default function CampaignSettingsStep({
     setDeleteDialog(prev => ({ ...prev, isDeleting: true }));
 
     try {
-      console.log('[Step 2] Deleting campaign:', deleteDialog.campaign.name, '(ID:', deleteDialog.campaign.id + ')');
+      console.log(
+        '[Step 2] Deleting campaign:',
+        deleteDialog.campaign.name,
+        '(ID:',
+        deleteDialog.campaign.id + ')'
+      );
       await campaignService.deleteCampaign(deleteDialog.campaign.id);
 
       console.log('[Step 2] Campaign deleted successfully');
 
       // Show success message
-      setSuccessMessage(`Campaign "${deleteDialog.campaign.name}" deleted successfully!`);
+      setSuccessMessage(
+        `Campaign "${deleteDialog.campaign.name}" deleted successfully!`
+      );
 
       // Reload campaigns and clear selection
       await loadExistingCampaigns();
@@ -289,7 +335,8 @@ export default function CampaignSettingsStep({
       setTimeout(() => setSuccessMessage(''), 5000);
     } catch (error) {
       console.error('❌ Failed to delete campaign:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Failed to delete campaign';
+      const errorMessage =
+        error instanceof Error ? error.message : 'Failed to delete campaign';
       setErrors(prev => ({ ...prev, general: errorMessage }));
       setDeleteDialog(prev => ({ ...prev, isDeleting: false }));
     }
@@ -304,15 +351,21 @@ export default function CampaignSettingsStep({
   };
 
   // Handle enrichment service toggle
-  const handleEnrichmentServiceToggle = (serviceId: string, enabled: boolean) => {
-    const serviceName = enrichmentServices.find(s => s.id === serviceId)?.name || serviceId;
-    console.log('[Step 2] Enrichment service toggled:', serviceName, enabled ? 'enabled' : 'disabled');
+  const handleEnrichmentServiceToggle = (
+    serviceId: string,
+    enabled: boolean
+  ) => {
+    const serviceName =
+      enrichmentServices.find(s => s.id === serviceId)?.name || serviceId;
+    console.log(
+      '[Step 2] Enrichment service toggled:',
+      serviceName,
+      enabled ? 'enabled' : 'disabled'
+    );
 
     setEnrichmentServices(prev =>
       prev.map(service =>
-        service.id === serviceId
-          ? { ...service, enabled }
-          : service
+        service.id === serviceId ? { ...service, enabled } : service
       )
     );
   };
@@ -327,7 +380,8 @@ export default function CampaignSettingsStep({
       const hasRequiredFields =
         newCampaign.name.trim() &&
         newCampaign.emailSubjectPrompt.trim() &&
-        newCampaign.emailBodyPrompt.trim();
+        newCampaign.emailBodyPrompt.trim() &&
+        campaignSettings.calendarLink.trim();
       return hasRequiredFields && hasLLMModel;
     }
   })();
@@ -342,12 +396,16 @@ export default function CampaignSettingsStep({
     }
 
     // Find the selected model details
-    const selectedModel = llmModels.find(model => model.id === selectedLLMModel);
+    const selectedModel = llmModels.find(
+      model => model.id === selectedLLMModel
+    );
 
     // Get selected enrichment services
-    const selectedEnrichmentServices = enrichmentServices.filter(service => service.enabled);
+    const selectedEnrichmentServices = enrichmentServices.filter(
+      service => service.enabled
+    );
     const enrichmentCost = selectedEnrichmentServices.reduce(
-      (total, service) => total + (service.pricePerProspect * prospectCount),
+      (total, service) => total + service.pricePerProspect * prospectCount,
       0
     );
 
@@ -356,28 +414,32 @@ export default function CampaignSettingsStep({
       campaignName: '',
       emailSubject: '',
       prompt: '',
-      language: 'English' as 'English' | 'Italian'
+      language: campaignSettings.language,
+      calendarLink: campaignSettings.calendarLink,
     };
 
     if (templateMode === 'existing' && selectedCampaignId) {
       // Find the selected existing campaign
-      const selectedCampaign = existingCampaigns.find(c => c.id === selectedCampaignId);
+      const selectedCampaign = existingCampaigns.find(
+        c => c.id === selectedCampaignId
+      );
       if (selectedCampaign) {
         campaignData = {
           campaignName: selectedCampaign.name,
           emailSubject: selectedCampaign.emailSubject || '',
           prompt: selectedCampaign.prompt || '',
-          // Since Campaign type doesn't have language field, default to English for existing campaigns
-          language: 'English' as 'English' | 'Italian'
+          language: campaignSettings.language,
+          calendarLink: campaignSettings.calendarLink,
         };
       }
     } else if (templateMode === 'new') {
-      // Use new campaign form data
+      // Use new campaign form data + campaign settings
       campaignData = {
         campaignName: newCampaign.name,
         emailSubject: newCampaign.emailSubjectPrompt,
         prompt: newCampaign.emailBodyPrompt,
-        language: newCampaign.language
+        language: campaignSettings.language,
+        calendarLink: campaignSettings.calendarLink,
       };
     }
 
@@ -395,6 +457,7 @@ export default function CampaignSettingsStep({
       emailSubject: campaignData.emailSubject,
       prompt: campaignData.prompt,
       language: campaignData.language,
+      calendarLink: campaignData.calendarLink,
 
       // AI model configuration
       aiProvider: selectedLLMModel,
@@ -415,8 +478,13 @@ export default function CampaignSettingsStep({
     console.log('  • Email Subject:', campaignData.emailSubject || 'Not set');
     console.log('  • Email Body Prompt:', campaignData.prompt || 'Not set');
     console.log('  • Language:', campaignData.language);
+    console.log('  • Calendar Link:', campaignData.calendarLink);
     console.log('  • AI Model:', selectedModel?.name || 'Not selected');
-    console.log('  • Enrichment Services:', selectedEnrichmentServices.length, 'selected');
+    console.log(
+      '  • Enrichment Services:',
+      selectedEnrichmentServices.length,
+      'selected'
+    );
     console.log('  • Estimated Cost: $' + enrichmentCost.toFixed(2));
 
     // Call onStepComplete with the data
@@ -430,14 +498,15 @@ export default function CampaignSettingsStep({
     newCampaign.name,
     newCampaign.emailSubjectPrompt,
     newCampaign.emailBodyPrompt,
-    newCampaign.language,
     prospectCount,
     selectedLLMModel,
     enrichmentServices,
     csvData,
     batchName,
     existingCampaigns,
-    onStepComplete
+    onStepComplete,
+    campaignSettings.language,
+    campaignSettings.calendarLink,
   ]);
 
   // Expose the getCampaignStepData function globally for parent access
@@ -456,7 +525,9 @@ export default function CampaignSettingsStep({
       {/* Page Title */}
       <div className='text-center space-y-2'>
         <h2 className='text-2xl font-bold text-gray-900'>Workflow Settings</h2>
-        <p className='text-gray-600'>Configure AI models and campaign templates</p>
+        <p className='text-gray-600'>
+          Configure AI models and campaign templates
+        </p>
       </div>
 
       {/* Success Message */}
@@ -492,8 +563,9 @@ export default function CampaignSettingsStep({
             </Label>
             <Select
               value={selectedLLMModel}
-              onValueChange={(value) => {
-                const modelName = llmModels.find(m => m.id === value)?.name || value;
+              onValueChange={value => {
+                const modelName =
+                  llmModels.find(m => m.id === value)?.name || value;
                 console.log('[Step 2] AI model changed to:', modelName);
                 setSelectedLLMModel(value);
               }}
@@ -502,7 +574,7 @@ export default function CampaignSettingsStep({
                 <SelectValue placeholder='Select AI Model' />
               </SelectTrigger>
               <SelectContent>
-                {llmModels.map((model) => (
+                {llmModels.map(model => (
                   <SelectItem key={model.id} value={model.id}>
                     {model.name}
                   </SelectItem>
@@ -532,27 +604,36 @@ export default function CampaignSettingsStep({
         <CardContent className='space-y-4'>
           {/* Horizontal Grid of 3 Cards */}
           <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
-            {enrichmentServices.map((service) => (
+            {enrichmentServices.map(service => (
               <Card
                 key={service.id}
                 className={`cursor-pointer transition-all border-2 ${service.enabled
                   ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/20'
                   : 'border-gray-200 hover:border-gray-300'
                   }`}
-                onClick={() => handleEnrichmentServiceToggle(service.id, !service.enabled)}
+                onClick={() =>
+                  handleEnrichmentServiceToggle(service.id, !service.enabled)
+                }
               >
                 <CardContent className='p-4'>
                   <div className='space-y-3'>
                     <div className='flex items-center justify-between'>
-                      <div className={`p-2 rounded-lg ${service.enabled
-                        ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/30'
-                        : 'bg-gray-100 text-gray-600'
-                        }`}>
+                      <div
+                        className={`p-2 rounded-lg ${service.enabled
+                          ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/30'
+                          : 'bg-gray-100 text-gray-600'
+                          }`}
+                      >
                         {service.icon}
                       </div>
                       <Checkbox
                         checked={service.enabled}
-                        onChange={() => handleEnrichmentServiceToggle(service.id, !service.enabled)}
+                        onChange={() =>
+                          handleEnrichmentServiceToggle(
+                            service.id,
+                            !service.enabled
+                          )
+                        }
                       />
                     </div>
                     <div>
@@ -568,7 +649,11 @@ export default function CampaignSettingsStep({
                         ${service.pricePerProspect.toFixed(3)} per prospect
                       </Badge>
                       <div className='text-xs text-gray-600'>
-                        ~${(service.pricePerProspect * prospectCount).toFixed(2)} total
+                        ~$
+                        {(service.pricePerProspect * prospectCount).toFixed(
+                          2
+                        )}{' '}
+                        total
                       </div>
                     </div>
                   </div>
@@ -584,9 +669,14 @@ export default function CampaignSettingsStep({
                 <span className='font-medium'>Estimated Cost:</span>
                 <div className='text-right'>
                   <div className='font-bold text-lg'>
-                    ${enrichmentServices
+                    $
+                    {enrichmentServices
                       .filter(service => service.enabled)
-                      .reduce((total, service) => total + (service.pricePerProspect * prospectCount), 0)
+                      .reduce(
+                        (total, service) =>
+                          total + service.pricePerProspect * prospectCount,
+                        0
+                      )
                       .toFixed(2)}
                   </div>
                   <div className='text-sm text-gray-600 dark:text-gray-400'>
@@ -634,21 +724,34 @@ export default function CampaignSettingsStep({
                     <div className='flex gap-2'>
                       <Select
                         value={selectedCampaignId?.toString() || ''}
-                        onValueChange={(value) => {
-                          const campaignName = existingCampaigns.find(c => c.id === parseInt(value))?.name || value;
-                          console.log('[Step 2] Campaign selected:', campaignName);
+                        onValueChange={value => {
+                          const campaignName =
+                            existingCampaigns.find(
+                              c => c.id === parseInt(value)
+                            )?.name || value;
+                          console.log(
+                            '[Step 2] Campaign selected:',
+                            campaignName
+                          );
                           setSelectedCampaignId(parseInt(value));
                         }}
                         disabled={loadingCampaigns}
                       >
                         <SelectTrigger className='w-full'>
-                          <SelectValue placeholder={
-                            loadingCampaigns ? 'Loading campaigns...' : 'Select a campaign'
-                          } />
+                          <SelectValue
+                            placeholder={
+                              loadingCampaigns
+                                ? 'Loading campaigns...'
+                                : 'Select a campaign'
+                            }
+                          />
                         </SelectTrigger>
                         <SelectContent>
-                          {existingCampaigns.map((campaign) => (
-                            <SelectItem key={campaign.id} value={campaign.id.toString()}>
+                          {existingCampaigns.map(campaign => (
+                            <SelectItem
+                              key={campaign.id}
+                              value={campaign.id.toString()}
+                            >
                               {campaign.name}
                             </SelectItem>
                           ))}
@@ -690,7 +793,9 @@ export default function CampaignSettingsStep({
                     {errors.createCampaign && (
                       <Alert variant='destructive'>
                         <AlertCircle className='h-4 w-4' />
-                        <AlertDescription>{errors.createCampaign}</AlertDescription>
+                        <AlertDescription>
+                          {errors.createCampaign}
+                        </AlertDescription>
                       </Alert>
                     )}
 
@@ -703,20 +808,31 @@ export default function CampaignSettingsStep({
                         type='text'
                         placeholder='Enter campaign name'
                         value={newCampaign.name}
-                        onChange={(e) => setNewCampaign(prev => ({ ...prev, name: e.target.value }))}
+                        onChange={e =>
+                          setNewCampaign(prev => ({
+                            ...prev,
+                            name: e.target.value,
+                          }))
+                        }
                         disabled={isCreatingCampaign}
                       />
                     </div>
 
                     <div className='space-y-2'>
                       <Label htmlFor='email-subject-prompt'>
-                        Email subject generation prompt <span className='text-red-500'>*</span>
+                        Email subject generation prompt{' '}
+                        <span className='text-red-500'>*</span>
                       </Label>
                       <Textarea
                         id='email-subject-prompt'
                         placeholder='Enter the prompt for generating email subjects'
                         value={newCampaign.emailSubjectPrompt}
-                        onChange={(e) => setNewCampaign(prev => ({ ...prev, emailSubjectPrompt: e.target.value }))}
+                        onChange={e =>
+                          setNewCampaign(prev => ({
+                            ...prev,
+                            emailSubjectPrompt: e.target.value,
+                          }))
+                        }
                         disabled={isCreatingCampaign}
                         rows={3}
                       />
@@ -724,43 +840,36 @@ export default function CampaignSettingsStep({
 
                     <div className='space-y-2'>
                       <Label htmlFor='email-body-prompt'>
-                        Email body generation prompt <span className='text-red-500'>*</span>
+                        Email body generation prompt{' '}
+                        <span className='text-red-500'>*</span>
                       </Label>
                       <Textarea
                         id='email-body-prompt'
                         placeholder='Enter the prompt for generating email body content'
                         value={newCampaign.emailBodyPrompt}
-                        onChange={(e) => setNewCampaign(prev => ({ ...prev, emailBodyPrompt: e.target.value }))}
+                        onChange={e =>
+                          setNewCampaign(prev => ({
+                            ...prev,
+                            emailBodyPrompt: e.target.value,
+                          }))
+                        }
                         disabled={isCreatingCampaign}
                         rows={4}
                       />
                     </div>
 
-                    <div className='space-y-2'>
-                      <Label htmlFor='language'>
-                        Language <span className='text-red-500'>*</span>
-                      </Label>
-                      <Select
-                        value={newCampaign.language}
-                        onValueChange={(value: 'English' | 'Italian') =>
-                          setNewCampaign(prev => ({ ...prev, language: value }))
-                        }
-                        disabled={isCreatingCampaign}
-                      >
-                        <SelectTrigger className='w-full'>
-                          <SelectValue placeholder='Select language' />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value='English'>English</SelectItem>
-                          <SelectItem value='Italian'>Italian</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
+
 
                     {/* Create Button */}
                     <Button
                       onClick={handleCreateCampaign}
-                      disabled={isCreatingCampaign || !newCampaign.name.trim() || !newCampaign.emailSubjectPrompt.trim() || !newCampaign.emailBodyPrompt.trim()}
+                      disabled={
+                        isCreatingCampaign ||
+                        !newCampaign.name.trim() ||
+                        !newCampaign.emailSubjectPrompt.trim() ||
+                        !newCampaign.emailBodyPrompt.trim() ||
+                        !campaignSettings.calendarLink.trim()
+                      }
                       className='w-full'
                     >
                       {isCreatingCampaign ? (
@@ -779,6 +888,63 @@ export default function CampaignSettingsStep({
                 )}
               </div>
             </RadioGroup>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Email Settings Section - Always shown for both existing and new campaigns */}
+      <Card>
+        <CardHeader>
+          <CardTitle className='flex items-center gap-2'>
+            <FileText className='h-5 w-5' />
+            Email Settings
+          </CardTitle>
+          <CardDescription>
+            Required settings for email generation that apply to all campaigns
+          </CardDescription>
+        </CardHeader>
+        <CardContent className='space-y-4'>
+          <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
+            <div className='space-y-2'>
+              <Label htmlFor='email-language'>
+                Language <span className='text-red-500'>*</span>
+              </Label>
+              <Select
+                value={campaignSettings.language}
+                onValueChange={(value: 'English' | 'Italian' | 'Spanish' | 'French' | 'German') =>
+                  setCampaignSettings(prev => ({ ...prev, language: value }))
+                }
+              >
+                <SelectTrigger className='w-full'>
+                  <SelectValue placeholder='Select language' />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value='English'>English</SelectItem>
+                  <SelectItem value='Italian'>Italian</SelectItem>
+                  <SelectItem value='Spanish'>Spanish</SelectItem>
+                  <SelectItem value='French'>French</SelectItem>
+                  <SelectItem value='German'>German</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className='space-y-2'>
+              <Label htmlFor='email-calendar-link'>
+                Calendar Link <span className='text-red-500'>*</span>
+              </Label>
+              <Input
+                id='email-calendar-link'
+                type='url'
+                placeholder='Enter your calendar booking link (e.g., calendly.com/your-link)'
+                value={campaignSettings.calendarLink}
+                onChange={e =>
+                  setCampaignSettings(prev => ({
+                    ...prev,
+                    calendarLink: e.target.value,
+                  }))
+                }
+              />
+            </div>
           </div>
         </CardContent>
       </Card>

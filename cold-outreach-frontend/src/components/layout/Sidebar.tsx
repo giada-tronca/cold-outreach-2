@@ -41,7 +41,10 @@ interface NavigationItem {
   children?: NavigationItem[];
 }
 
-const getNavigationItems = (currentPath: string, prospectCount: number): NavigationItem[] => [
+const getNavigationItems = (
+  currentPath: string,
+  prospectCount: number
+): NavigationItem[] => [
   {
     title: 'Dashboard',
     href: '/dashboard',
@@ -64,9 +67,7 @@ const getNavigationItems = (currentPath: string, prospectCount: number): Navigat
     icon: Users,
     badge: formatNumber(prospectCount),
     active: currentPath.startsWith('/prospects'),
-    children: [
-      { title: 'All Prospects', href: '/prospects', icon: Users },
-    ],
+    children: [{ title: 'All Prospects', href: '/prospects', icon: Users }],
   },
   {
     title: 'Workflow',
@@ -248,7 +249,10 @@ export function Sidebar({
         <div className='flex h-full flex-col'>
           {/* Mobile header */}
           <div className='flex h-16 items-center justify-between px-4 border-b'>
-            <Link to="/dashboard" className='flex items-center gap-2 cursor-pointer'>
+            <Link
+              to='/dashboard'
+              className='flex items-center gap-2 cursor-pointer'
+            >
               <div className='flex items-center justify-center w-8 h-8 bg-primary text-primary-foreground rounded-lg'>
                 <Zap className='h-4 w-4' />
               </div>
@@ -282,7 +286,10 @@ export function Sidebar({
       >
         {/* Desktop header */}
         <div className='flex h-16 items-center px-4 border-b'>
-          <Link to="/dashboard" className='flex items-center gap-2 cursor-pointer'>
+          <Link
+            to='/dashboard'
+            className='flex items-center gap-2 cursor-pointer'
+          >
             <div className='flex items-center justify-center w-8 h-8 bg-primary text-primary-foreground rounded-lg'>
               <Zap className='h-4 w-4' />
             </div>

@@ -61,7 +61,13 @@ interface ProspectData {
   company: string;
   position: string;
   linkedinUrl?: string;
-  status: 'pending' | 'processing' | 'completed' | 'failed' | 'retrying' | 'skipped';
+  status:
+  | 'pending'
+  | 'processing'
+  | 'completed'
+  | 'failed'
+  | 'retrying'
+  | 'skipped';
   progress: number;
   enrichedData?: {
     linkedinSummary?: string;
@@ -129,7 +135,10 @@ export default function BeginEnrichmentStep({
   // Log configuration received from previous steps
   console.log('[Step 3] Initialized with configuration:');
   console.log('  • Prospect Count:', prospectCount);
-  console.log('  • AI Model:', enrichmentConfig?.selectedModel?.name || 'Not specified');
+  console.log(
+    '  • AI Model:',
+    enrichmentConfig?.selectedModel?.name || 'Not specified'
+  );
   console.log('  • CSV Data:', csvFileInfo ? 'Available' : 'Missing');
   console.log('  • Campaign ID:', campaignId || 'Not specified');
 
@@ -172,13 +181,20 @@ export default function BeginEnrichmentStep({
         headerMapping[header] = 'firstName';
       } else if (lowerHeader.includes('last') && lowerHeader.includes('name')) {
         headerMapping[header] = 'lastName';
-      } else if (lowerHeader.includes('name') && !lowerHeader.includes('company')) {
+      } else if (
+        lowerHeader.includes('name') &&
+        !lowerHeader.includes('company')
+      ) {
         headerMapping[header] = 'name';
       } else if (lowerHeader.includes('email')) {
         headerMapping[header] = 'email';
       } else if (lowerHeader.includes('company')) {
         headerMapping[header] = 'company';
-      } else if (lowerHeader.includes('title') || lowerHeader.includes('position') || lowerHeader.includes('role')) {
+      } else if (
+        lowerHeader.includes('title') ||
+        lowerHeader.includes('position') ||
+        lowerHeader.includes('role')
+      ) {
         headerMapping[header] = 'position';
       } else if (lowerHeader.includes('phone')) {
         headerMapping[header] = 'phone';
@@ -191,47 +207,49 @@ export default function BeginEnrichmentStep({
       }
     });
 
-    const previewProspects = rows.map((row: CSVPreviewRow, rowIndex: number) => {
-      const rowData: ProspectData = {
-        id: rowIndex + 1,
-        name: '',
-        email: '',
-        company: '',
-        position: '',
-        status: 'pending',
-        progress: 0,
-        errors: [],
-        retryCount: 0,
-        processingTime: 0,
-        firstName: '',
-        lastName: '',
-        linkedinUrl: '',
-        location: '',
-        phone: ''
-      };
+    const previewProspects = rows.map(
+      (row: CSVPreviewRow, rowIndex: number) => {
+        const rowData: ProspectData = {
+          id: rowIndex + 1,
+          name: '',
+          email: '',
+          company: '',
+          position: '',
+          status: 'pending',
+          progress: 0,
+          errors: [],
+          retryCount: 0,
+          processingTime: 0,
+          firstName: '',
+          lastName: '',
+          linkedinUrl: '',
+          location: '',
+          phone: '',
+        };
 
-      // Map the CSV data using the same logic
-      headers.forEach((header: string) => {
-        const mappedField = headerMapping[header];
-        const value = row[header] || '';
-        if (mappedField) {
-          (rowData as any)[mappedField] = value;
+        // Map the CSV data using the same logic
+        headers.forEach((header: string) => {
+          const mappedField = headerMapping[header];
+          const value = row[header] || '';
+          if (mappedField) {
+            (rowData as any)[mappedField] = value;
+          }
+        });
+
+        // Create proper name field
+        if (rowData.firstName && rowData.lastName && !rowData.name) {
+          rowData.name = `${rowData.firstName} ${rowData.lastName}`.trim();
         }
-      });
 
-      // Create proper name field
-      if (rowData.firstName && rowData.lastName && !rowData.name) {
-        rowData.name = `${rowData.firstName} ${rowData.lastName}`.trim();
+        // Ensure we have fallback values for display
+        rowData.name = rowData.name || rowData.firstName || 'Unknown Name';
+        rowData.email = rowData.email || 'No Email';
+        rowData.company = rowData.company || 'Unknown Company';
+        rowData.position = rowData.position || 'Unknown Position';
+
+        return rowData;
       }
-
-      // Ensure we have fallback values for display
-      rowData.name = rowData.name || rowData.firstName || 'Unknown Name';
-      rowData.email = rowData.email || 'No Email';
-      rowData.company = rowData.company || 'Unknown Company';
-      rowData.position = rowData.position || 'Unknown Position';
-
-      return rowData as ProspectEnrichmentStatus;
-    });
+    );
 
     console.log('[Step 3] Preview prospects loaded:', previewProspects.length);
     setProspects(previewProspects);
@@ -258,37 +276,60 @@ export default function BeginEnrichmentStep({
 
     try {
       // Try to get campaign ID from props first, then from stepData
-      let finalCampaignId = campaignId || stepData?.campaignData?.campaignId || stepData?.campaignData?.id;
+      const finalCampaignId =
+        campaignId ||
+        stepData?.campaignData?.campaignId ||
+        stepData?.campaignData?.id;
 
       console.log('[Step 3] Campaign ID sources:');
       console.log('  • From props:', campaignId);
-      console.log('  • From stepData.campaignData.campaignId:', stepData?.campaignData?.campaignId);
-      console.log('  • From stepData.campaignData.id:', stepData?.campaignData?.id);
+      console.log(
+        '  • From stepData.campaignData.campaignId:',
+        stepData?.campaignData?.campaignId
+      );
+      console.log(
+        '  • From stepData.campaignData.id:',
+        stepData?.campaignData?.id
+      );
       console.log('  • Final Campaign ID:', finalCampaignId);
 
       // Validate that we have either a campaign ID or CSV data
       if (!finalCampaignId && !csvFileInfo?.preview?.rows) {
-        throw new Error('Either campaign ID or valid CSV data is required to start enrichment');
+        throw new Error(
+          'Either campaign ID or valid CSV data is required to start enrichment'
+        );
       }
 
       console.log('[Step 3] Configuring enrichment job:');
       console.log('  • Campaign ID:', finalCampaignId || 'will be created');
-      console.log('  • Prospect Count:', prospects.length > 0 ? prospects.length : prospectCount);
+      console.log(
+        '  • Prospect Count:',
+        prospects.length > 0 ? prospects.length : prospectCount
+      );
       console.log('  • CSV Data:', csvFileInfo ? 'Available' : 'Missing');
-      console.log('  • AI Model:', enrichmentConfig?.selectedModel?.name || 'Not specified');
+      console.log(
+        '  • AI Model:',
+        enrichmentConfig?.selectedModel?.name || 'Not specified'
+      );
       if (!enrichmentConfig) {
         console.log('[Step 3] Error: No enrichment configuration provided');
-        throw new Error('No enrichment configuration provided. Please go back to Step 2 and select an AI model.');
+        throw new Error(
+          'No enrichment configuration provided. Please go back to Step 2 and select an AI model.'
+        );
       }
 
       if (!enrichmentConfig.selectedModel) {
         console.log('[Step 3] Error: No AI model selected in configuration');
-        throw new Error('No LLM model selected. Please go back to Step 2 and select an AI model.');
+        throw new Error(
+          'No LLM model selected. Please go back to Step 2 and select an AI model.'
+        );
       }
 
       if (!enrichmentConfig.selectedModel.id) {
         console.log('[Step 3] Error: No AI model ID found in configuration');
-        throw new Error('No LLM model selected. Please go back to Step 2 and select an AI model.');
+        throw new Error(
+          'No LLM model selected. Please go back to Step 2 and select an AI model.'
+        );
       }
 
       const selectedLLMModel = enrichmentConfig.selectedModel.id;
@@ -296,17 +337,26 @@ export default function BeginEnrichmentStep({
       console.log('[Step 3] AI Model configured:', selectedLLMModel);
 
       // Determine AI provider from the selected model
-      const aiProvider = selectedLLMModel.startsWith('gemini-') ? 'gemini' : 'openrouter';
+      const aiProvider = selectedLLMModel.startsWith('gemini-')
+        ? 'gemini'
+        : 'openrouter';
       console.log('[Step 3] AI Provider detected:', aiProvider);
 
       // Get services from previous step data (enrichment services)
-      const enabledServices = stepData?.campaignData?.enrichmentServices?.filter((service: any) => service.enabled) || [];
+      const enabledServices =
+        stepData?.campaignData?.enrichmentServices?.filter(
+          (service: any) => service.enabled
+        ) || [];
       const serviceNames = enabledServices.map((service: any) => {
         switch (service.id) {
-          case 'company-data': return 'Company';
-          case 'linkedin-profile': return 'LinkedIn';
-          case 'website-technology': return 'TechStack';
-          default: return service.name;
+          case 'company-data':
+            return 'Company';
+          case 'linkedin-profile':
+            return 'LinkedIn';
+          case 'website-technology':
+            return 'TechStack';
+          default:
+            return service.name;
         }
       });
 
@@ -325,7 +375,7 @@ export default function BeginEnrichmentStep({
           retryAttempts: retryAttempts[0] || 2, // Use slider value, default 2
           websitePages: websitePages[0] || 3, // Use slider value, default 3
           services: serviceNames,
-        }
+        },
       };
 
       // Add CSV data if available
@@ -334,35 +384,66 @@ export default function BeginEnrichmentStep({
         const isLocalFallback = csvFileInfo.uploadId?.includes('fallback');
 
         if (isLocalFallback && csvFileInfo.preview?.rows) {
-          console.log('[Step 3] Using local CSV data with', csvFileInfo.preview.rows.length, 'rows');
+          console.log(
+            '[Step 3] Using local CSV data with',
+            csvFileInfo.preview.rows.length,
+            'rows'
+          );
 
           // Transform CSV data to match Prospect interface
-          const csvData: Prospect[] = csvFileInfo.preview.rows.map((row: CSVPreviewRow) => {
-            const name = row.name || `${row.firstName || ''} ${row.lastName || ''}`.trim();
-            const email = row.email || '';
+          const csvData: Prospect[] = csvFileInfo.preview.rows.map(
+            (row: CSVPreviewRow) => {
+              const name =
+                row.name ||
+                `${row.firstName || ''} ${row.lastName || ''}`.trim();
+              const email = row.email || '';
 
-            if (!name || !email) {
-              console.log('[Step 3] Warning: Row missing required name or email:', row);
+              if (!name || !email) {
+                console.log(
+                  '[Step 3] Warning: Row missing required name or email:',
+                  row
+                );
+              }
+
+              const prospect: Prospect = {
+                name: name || 'Unknown',
+                email: email || 'unknown@example.com',
+                ...(row.company && { company: row.company }),
+                ...(row.position || row.title
+                  ? { position: row.position || row.title }
+                  : {}),
+                ...(row.linkedinUrl || row.linkedin
+                  ? { linkedinUrl: row.linkedinUrl || row.linkedin }
+                  : {}),
+                ...(row.phone && { phone: row.phone }),
+                ...(row.location && { location: row.location }),
+                // Add any additional fields that exist in the row
+                ...Object.entries(row).reduce(
+                  (acc, [key, value]) => {
+                    if (
+                      ![
+                        'name',
+                        'email',
+                        'company',
+                        'position',
+                        'title',
+                        'linkedinUrl',
+                        'linkedin',
+                        'phone',
+                        'location',
+                      ].includes(key) &&
+                      value
+                    ) {
+                      acc[key] = value;
+                    }
+                    return acc;
+                  },
+                  {} as Record<string, any>
+                ),
+              };
+              return prospect;
             }
-
-            const prospect: Prospect = {
-              name: name || 'Unknown',
-              email: email || 'unknown@example.com',
-              ...(row.company && { company: row.company }),
-              ...(row.position || row.title ? { position: row.position || row.title } : {}),
-              ...(row.linkedinUrl || row.linkedin ? { linkedinUrl: row.linkedinUrl || row.linkedin } : {}),
-              ...(row.phone && { phone: row.phone }),
-              ...(row.location && { location: row.location }),
-              // Add any additional fields that exist in the row
-              ...Object.entries(row).reduce((acc, [key, value]) => {
-                if (!['name', 'email', 'company', 'position', 'title', 'linkedinUrl', 'linkedin', 'phone', 'location'].includes(key) && value) {
-                  acc[key] = value;
-                }
-                return acc;
-              }, {} as Record<string, any>)
-            };
-            return prospect;
-          });
+          );
 
           console.log('[Step 3] CSV data processed successfully');
           jobConfig.csvData = csvData;
@@ -371,12 +452,18 @@ export default function BeginEnrichmentStep({
           jobConfig.fileId = csvFileInfo.uploadId;
           jobConfig.filename = csvFileInfo.fileName;
         } else {
-          throw new Error('CSV preview data is missing. Please re-upload your CSV file.');
+          throw new Error(
+            'CSV preview data is missing. Please re-upload your CSV file.'
+          );
         }
       }
 
       // Check if we have CSV data from stepData instead
-      if (!jobConfig.csvData && stepData?.csvData?.preview?.rows && stepData?.csvData?.preview?.headers) {
+      if (
+        !jobConfig.csvData &&
+        stepData?.csvData?.preview?.rows &&
+        stepData?.csvData?.preview?.headers
+      ) {
         console.log('[Step 3] Processing CSV data from stepData...');
         const { rows, headers } = stepData.csvData.preview;
 
@@ -397,23 +484,45 @@ export default function BeginEnrichmentStep({
 
           // Create prospect object with proper field mapping
           const prospect: Prospect = {
-            name: rowObj['First Name'] && rowObj['Last Name'] ?
-              `${rowObj['First Name']} ${rowObj['Last Name']}`.trim() :
-              (rowObj['name'] || rowObj['Name'] || `Prospect ${index + 1}`),
+            name:
+              rowObj['First Name'] && rowObj['Last Name']
+                ? `${rowObj['First Name']} ${rowObj['Last Name']}`.trim()
+                : rowObj['name'] || rowObj['Name'] || `Prospect ${index + 1}`,
             email: rowObj['Emails'] || rowObj['Email'] || rowObj['email'] || '',
             ...(rowObj['Company'] && { company: rowObj['Company'] }),
             ...(rowObj['Title'] && { position: rowObj['Title'] }),
-            ...(rowObj['LinkedIn URL'] && { linkedinUrl: rowObj['LinkedIn URL'] }),
+            ...(rowObj['LinkedIn URL'] && {
+              linkedinUrl: rowObj['LinkedIn URL'],
+            }),
             ...(rowObj['Phone'] && { phone: rowObj['Phone'] }),
             ...(rowObj['Location'] && { location: rowObj['Location'] }),
             // Add all other fields as additional data
-            ...Object.entries(rowObj).reduce((acc, [key, value]) => {
-              // Skip already mapped fields
-              if (!['First Name', 'Last Name', 'Emails', 'Email', 'Company', 'Title', 'LinkedIn URL', 'Phone', 'Location', 'name', 'Name', 'email'].includes(key) && value) {
-                acc[key] = value;
-              }
-              return acc;
-            }, {} as Record<string, any>)
+            ...Object.entries(rowObj).reduce(
+              (acc, [key, value]) => {
+                // Skip already mapped fields
+                if (
+                  ![
+                    'First Name',
+                    'Last Name',
+                    'Emails',
+                    'Email',
+                    'Company',
+                    'Title',
+                    'LinkedIn URL',
+                    'Phone',
+                    'Location',
+                    'name',
+                    'Name',
+                    'email',
+                  ].includes(key) &&
+                  value
+                ) {
+                  acc[key] = value;
+                }
+                return acc;
+              },
+              {} as Record<string, any>
+            ),
           };
 
           return prospect;
@@ -431,17 +540,22 @@ export default function BeginEnrichmentStep({
 
       // Validate that we have CSV data
       if (!jobConfig.csvData || jobConfig.csvData.length === 0) {
-        throw new Error('No CSV data available for enrichment. Please ensure prospects were uploaded in Step 1.');
+        throw new Error(
+          'No CSV data available for enrichment. Please ensure prospects were uploaded in Step 1.'
+        );
       }
 
       console.log('[Step 3] Creating enrichment job...');
       console.log('[Step 3] Final JobConfig being sent to API:', {
         ...jobConfig,
-        csvData: jobConfig.csvData ? `${jobConfig.csvData.length} rows` : 'none'
+        csvData: jobConfig.csvData
+          ? `${jobConfig.csvData.length} rows`
+          : 'none',
       });
 
       // Create the enrichment job
-      const jobResponse = await ProspectEnrichmentService.createEnrichmentJob(jobConfig);
+      const jobResponse =
+        await ProspectEnrichmentService.createEnrichmentJob(jobConfig);
       const job = jobResponse.data;
 
       console.log('[Step 3] Enrichment job created:', job.id);
@@ -718,7 +832,15 @@ Jane Smith,jane@company.com,Company Inc,CTO
 
   const setupSSEConnection = (jobId: string) => {
     try {
-      console.log(`📡 [Step 3] Setting up SSE connection for user: ${userId}, job: ${jobId}`);
+      console.log(
+        `📡 [Step 3] Setting up SSE connection for user: ${userId}, job: ${jobId}`
+      );
+
+      // Close any existing connection
+      if (eventSourceRef.current) {
+        console.log('📡 [Step 3] Closing existing SSE connection');
+        eventSourceRef.current.close();
+      }
 
       // Use the user-specific SSE connection for final prospect completion only
       eventSourceRef.current = ProspectEnrichmentService.createSSEConnection(
@@ -733,7 +855,11 @@ Jane Smith,jane@company.com,Company Inc,CTO
                 // Handle job progress updates (batch completion)
                 console.log('[Step 3] Job progress update:', data.status);
 
-                if (data.status === 'completed' || data.status === 'completed_with_errors' || data.status === 'failed') {
+                if (
+                  data.status === 'completed' ||
+                  data.status === 'completed_with_errors' ||
+                  data.status === 'failed'
+                ) {
                   // Job completed - prepare data for Step 4
                   const jobResult = {
                     id: data.jobId,
@@ -743,9 +869,12 @@ Jane Smith,jane@company.com,Company Inc,CTO
                     failedProspects: data.failedProspects,
                     prospects: data.prospects || prospects,
                     progress: Math.min(100, data.progress || 100),
-                    message: data.status === 'completed' ? 'Enrichment completed successfully' :
-                      data.status === 'failed' ? 'Enrichment failed' :
-                        'Enrichment completed with some errors'
+                    message:
+                      data.status === 'completed'
+                        ? 'Enrichment completed successfully'
+                        : data.status === 'failed'
+                          ? 'Enrichment failed'
+                          : 'Enrichment completed with some errors',
                   };
 
                   setJobStatus(prev => {
@@ -753,19 +882,24 @@ Jane Smith,jane@company.com,Company Inc,CTO
                     return {
                       ...prev,
                       id: data.jobId || prev.id,
-                      status: data.status as any,
+                      status: data.status,
                       totalProspects: data.totalProspects,
-                      processedProspects: data.completedProspects + data.failedProspects,
+                      processedProspects:
+                        data.completedProspects + data.failedProspects,
                       completedProspects: data.completedProspects,
                       failedProspects: data.failedProspects,
                       progress: Math.min(100, data.progress || 100),
                       metrics: prev.metrics || {
                         averageProcessingTime: 0,
-                        successRate: data.totalProspects > 0 ? (data.completedProspects / data.totalProspects * 100) : 0,
+                        successRate:
+                          data.totalProspects > 0
+                            ? (data.completedProspects / data.totalProspects) *
+                            100
+                            : 0,
                         enrichmentQuality: 0,
                         costPerProspect: 0.12,
                         totalCost: data.totalProspects * 0.12,
-                      }
+                      },
                     };
                   });
 
@@ -781,13 +915,17 @@ Jane Smith,jane@company.com,Company Inc,CTO
                       concurrency: concurrency[0],
                       retryAttempts: retryAttempts[0],
                       websitePages: websitePages[0],
-                      selectedModel: enrichmentConfig?.selectedModel
+                      selectedModel: enrichmentConfig?.selectedModel,
                     },
-                    ...stepData
+                    ...stepData,
                   };
 
-                  console.log(`[Step 3] Enrichment ${data.status} - proceeding to Step 4`);
-                  console.log(`  • Total: ${data.totalProspects}, Completed: ${data.completedProspects}, Failed: ${data.failedProspects}`);
+                  console.log(
+                    `[Step 3] Enrichment ${data.status} - proceeding to Step 4`
+                  );
+                  console.log(
+                    `  • Total: ${data.totalProspects}, Completed: ${data.completedProspects}, Failed: ${data.failedProspects}`
+                  );
 
                   if (data.status === 'failed') {
                     setError(`Enrichment failed: ${jobResult.message}`);
@@ -800,21 +938,29 @@ Jane Smith,jane@company.com,Company Inc,CTO
 
               case 'prospect-enrichment':
                 // Handle ONLY final prospect completion/failure (no intermediate updates)
-                console.log(`[Step 3] Prospect final result: ${data.prospectId} - ${data.status}`);
+                console.log(
+                  `[Step 3] Prospect final result: ${data.prospectId} - ${data.status}`
+                );
 
                 // Only process completed or error status (final states)
                 if (data.status === 'completed' || data.status === 'error') {
                   // Update specific prospect in the list
                   setProspects(prev =>
                     prev.map(p => {
-                      if (p.id.toString() === data.prospectId || `csv-${p.id - 1}` === data.prospectId) {
+                      if (
+                        p.id.toString() === data.prospectId ||
+                        `csv-${p.id - 1}` === data.prospectId
+                      ) {
                         return {
                           ...p,
-                          status: data.status === 'completed' ? 'completed' : 'failed',
+                          status:
+                            data.status === 'completed'
+                              ? 'completed'
+                              : 'failed',
                           progress: data.status === 'completed' ? 100 : 0,
                           enrichedData: data.enrichmentData || p.enrichedData,
                           errors: data.error ? [data.error] : p.errors,
-                          completedAt: new Date().toISOString()
+                          completedAt: new Date().toISOString(),
                         } as ProspectData;
                       }
                       return p;
@@ -828,37 +974,55 @@ Jane Smith,jane@company.com,Company Inc,CTO
                     const updatedStatus = { ...prev };
 
                     if (data.status === 'completed') {
-                      updatedStatus.completedProspects = (prev.completedProspects || 0) + 1;
+                      updatedStatus.completedProspects =
+                        (prev.completedProspects || 0) + 1;
                     } else if (data.status === 'error') {
-                      updatedStatus.failedProspects = (prev.failedProspects || 0) + 1;
+                      updatedStatus.failedProspects =
+                        (prev.failedProspects || 0) + 1;
                     }
 
-                    const processed = (updatedStatus.completedProspects || 0) + (updatedStatus.failedProspects || 0);
+                    const processed =
+                      (updatedStatus.completedProspects || 0) +
+                      (updatedStatus.failedProspects || 0);
                     // Cap progress at 100% to fix the 150% issue
-                    updatedStatus.progress = Math.min(100, prev.totalProspects > 0 ? Math.round((processed / prev.totalProspects) * 100) : 0);
+                    updatedStatus.progress = Math.min(
+                      100,
+                      prev.totalProspects > 0
+                        ? Math.round((processed / prev.totalProspects) * 100)
+                        : 0
+                    );
 
                     // Auto-transition to Step 4 when all prospects are processed
                     if (processed >= prev.totalProspects) {
-                      console.log('[Step 3] All prospects processed, auto-transitioning to Step 4');
+                      console.log(
+                        '[Step 3] All prospects processed, auto-transitioning to Step 4'
+                      );
 
                       const completeStepData = {
                         enrichmentResults: {
                           id: prev.id,
-                          status: updatedStatus.failedProspects === 0 ? 'completed' : 'completed_with_errors',
+                          status:
+                            updatedStatus.failedProspects === 0
+                              ? 'completed'
+                              : 'completed_with_errors',
                           totalProspects: prev.totalProspects,
-                          completedProspects: updatedStatus.completedProspects || 0,
+                          completedProspects:
+                            updatedStatus.completedProspects || 0,
                           failedProspects: updatedStatus.failedProspects || 0,
                           prospects: prospects,
                           progress: 100,
-                          message: updatedStatus.failedProspects === 0 ? 'Enrichment completed successfully' : 'Enrichment completed with some errors'
+                          message:
+                            updatedStatus.failedProspects === 0
+                              ? 'Enrichment completed successfully'
+                              : 'Enrichment completed with some errors',
                         },
                         enrichmentSettings: {
                           concurrency: concurrency[0],
                           retryAttempts: retryAttempts[0],
                           websitePages: websitePages[0],
-                          selectedModel: enrichmentConfig?.selectedModel
+                          selectedModel: enrichmentConfig?.selectedModel,
                         },
-                        ...stepData
+                        ...stepData,
                       };
 
                       setTimeout(() => {
@@ -888,9 +1052,12 @@ Jane Smith,jane@company.com,Company Inc,CTO
           }
         },
         error => {
-          console.error('SSE connection error:', error);
+          console.error('📡 [Step 3] SSE connection error:', error);
+          console.error('📡 [Step 3] EventSource readyState:', eventSourceRef.current?.readyState);
+          console.error('📡 [Step 3] EventSource URL:', eventSourceRef.current?.url);
           // Don't show error immediately, try to reconnect silently
           setTimeout(() => {
+            console.log('📡 [Step 3] Attempting SSE reconnection...');
             if (jobStatus?.id) {
               setupSSEConnection(jobStatus.id);
             }
@@ -898,8 +1065,18 @@ Jane Smith,jane@company.com,Company Inc,CTO
         }
       );
 
+      // Add connection state logging
+      eventSourceRef.current.addEventListener('open', () => {
+        console.log('📡 [Step 3] SSE connection opened successfully');
+      });
+
+      eventSourceRef.current.addEventListener('error', (event) => {
+        console.error('📡 [Step 3] SSE connection error event:', event);
+        console.error('📡 [Step 3] EventSource readyState:', eventSourceRef.current?.readyState);
+      });
+
     } catch (err) {
-      console.error('Failed to setup SSE connection:', err);
+      console.error('📡 [Step 3] Failed to setup SSE connection:', err);
       setError('Failed to establish real-time connection');
     }
   };
@@ -909,24 +1086,29 @@ Jane Smith,jane@company.com,Company Inc,CTO
     <div className='max-w-6xl mx-auto space-y-6'>
       {/* Page Title */}
       <div className='text-center space-y-2'>
-        <h2 className='text-2xl font-bold text-gray-900'>Prospect Enrichment</h2>
-        <p className='text-gray-600'>Configure and start the enrichment process for {prospectCount} prospects</p>
+        <h2 className='text-2xl font-bold text-gray-900'>
+          Prospect Enrichment
+        </h2>
+        <p className='text-gray-600'>
+          Configure and start the enrichment process for {prospectCount}{' '}
+          prospects
+        </p>
       </div>
 
       {/* Enrichment Settings Section */}
-      <Card className="w-full">
+      <Card className='w-full'>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Settings2 className="h-5 w-5" />
+          <CardTitle className='flex items-center gap-2'>
+            <Settings2 className='h-5 w-5' />
             Enrichment Settings
           </CardTitle>
           <CardDescription>
             Configure how the enrichment process will run
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="space-y-2">
+        <CardContent className='space-y-6'>
+          <div className='grid grid-cols-1 md:grid-cols-3 gap-6'>
+            <div className='space-y-2'>
               <Label>Parallel Processing (1-5)</Label>
               <Slider
                 value={concurrency}
@@ -935,11 +1117,11 @@ Jane Smith,jane@company.com,Company Inc,CTO
                 min={1}
                 step={1}
               />
-              <p className="text-sm text-muted-foreground">
+              <p className='text-sm text-muted-foreground'>
                 Current: {concurrency[0]} parallel processes
               </p>
             </div>
-            <div className="space-y-2">
+            <div className='space-y-2'>
               <Label>LLM API Retry Limit (0-3)</Label>
               <Slider
                 value={retryAttempts}
@@ -948,11 +1130,11 @@ Jane Smith,jane@company.com,Company Inc,CTO
                 min={0}
                 step={1}
               />
-              <p className="text-sm text-muted-foreground">
+              <p className='text-sm text-muted-foreground'>
                 Current: {retryAttempts[0]} retries
               </p>
             </div>
-            <div className="space-y-2">
+            <div className='space-y-2'>
               <Label>Website Pages to Scrape (1-10)</Label>
               <Slider
                 value={websitePages}
@@ -961,32 +1143,32 @@ Jane Smith,jane@company.com,Company Inc,CTO
                 min={1}
                 step={1}
               />
-              <p className="text-sm text-muted-foreground">
+              <p className='text-sm text-muted-foreground'>
                 Current: {websitePages[0]} pages
               </p>
             </div>
           </div>
 
           {/* Start Enrichment Button - Bottom Right */}
-          <div className="flex justify-end pt-4">
+          <div className='flex justify-end pt-4'>
             <Button
               onClick={startEnrichment}
               disabled={disabled || isLoading}
-              className="flex items-center gap-2"
-              size="lg"
+              className='flex items-center gap-2'
+              size='lg'
             >
               {isLoading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
+                <Loader2 className='h-4 w-4 animate-spin' />
               ) : (
-                <Play className="h-4 w-4" />
+                <Play className='h-4 w-4' />
               )}
               Start Enrichment
             </Button>
           </div>
 
           {error && (
-            <Alert variant="destructive" className="mt-4">
-              <AlertCircle className="h-4 w-4" />
+            <Alert variant='destructive' className='mt-4'>
+              <AlertCircle className='h-4 w-4' />
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
@@ -1000,44 +1182,53 @@ Jane Smith,jane@company.com,Company Inc,CTO
     <div className='max-w-6xl mx-auto space-y-6'>
       {/* Page Title */}
       <div className='text-center space-y-2'>
-        <h2 className='text-2xl font-bold text-gray-900'>Prospect Enrichment</h2>
-        <p className='text-gray-600'>Configure and start the enrichment process for {prospectCount} prospects</p>
+        <h2 className='text-2xl font-bold text-gray-900'>
+          Prospect Enrichment
+        </h2>
+        <p className='text-gray-600'>
+          Configure and start the enrichment process for {prospectCount}{' '}
+          prospects
+        </p>
       </div>
 
       {/* Simple Progress Bar */}
-      <Card className="w-full">
-        <CardContent className="pt-6">
-          <div className="space-y-4">
-            <div className="flex justify-between text-sm">
+      <Card className='w-full'>
+        <CardContent className='pt-6'>
+          <div className='space-y-4'>
+            <div className='flex justify-between text-sm'>
               <span>Progress</span>
               <span>{Math.round(jobStatus?.progress || 0)}%</span>
             </div>
-            <Progress value={jobStatus?.progress || 0} className="w-full" />
+            <Progress value={jobStatus?.progress || 0} className='w-full' />
           </div>
         </CardContent>
       </Card>
 
       {/* Success & Failed Cards */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className='grid grid-cols-2 gap-4'>
         <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center space-x-2">
-              <CheckCircle className="h-5 w-5 text-green-500" />
+          <CardContent className='pt-6'>
+            <div className='flex items-center space-x-2'>
+              <CheckCircle className='h-5 w-5 text-green-500' />
               <div>
-                <p className="text-sm font-medium">Success</p>
-                <p className="text-2xl font-bold text-green-600">{jobStatus?.completedProspects || 0}</p>
+                <p className='text-sm font-medium'>Success</p>
+                <p className='text-2xl font-bold text-green-600'>
+                  {jobStatus?.completedProspects || 0}
+                </p>
               </div>
             </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center space-x-2">
-              <XCircle className="h-5 w-5 text-red-500" />
+          <CardContent className='pt-6'>
+            <div className='flex items-center space-x-2'>
+              <XCircle className='h-5 w-5 text-red-500' />
               <div>
-                <p className="text-sm font-medium">Failed</p>
-                <p className="text-2xl font-bold text-red-600">{jobStatus?.failedProspects || 0}</p>
+                <p className='text-sm font-medium'>Failed</p>
+                <p className='text-2xl font-bold text-red-600'>
+                  {jobStatus?.failedProspects || 0}
+                </p>
               </div>
             </div>
           </CardContent>
@@ -1064,7 +1255,9 @@ Jane Smith,jane@company.com,Company Inc,CTO
               Enrichment Job Failed
             </h3>
             <div className='prose prose-sm max-w-none text-red-700'>
-              <ReactMarkdown>{extractDetailedErrorMessage(error)}</ReactMarkdown>
+              <ReactMarkdown>
+                {extractDetailedErrorMessage(error)}
+              </ReactMarkdown>
             </div>
           </div>
         </div>
@@ -1090,13 +1283,18 @@ Jane Smith,jane@company.com,Company Inc,CTO
             setIsStarted(false);
             // Try to load existing prospects for this campaign
             try {
-              const existingProspects = await ProspectEnrichmentService.getProspects(
-                campaignId,
-                undefined
-              );
+              const existingProspects =
+                await ProspectEnrichmentService.getProspects(
+                  campaignId,
+                  undefined
+                );
               if (existingProspects.length > 0) {
                 setProspects(existingProspects);
-                console.log('[Step 3] Loaded', existingProspects.length, 'existing prospects');
+                console.log(
+                  '[Step 3] Loaded',
+                  existingProspects.length,
+                  'existing prospects'
+                );
               }
             } catch (err) {
               console.warn('Could not load existing prospects:', err);
@@ -1138,12 +1336,13 @@ Jane Smith,jane@company.com,Company Inc,CTO
   }
 
   // Show error view if there's a critical error that prevents enrichment
-  if (error && (
-    error.includes('duplicate') ||
-    error.includes('already exist') ||
-    error.includes('No new prospects were created') ||
-    error.includes('No prospects found to enrich')
-  )) {
+  if (
+    error &&
+    (error.includes('duplicate') ||
+      error.includes('already exist') ||
+      error.includes('No new prospects were created') ||
+      error.includes('No prospects found to enrich'))
+  ) {
     return renderErrorView();
   }
 

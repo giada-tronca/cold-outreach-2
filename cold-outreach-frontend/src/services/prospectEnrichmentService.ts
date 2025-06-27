@@ -9,12 +9,12 @@ export interface ProspectEnrichmentStatus {
   position: string;
   linkedinUrl?: string;
   status:
-  | 'pending'
-  | 'processing'
-  | 'completed'
-  | 'failed'
-  | 'retrying'
-  | 'skipped';
+    | 'pending'
+    | 'processing'
+    | 'completed'
+    | 'failed'
+    | 'retrying'
+    | 'skipped';
   progress: number;
   enrichedData?: {
     linkedinSummary?: string;
@@ -32,12 +32,12 @@ export interface ProspectEnrichmentStatus {
 export interface EnrichmentJobStatus {
   id: string;
   status:
-  | 'pending'
-  | 'running'
-  | 'paused'
-  | 'completed'
-  | 'failed'
-  | 'cancelled';
+    | 'pending'
+    | 'running'
+    | 'paused'
+    | 'completed'
+    | 'failed'
+    | 'cancelled';
   totalProspects: number;
   processedProspects: number;
   completedProspects: number;
@@ -126,14 +126,15 @@ export class ProspectEnrichmentService {
         progress: 0,
         errors: [],
         retryCount: 0,
-        processingTime: 0
+        processingTime: 0,
       }));
     }
 
     // Otherwise, try to get prospects from the database
     if (campaignId) params.append('campaignId', campaignId.toString());
     if (batchId) params.append('batchId', batchId.toString());
-    if (workflowSessionId) params.append('workflowSessionId', workflowSessionId);
+    if (workflowSessionId)
+      params.append('workflowSessionId', workflowSessionId);
     if (uploadSession) params.append('uploadSession', uploadSession);
 
     const response = await apiClient.get(`/api/prospects?${params.toString()}`);
@@ -152,11 +153,12 @@ export class ProspectEnrichmentService {
         progress: this.calculateProgress(prospect),
         enrichedData: prospect.enrichment
           ? {
-            linkedinSummary: prospect.enrichment.linkedinSummary,
-            companySummary: prospect.enrichment.companySummary,
-            techStack: prospect.enrichment.techStack,
-            prospectAnalysisSummary: prospect.enrichment.prospectAnalysisSummary,
-          }
+              linkedinSummary: prospect.enrichment.linkedinSummary,
+              companySummary: prospect.enrichment.companySummary,
+              techStack: prospect.enrichment.techStack,
+              prospectAnalysisSummary:
+                prospect.enrichment.prospectAnalysisSummary,
+            }
           : undefined,
         errors: [],
         retryCount: 0,
@@ -260,7 +262,7 @@ export class ProspectEnrichmentService {
     try {
       console.log('📝 Creating enrichment job with config:', {
         ...config,
-        csvData: config.csvData ? `${config.csvData.length} rows` : 'none'
+        csvData: config.csvData ? `${config.csvData.length} rows` : 'none',
       });
 
       // First create a batch to get batchId
@@ -271,8 +273,8 @@ export class ProspectEnrichmentService {
         source: 'csv_upload',
         metadata: {
           filename: config.filename,
-          rowCount: config.csvData?.length || 0
-        }
+          rowCount: config.csvData?.length || 0,
+        },
       });
 
       const batchData = await handleApiResponse(batchResponse);
@@ -286,7 +288,7 @@ export class ProspectEnrichmentService {
         csvData: config.csvData,
         filename: config.filename,
         batchId,
-        configuration: config.configuration
+        configuration: config.configuration,
       });
 
       const jobData = await handleApiResponse(jobResponse);
@@ -294,8 +296,8 @@ export class ProspectEnrichmentService {
         success: true,
         data: {
           ...jobData.data,
-          batchId // Include batchId in response
-        }
+          batchId, // Include batchId in response
+        },
       };
     } catch (error) {
       console.error('Error creating enrichment job:', error);

@@ -90,6 +90,12 @@ export interface EmailGenerationJobData {
   llmModelId?: string;
   templateId?: string;
   customPrompt?: string;
+  configuration?: {
+    language?: string;
+    calendarLink?: string;
+    parallelism?: number;
+    [key: string]: any;
+  };
 }
 
 export interface BatchEnrichmentJobData {

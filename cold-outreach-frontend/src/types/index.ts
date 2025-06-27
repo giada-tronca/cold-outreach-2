@@ -57,13 +57,13 @@ export interface Prospect {
   position?: string;
   linkedinUrl?: string;
   status:
-  | 'PENDING'
-  | 'ENRICHING'
-  | 'ENRICHED'
-  | 'GENERATING'
-  | 'COMPLETED'
-  | 'EMAIL_GENERATED'
-  | 'FAILED';
+    | 'PENDING'
+    | 'ENRICHING'
+    | 'ENRICHED'
+    | 'GENERATING'
+    | 'COMPLETED'
+    | 'EMAIL_GENERATED'
+    | 'FAILED';
   additionalData?: any;
   errorMessage?: string;
   createdAt: string;
@@ -142,13 +142,13 @@ export interface UpdateProspectData {
   position?: string;
   linkedinUrl?: string;
   status?:
-  | 'PENDING'
-  | 'ENRICHING'
-  | 'ENRICHED'
-  | 'GENERATING'
-  | 'COMPLETED'
-  | 'EMAIL_GENERATED'
-  | 'FAILED';
+    | 'PENDING'
+    | 'ENRICHING'
+    | 'ENRICHED'
+    | 'GENERATING'
+    | 'COMPLETED'
+    | 'EMAIL_GENERATED'
+    | 'FAILED';
 }
 
 export interface CreateEnrichmentData {

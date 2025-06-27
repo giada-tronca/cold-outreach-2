@@ -11,7 +11,13 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
-import { Settings as SettingsIcon, Mail, Bell, Shield, Building } from 'lucide-react';
+import {
+  Settings as SettingsIcon,
+  Mail,
+  Bell,
+  Shield,
+  Building,
+} from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { ConfigurationService } from '@/services/configurationService';
 
@@ -78,14 +84,14 @@ export default function Settings() {
                 id='selfCompanyInfo'
                 placeholder='Describe your company, products, services, and value proposition. This information will be used to personalize outreach emails.'
                 value={selfCompanyInfo}
-                onChange={(e) => setSelfCompanyInfo(e.target.value)}
+                onChange={e => setSelfCompanyInfo(e.target.value)}
                 disabled={isLoading}
                 rows={6}
                 className='resize-none'
               />
               <p className='text-sm text-muted-foreground'>
-                This information helps the AI generate more personalized and relevant emails for your prospects.
-                Maximum 5000 characters.
+                This information helps the AI generate more personalized and
+                relevant emails for your prospects. Maximum 5000 characters.
               </p>
             </div>
 
