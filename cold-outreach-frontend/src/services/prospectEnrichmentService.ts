@@ -1,4 +1,4 @@
-import { apiClient, handleApiResponse } from './api';
+import { apiClient, handleApiResponse, getApiUrl } from './api';
 
 // Types for prospect enrichment
 export interface ProspectEnrichmentStatus {
@@ -9,12 +9,12 @@ export interface ProspectEnrichmentStatus {
   position: string;
   linkedinUrl?: string;
   status:
-    | 'pending'
-    | 'processing'
-    | 'completed'
-    | 'failed'
-    | 'retrying'
-    | 'skipped';
+  | 'pending'
+  | 'processing'
+  | 'completed'
+  | 'failed'
+  | 'retrying'
+  | 'skipped';
   progress: number;
   enrichedData?: {
     linkedinSummary?: string;
@@ -32,12 +32,12 @@ export interface ProspectEnrichmentStatus {
 export interface EnrichmentJobStatus {
   id: string;
   status:
-    | 'pending'
-    | 'running'
-    | 'paused'
-    | 'completed'
-    | 'failed'
-    | 'cancelled';
+  | 'pending'
+  | 'running'
+  | 'paused'
+  | 'completed'
+  | 'failed'
+  | 'cancelled';
   totalProspects: number;
   processedProspects: number;
   completedProspects: number;
@@ -153,12 +153,12 @@ export class ProspectEnrichmentService {
         progress: this.calculateProgress(prospect),
         enrichedData: prospect.enrichment
           ? {
-              linkedinSummary: prospect.enrichment.linkedinSummary,
-              companySummary: prospect.enrichment.companySummary,
-              techStack: prospect.enrichment.techStack,
-              prospectAnalysisSummary:
-                prospect.enrichment.prospectAnalysisSummary,
-            }
+            linkedinSummary: prospect.enrichment.linkedinSummary,
+            companySummary: prospect.enrichment.companySummary,
+            techStack: prospect.enrichment.techStack,
+            prospectAnalysisSummary:
+              prospect.enrichment.prospectAnalysisSummary,
+          }
           : undefined,
         errors: [],
         retryCount: 0,
@@ -375,7 +375,7 @@ export class ProspectEnrichmentService {
     onMessage: (event: MessageEvent) => void,
     onError?: (error: Event) => void
   ): EventSource {
-    const sseUrl = `/api/jobs/stream/${userId}`;
+    const sseUrl = getApiUrl(`/api/jobs/stream/${userId}`);
     const eventSource = new EventSource(sseUrl);
 
     eventSource.onmessage = onMessage;
@@ -402,7 +402,7 @@ export class ProspectEnrichmentService {
     onMessage: (event: MessageEvent) => void,
     onError?: (error: Event) => void
   ): EventSource {
-    const sseUrl = `/api/enrichment/jobs/${jobId}/progress`;
+    const sseUrl = getApiUrl(`/api/enrichment/jobs/${jobId}/progress`);
     const eventSource = new EventSource(sseUrl);
 
     eventSource.onmessage = onMessage;

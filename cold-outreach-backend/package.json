@@ -26,11 +26,14 @@
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
+    "db:migrate:deploy": "prisma migrate deploy",
     "db:introspect": "prisma db pull",
     "db:studio": "prisma studio",
     "db:seed": "tsx src/seed.ts",
     "postinstall": "prisma generate",
-    "setup:env": "node scripts/setup-env.js"
+    "setup:env": "node scripts/setup-env.js",
+    "deploy": "npm ci && prisma migrate deploy && prisma generate && npm run build",
+    "deploy:quick-fix": "prisma generate && prisma migrate deploy && npm run build"
   },
   "keywords": [],
   "author": "",

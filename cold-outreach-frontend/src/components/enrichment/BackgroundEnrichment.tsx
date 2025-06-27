@@ -6,6 +6,7 @@ import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { CheckCircle, Clock, AlertCircle, Loader2 } from 'lucide-react';
+import { apiClient, handleApiResponse } from '@/services/api';
 
 interface EnrichmentJob {
   jobId: string;
@@ -65,10 +66,10 @@ const BackgroundEnrichment: React.FC = () => {
     const interval = setInterval(async () => {
       for (const job of activeJobs) {
         try {
-          const response = await fetch(
+          const response = await apiClient.get(
             `/api/prospects/enrich/jobs/${job.jobId}`
           );
-          const data = await response.json();
+          const data = await handleApiResponse(response);
 
           if (data.success) {
             setJobs(prevJobs =>
@@ -94,19 +95,13 @@ const BackgroundEnrichment: React.FC = () => {
     setError(null);
 
     try {
-      const response = await fetch('/api/prospects/enrich/queue', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          ...form,
-          userId: 'user123', // In real app, get from auth context
-          campaignId: 1,
-        }),
+      const response = await apiClient.post('/api/prospects/enrich/queue', {
+        ...form,
+        userId: 'user123', // In real app, get from auth context
+        campaignId: 1,
       });
 
-      const data = await response.json();
+      const data = await handleApiResponse(response);
 
       if (data.success) {
         const newJob: EnrichmentJob = {
@@ -320,17 +315,17 @@ const BackgroundEnrichment: React.FC = () => {
 
                   {(job.status === 'processing' ||
                     job.status === 'pending') && (
-                    <div className='space-y-2'>
-                      <div className='flex justify-between text-sm'>
-                        <span>{job.progress.status}</span>
-                        <span>{job.progress.progress}%</span>
+                      <div className='space-y-2'>
+                        <div className='flex justify-between text-sm'>
+                          <span>{job.progress.status}</span>
+                          <span>{job.progress.progress}%</span>
+                        </div>
+                        <Progress
+                          value={job.progress.progress}
+                          className='w-full'
+                        />
                       </div>
-                      <Progress
-                        value={job.progress.progress}
-                        className='w-full'
-                      />
-                    </div>
-                  )}
+                    )}
 
                   {job.status === 'completed' && job.result && (
                     <Alert>

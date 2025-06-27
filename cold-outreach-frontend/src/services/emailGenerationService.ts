@@ -1,4 +1,4 @@
-import { apiClient, handleApiResponse } from './api';
+import { apiClient, handleApiResponse, getApiUrl } from './api';
 
 // Types for email generation
 export interface EmailGenerationStatus {
@@ -119,7 +119,8 @@ export class EmailGenerationService {
     onMessage: (event: MessageEvent) => void,
     onError?: (error: Event) => void
   ): EventSource {
-    const eventSource = new EventSource(`/api/jobs/stream/${userId}`);
+    const sseUrl = getApiUrl(`/api/jobs/stream/${userId}`);
+    const eventSource = new EventSource(sseUrl);
 
     eventSource.onmessage = onMessage;
 
@@ -141,7 +142,7 @@ export class EmailGenerationService {
     onMessage: (event: MessageEvent) => void,
     onError?: (error: Event) => void
   ): EventSource {
-    const sseUrl = `/api/email-generation/jobs/${jobId}/progress`;
+    const sseUrl = getApiUrl(`/api/email-generation/jobs/${jobId}/progress`);
     const eventSource = new EventSource(sseUrl);
 
     eventSource.onmessage = onMessage;
